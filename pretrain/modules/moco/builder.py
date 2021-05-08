@@ -44,8 +44,7 @@ class ContrastiveModel(nn.Module):
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
 
-        self.mask2d = MaskedCNN(in_channels=self.dim, out_channels=self.dim, kernel_size=3, padding=1)
-        
+        self.avg2d = nn.AvgPool2d(kernel_size=3, padding=1, stride=1)        
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -127,7 +126,7 @@ class ContrastiveModel(nn.Module):
             logits, targets
         """
         batch_size = im_q.size(0)
-        self.mask2d = self.mask2d.to(sal_q.device)
+        self.avg2d = self.avg2d.to(sal_q.device)
 
         q, q_bg = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -174,7 +173,7 @@ class ContrastiveModel(nn.Module):
             object_i = q_i[indexes]                                     # object_i: opixels x dim
             
             with torch.no_grad():
-                local_k = self.mask2d(k)                                     
+                local_k = self.avg2d(k)                                     
                 local_k = local_k.view(-1, self.dim)                        # local_k: HW x dim
                 local_k = local_k[indexes].to(sal_q.device)
                 k_i = k[i].view(-1, self.dim).to(sal_q.device)                  # k_i: HW x dim
@@ -244,20 +243,5 @@ def concat_all_gather(tensor):
     output = torch.cat(tensors_gather, dim=0)
     return output
 
-
-
-class MaskedCNN(nn.Conv2d):
-	def __init__(self, *args, **kwargs):
-		super(MaskedCNN, self).__init__(*args, **kwargs)
-		self.register_buffer('mask', self.weight.data.clone())
-
-		_, self.depth, self.height, self.width = self.weight.size()
-  
-		self.mask.fill_(1/(self.height*self.width))
-    #self.mask[:,:,self.height//2, self.width//2]=0
-
-	def forward(self, x):
-		self.weight.data=self.mask
-		return super(MaskedCNN, self).forward(x)
 
 
