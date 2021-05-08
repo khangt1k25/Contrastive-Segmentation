@@ -170,12 +170,12 @@ class ContrastiveModel(nn.Module):
         for i in range(q.shape[0]):
             # Working with each image
             indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()  # (opixels)
-            q_i = q[i].view(-1, 64)                                 # (H*W, dim)
+            q_i = q[i].view(-1, self.dim)                                 # (H*W, dim)
             object_i = q_i[indexes]                                 # (opixels, dim)
 
             with torch.no_grad():
-                k_i = k[i].view(-1, 64)                                 # (H*W, dim)
-                neighbors_i = k_neighbors[i].view(-1, 64)[indexes]
+                k_i = k[i].view(-1, self.dim)                                 # (H*W, dim)
+                neighbors_i = k_neighbors[i].view(-1, self.dim)[indexes]
 
 
             similarity = torch.matmul(object_i, neighbors_i.T)          # (opixels, opixels)    
@@ -199,7 +199,7 @@ class ContrastiveModel(nn.Module):
         l_labels = torch.zeros(l_logits.shape[0])
       
 
-            
+
 
         # q: pixels x dim
         # k: pixels x dim
