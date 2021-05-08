@@ -165,39 +165,44 @@ class ContrastiveModel(nn.Module):
         
 
         # Compute local contrastive logits, labels
+        with torch.no_grad():
+            k_neighbors = self.avg(k)
+            k_neighbors = k_neighbors.view(k_neighbors.shape[0], k_neighbors.shape[1], -1)
+        
+        q = q.permute((0, 2, 3, 1)).view(q.shape[0], -1, self.dim)
+        k = k.permute((0, 2, 3, 1)).view(k.shape[0], self.dim, -1)
+
+        
+        similarity = torch.bmm(q, k_neighbors)
+        mask = torch.eye(similarity.shape[1], dtype=torch.bool)
+        pos = similarity[:, mask]
+
+        neg = torch.bmm(q, k)
+
         l_logits = []
-        k_neighbors = self.avg(k)
         for i in range(q.shape[0]):
-            # Working with each image
-            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()  # (opixels)
-            q_i = q[i].view(-1, self.dim)                                 # (H*W, dim)
-            object_i = q_i[indexes]                                 # (opixels, dim)
-
-            with torch.no_grad():
-                k_i = k[i].view(-1, self.dim)                                 # (H*W, dim)
-                neighbors_i = k_neighbors[i].view(-1, self.dim)[indexes]
+            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()
+            
+            positive = pos[i][indexes]
 
 
-            similarity = torch.matmul(object_i, neighbors_i.T)          # (opixels, opixels)    
-            mask = torch.eye(indexes.shape[0], dtype=torch.bool)
-            l_positive = similarity[mask].view(indexes.shape[0], -1)
-
-
-            neg = torch.matmul(q_i, k_i.T)
-            l_negative = torch.zeros(size=(indexes.shape[0], num_negatives), dtype=torch.float)
+            negative = torch.zeros(size=(indexes.shape[0], num_negatives), dtype=torch.float)
             a = torch.arange(q_i.shape[0]).float()
             weight = torch.ones_like(a)
             for j in range(indexes.shape[0]):
                 cur_index = indexes[j].item()
                 weight[cur_index] = 0.
                 rand_neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
-                l_negative[j] = neg[cur_index][rand_neg_indexes]
-         
-            l_logits.append(torch.cat([l_positive, l_negative], dim=1))
+                
+                negative[j] = neg[i][cur_index][rand_neg_indexes]
+                
+                weight[cur_index] = 1.
+            
+            logits = torch.cat([positive.view(-1, 1), negative], dim=1)
+            l_logits.append(logits)
 
         l_logits = torch.cat(l_logits, dim=0)
-        l_labels = torch.zeros(l_logits.shape[0])
-      
+        l_labels = torch.zeros(l_logits.shape[0])    
 
 
 
