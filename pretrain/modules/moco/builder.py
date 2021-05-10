@@ -44,7 +44,7 @@ class ContrastiveModel(nn.Module):
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
 
-        self.avg = nn.AvgPool2d(kernel_size=3, padding=1, stride=1)        
+        self.avg2d = nn.AvgPool2d(kernel_size=3, padding=1, stride=1)        
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -117,7 +117,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, num_negatives = 10):
+    def forward(self, im_q, im_k, sal_q, sal_k, num_negatives = 5):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -126,7 +126,7 @@ class ContrastiveModel(nn.Module):
             logits, targets
         """
         batch_size = im_q.size(0)
-        self.avg = self.avg.to(sal_q.device)
+        self.avg2d = self.avg2d.to(sal_q.device)
 
         q, q_bg = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -163,47 +163,47 @@ class ContrastiveModel(nn.Module):
             prototypes_foreground = torch.bmm(k_flat, sal_k).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
         
-
         # Compute local contrastive logits, labels
-        with torch.no_grad():
-            k_neighbors = self.avg(k)
-            k_neighbors = k_neighbors.view(k_neighbors.shape[0], k_neighbors.shape[1], -1)
-        
-        q = q.permute((0, 2, 3, 1)).view(q.shape[0], -1, self.dim)
-        k = k.permute((0, 2, 3, 1)).view(k.shape[0], self.dim, -1)
-
-        
-        similarity = torch.bmm(q, k_neighbors)
-        mask = torch.eye(similarity.shape[1], dtype=torch.bool)
-        pos = similarity[:, mask]
-
-        neg = torch.bmm(q, k)
-
         l_logits = []
         for i in range(q.shape[0]):
-            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()
+            # Working with each image
+            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
+            q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
+            object_i = q_i[indexes]                                     # object_i: opixels x dim
             
-            positive = pos[i][indexes]
+            with torch.no_grad():
+                local_k = self.avg2d(k)                                     
+                local_k = local_k.view(-1, self.dim)[indexes]               # local_k: opixels x dim
+                k_i = k[i].view(-1, self.dim)                               # k_i:   HW x dim
+
+            # local positive
+            similarity = torch.matmul(object_i, local_k.T)
+            mask = torch.eye(object_i.shape[0], dtype=torch.bool)
+            local_positive = similarity[mask].view(object_i.shape[0], -1)
 
 
-            negative = torch.zeros(size=(indexes.shape[0], num_negatives), dtype=torch.float)
+            # local negative
+            neg = torch.matmul(q_i, k_i.T)
+            local_negative = torch.zeros(size=(object_i.shape[0], num_negatives), dtype=torch.float)
             a = torch.arange(q_i.shape[0]).float()
             weight = torch.ones_like(a)
             for j in range(indexes.shape[0]):
+                # random pixels exclude current pixel
                 cur_index = indexes[j].item()
                 weight[cur_index] = 0.
-                rand_neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
-                
-                negative[j] = neg[i][cur_index][rand_neg_indexes]
-                
+                neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
+                local_negative[j] = neg[cur_index][neg_indexes]
                 weight[cur_index] = 1.
-            
-            logits = torch.cat([positive.view(-1, 1), negative], dim=1)
-            l_logits.append(logits)
 
+            local_logits = torch.cat([local_positive, local_negative], dim=1)
+            l_logits.append(local_logits)
+     
+        
         l_logits = torch.cat(l_logits, dim=0)
-        l_labels = torch.zeros(l_logits.shape[0])    
-    
+        l_labels = torch.zeros(l_logits.shape[0])  
+
+      
+
 
 
         # q: pixels x dim
