@@ -203,7 +203,7 @@ class ContrastiveModel(nn.Module):
 
         l_logits = torch.cat(l_logits, dim=0)
         l_labels = torch.zeros(l_logits.shape[0])    
-
+    
 
 
         # q: pixels x dim
