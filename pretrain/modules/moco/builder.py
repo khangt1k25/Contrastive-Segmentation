@@ -167,25 +167,30 @@ class ContrastiveModel(nn.Module):
         
         # ver1: hard computational  
         # l_logits = []
+        # kernel = 3
         # for i in range(q.shape[0]):
         #     # Working with each image
         #     indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
         #     q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
         #     object_i = q_i[indexes]                                     # object_i: opixels x dim
             
-        #     with torch.no_grad():
-        #         local_k = self.avg2d(k)                                     
-        #         local_k = local_k.view(-1, self.dim)[indexes]               # local_k: opixels x dim
-        #         k_i = k[i].view(-1, self.dim)                               # k_i:   HW x dim
+        #     local_i = F.avg_pool2d(q[i], kernel_size=kernel, stride=1, padding=1)
+        #     local_i = local_i.view(-1, self.dim)[indexes]
+
+        #     # with torch.no_grad():
+        #     #     local_k = F.avg_pool2d(k)                                     
+        #     #     local_k = local_k.view(-1, self.dim)[indexes]               # local_k: opixels x dim
+        #     #     k_i = k[i].view(-1, self.dim)                               # k_i:   HW x dim
+
 
         #     # local positive
-        #     similarity = torch.matmul(object_i, local_k.T)
+        #     similarity = torch.matmul(object_i, local_i.T)
         #     mask = torch.eye(object_i.shape[0], dtype=torch.bool)
         #     local_positive = similarity[mask].view(object_i.shape[0], -1)
 
 
         #     # local negative
-        #     neg = torch.matmul(q_i, k_i.T)
+        #     neg = torch.matmul(q_i, q_i.T)
         #     local_negative = torch.zeros(size=(object_i.shape[0], num_negatives), dtype=torch.float)
         #     a = torch.arange(q_i.shape[0]).float()
         #     weight = torch.ones_like(a)
@@ -199,8 +204,8 @@ class ContrastiveModel(nn.Module):
 
         #     local_logits = torch.cat([local_positive, local_negative], dim=1)
         #     l_logits.append(local_logits)
-     
-        
+
+
         # l_logits = torch.cat(l_logits, dim=0)
         # l_labels = torch.zeros(l_logits.shape[0])  
         # end ver1
