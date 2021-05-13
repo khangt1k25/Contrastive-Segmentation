@@ -45,7 +45,7 @@ class ContrastiveModel(nn.Module):
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
 
-        self.avg2d = nn.AvgPool2d(kernel_size=3, padding=1, stride=1)        
+              
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
