@@ -218,7 +218,7 @@ class ContrastiveModel(nn.Module):
         for i in range(q.shape[0]):
             # Working with each image
             q_i = q[i]                         
-            k_i = k[i]
+            #k_i = k[i]
             indexes = torch.nonzero(sal_q[i])  #[opixels, 2]
             indexes_range = torch.nonzero((sal_q[i]).view(-1)).squeeze()       #[opixels]
           
@@ -236,14 +236,14 @@ class ContrastiveModel(nn.Module):
                   positive = torch.Tensor([torch.dot(q_i[:,row, col], q_i[:, pos_row, pos_col])]).to(sal_q.device)
                   
                   # get negatives
-                  k_i_flat = k_i.view(k_i.shape[0], -1)
+                  q_i_flat = q_i.view(q_i.shape[0], -1)
                   a = torch.arange(self.H*self.W).float()
                   weight = torch.ones_like(a)
                   cur_index = indexes_range[j]
                   weight[cur_index] = 0.
                   neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
 
-                  negative = torch.matmul(q_i[:,row, col], k_i_flat[:,neg_indexes]).to(sal_q.device) 
+                  negative = torch.matmul(q_i[:,row, col], q_i_flat[:,neg_indexes]).to(sal_q.device) 
 
                   logit = torch.cat([positive, negative])
                   
