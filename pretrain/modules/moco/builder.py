@@ -178,10 +178,6 @@ class ContrastiveModel(nn.Module):
         #     local_i = F.avg_pool2d(q[i], kernel_size=kernel, stride=1, padding=1)
         #     local_i = local_i.view(-1, self.dim)[indexes]
 
-        #     # with torch.no_grad():
-        #     #     local_k = F.avg_pool2d(k)                                     
-        #     #     local_k = local_k.view(-1, self.dim)[indexes]               # local_k: opixels x dim
-        #     #     k_i = k[i].view(-1, self.dim)                               # k_i:   HW x dim
 
 
         #     # local positive
@@ -210,7 +206,8 @@ class ContrastiveModel(nn.Module):
         # l_logits = torch.cat(l_logits, dim=0)
         # l_labels = torch.zeros(l_logits.shape[0])  
         # end ver1
-      
+
+        
         # ver2: lightly computational 
         self.H, self.W = q.shape[2], q.shape[3]
         x_step =  [1, -1, 0, 0]
