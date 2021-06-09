@@ -67,7 +67,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-        break
+       
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):

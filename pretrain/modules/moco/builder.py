@@ -127,7 +127,7 @@ class ContrastiveModel(nn.Module):
             logits, targets
         """
         batch_size = im_q.size(0)
-        self.avg2d = self.avg2d.to(sal_q.device)
+ 
 
         q, q_bg = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -165,102 +165,43 @@ class ContrastiveModel(nn.Module):
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
         
         # Compute local contrastive logits, labels
-        
-        # ver1: hard computational  
-        # l_logits = []
-        # kernel = 3
-        # for i in range(q.shape[0]):
-        #     # Working with each image
-        #     indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
-        #     q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
-        #     object_i = q_i[indexes]                                     # object_i: opixels x dim
-            
-        #     local_i = F.avg_pool2d(q[i], kernel_size=kernel, stride=1, padding=1)
-        #     local_i = local_i.view(-1, self.dim)[indexes]
-
-
-
-        #     # local positive
-        #     similarity = torch.matmul(object_i, local_i.T)
-        #     mask = torch.eye(object_i.shape[0], dtype=torch.bool)
-        #     local_positive = similarity[mask].view(object_i.shape[0], -1)
-
-
-        #     # local negative
-        #     neg = torch.matmul(q_i, q_i.T)
-        #     local_negative = torch.zeros(size=(object_i.shape[0], num_negatives), dtype=torch.float)
-        #     a = torch.arange(q_i.shape[0]).float()
-        #     weight = torch.ones_like(a)
-        #     for j in range(indexes.shape[0]):
-        #         # random pixels exclude current pixel
-        #         cur_index = indexes[j].item()
-        #         weight[cur_index] = 0.
-        #         neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
-        #         local_negative[j] = neg[cur_index][neg_indexes]
-        #         weight[cur_index] = 1.
-
-        #     local_logits = torch.cat([local_positive, local_negative], dim=1)
-        #     l_logits.append(local_logits)
-
-
-        # l_logits = torch.cat(l_logits, dim=0)
-        # l_labels = torch.zeros(l_logits.shape[0])  
-        # end ver1
-
-        
-        # ver2: lightly computational 
-        self.H, self.W = q.shape[2], q.shape[3]
-        x_step =  [1, -1, 0, 0]
-        y_step =  [0, 0, 1, -1]
         l_logits = []
+        kernel = 3
         for i in range(q.shape[0]):
             # Working with each image
-            q_i = q[i]                         
-            #k_i = k[i]
-            indexes = torch.nonzero(sal_q[i])  #[opixels, 2]
-            indexes_range = torch.nonzero((sal_q[i]).view(-1)).squeeze()       #[opixels]
-          
-            for j in range(indexes.shape[0]):
-                  row, col = indexes[j].cpu().numpy()
-                  # get a positive
-                  pos_row, pos_col = row, col
-                  while True:
-                      tmp = random.randint(0, 3)
-                      pos_row, pos_col = pos_row+x_step[tmp], pos_col+y_step[tmp]
-                      if pos_row >= 0 and pos_row < self.H and pos_col >=0 and pos_col < self.W:
-                        break
-                      pos_row, pos_col = row, col
-                  
-                  positive = torch.Tensor([torch.dot(q_i[:,row, col], q_i[:, pos_row, pos_col])]).to(sal_q.device)
-                  
-                  # get negatives
-                  q_i_flat = q_i.view(q_i.shape[0], -1)
-                  a = torch.arange(self.H*self.W).float()
-                  weight = torch.ones_like(a)
-                  cur_index = indexes_range[j]
-                  weight[cur_index] = 0.
-                  neg_indexes = a[torch.multinomial(weight, num_samples=num_negatives)].long()
+            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
+            q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
+            object_i = q_i[indexes]                                     # object_i: opixels x dim
+            
+            local_i = F.avg_pool2d(q[i], kernel_size=kernel, stride=1, padding=1)
+            local_i = local_i.view(-1, self.dim)[indexes]
 
-                  negative = torch.matmul(q_i[:,row, col], q_i_flat[:,neg_indexes]).to(sal_q.device) 
 
-                  logit = torch.cat([positive, negative])
-                  
-                
-                  l_logits.append(logit)
+            # local positive
+            local_positive  = torch.einsum('ij,ji->i', object_i, local_i.T)  # [opixels]
 
-        l_logits = torch.stack(l_logits)
-        l_labels = torch.zeros(l_logits.shape[0])      
-        
-        # end ver2 
+
+            # local negative
+            neg_indexes = torch.randint(low=0, high=q_i.shape[0], size=(indexes.shape[0], num_negatives))
+            neg = q_i[neg_indexes]
+            local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
+            
+
+            local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
+
+            l_logits.append(local_logits)
+
+        l_logits = torch.cat(l_logits, dim=0)
+        l_labels = torch.zeros(l_logits.shape[0])  
 
 
         # q: pixels x dim
         # k: pixels x dim
         # prototypes_k: proto x dim
         q = torch.index_select(q_flat, index=mask_indexes, dim=0)
-        l_batch = torch.matmul(q_flat, prototypes.t())   # shape: pixels x proto
+        l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
         negatives = self.queue.clone().detach()          # shape: dim x negatives
-        l_mem = torch.matmul(q_flat, negatives)          # shape: pixels x negatives (Memory bank)
+        l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
 
         # apply temperature
