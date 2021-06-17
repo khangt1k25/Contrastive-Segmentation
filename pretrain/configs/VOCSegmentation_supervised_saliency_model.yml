@@ -7,10 +7,10 @@ train_db_name: VOCSegmentation
 train_db_kwargs:
    saliency: supervised_model
 num_workers: 8
-train_batch_size: 64
+train_batch_size: 32
 
 # Model
-backbone: resnet50
+backbone: resnet18
 backbone_kwargs:
    dilated: True
    pretraining: imagenet_classification 
@@ -24,7 +24,7 @@ head: deeplab
 freeze_layers: True 
 
 # Optimizer
-epochs: 40
+epochs: 45
 optimizer: sgd
 optimizer_kwargs:
    lr: 0.004

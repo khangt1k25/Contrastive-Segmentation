@@ -1,5 +1,5 @@
 # Code referenced from https://github.com/facebookresearch/astmt
-
+import sys
 import numpy as np
 import torch
 import torch.nn as nn
@@ -55,3 +55,31 @@ class BalancedCrossEntropyLoss(Module):
             final_loss /= labels.size()[0]
 
         return final_loss
+
+
+
+def IIC_Loss(y, y_neighbor,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
+    p_i_j = y.unsqueeze(2) * y_neighbor.unsqueeze(1)  # bn, k, k
+
+    p_i_j = p_i_j.mean(dim=0)
+
+    
+    # Symmetric
+    p_i_j = (p_i_j + p_i_j.t()) / 2.0
+    assert p_i_j.size() == (C, C)
+
+
+    # Nan problem fix:
+    mask = ((p_i_j > EPS).data).type(torch.float32)
+    p_i_j = p_i_j * mask + EPS * (1 - mask)
+
+    # Computing the marginals
+    p_i = p_i_j.sum(dim=1).view(C, 1).expand(C, C)
+    p_j = p_i_j.sum(dim=0).view(1, C).expand(C, C)
+
+    # Compute the mutual information
+    loss = -p_i_j * (torch.log(p_i_j) - lamb * torch.log(p_j) - lamb * torch.log(p_i))
+
+    loss = torch.sum(loss)
+
+    return loss 

@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import random
 
 from utils.common_config import get_model
-from modules.losses import BalancedCrossEntropyLoss
+from modules.losses import BalancedCrossEntropyLoss, IIC_Loss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -118,7 +118,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, num_negatives = 5):
+    def forward(self, im_q, im_k, sal_q, sal_k, kernel=3, num_negatives = 48, C=20, lamb=1.):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -126,10 +126,11 @@ class ContrastiveModel(nn.Module):
         Output:
             logits, targets
         """
+        self.C = C
         batch_size = im_q.size(0)
  
 
-        q, q_bg = self.model_q(im_q)                      # queries: B x dim x H x W
+        q, q_bg, y_q = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
         
         q_flat = q.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
@@ -144,6 +145,18 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
+
+        # compute icc loss
+        y_neighbors = F.avg_pool2d(y_q, kernel_size=kernel, stride=1, padding=1)
+        y_q = y_q.permute((0, 2, 3, 1))                  
+        y_q = torch.reshape(y_q, [-1, self.C])
+        y_neighbors = y_neighbors.permute((0, 2, 3, 1))                  
+        y_neighbors = torch.reshape(y_neighbors, [-1, self.C])
+        
+        y_q = torch.index_select(y_q, index=mask_indexes, dim=0)
+        y_neighbors = torch.index_select(y_neighbors, index=mask_indexes, dim=0)
+    
+        icc_loss = IIC_Loss(y_q, y_neighbors, self.C)
 
         # compute key prototypes
         with torch.no_grad():  # no gradient to keys
@@ -166,7 +179,6 @@ class ContrastiveModel(nn.Module):
         
         # Compute local contrastive logits, labels
         l_logits = []
-        kernel = 3
         for i in range(q.shape[0]):
             # Working with each image
             indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
@@ -211,7 +223,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, l_logits, l_labels, sal_loss
+        return logits, tmp, l_logits, l_labels, sal_loss, icc_loss
 
 
 
