@@ -165,7 +165,7 @@ class ContrastiveModel(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k, _ = self.model_k(im_k)  # keys: N x C x H x W
+            k, _, oops = self.model_k(im_k)  # keys: N x C x H x W
             k = nn.functional.normalize(k, dim=1)
 
             # undo shuffle
