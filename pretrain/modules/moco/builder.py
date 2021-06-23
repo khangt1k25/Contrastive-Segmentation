@@ -130,7 +130,7 @@ class ContrastiveModel(nn.Module):
         batch_size = im_q.size(0)
  
 
-        q, q_bg, _ = self.model_q(im_q)                      # queries: B x dim x H x W
+        q, q_bg, y_q = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
         
         q_flat = q.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
@@ -146,6 +146,17 @@ class ContrastiveModel(nn.Module):
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
 
+        # compute icc loss
+        y_neighbors = F.avg_pool2d(y_q, kernel_size=kernel, stride=1, padding=1)
+        y_q = y_q.permute((0, 2, 3, 1))                  
+        y_q = torch.reshape(y_q, [-1, self.C])
+        y_neighbors = y_neighbors.permute((0, 2, 3, 1))                  
+        y_neighbors = torch.reshape(y_neighbors, [-1, self.C])
+        
+        y_q = torch.index_select(y_q, index=mask_indexes, dim=0)
+        y_neighbors = torch.index_select(y_neighbors, index=mask_indexes, dim=0)
+    
+        icc_loss = IIC_Loss(y_q, y_neighbors, self.C)
 
         # compute key prototypes
         with torch.no_grad():  # no gradient to keys
@@ -166,26 +177,24 @@ class ContrastiveModel(nn.Module):
             prototypes_foreground = torch.bmm(k_flat, sal_k).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
         
-        # Local with background 
+        # Compute local contrastive logits, labels
         l_logits = []
         for i in range(q.shape[0]):
             # Working with each image
-            one_indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
-            zero_indexes = torch.nonzero((1-sal_q[i]).view(-1)).squeeze()
-
+            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
             q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
-            object_i = q_i[one_indexes]                            # object_i: opixels x dim
+            object_i = q_i[indexes]                                     # object_i: opixels x dim
             
             local_i = F.avg_pool2d(q[i], kernel_size=kernel, stride=1, padding=1)
-            local_i = local_i.view(-1, self.dim)[one_indexes]
+            local_i = local_i.view(-1, self.dim)[indexes]
+
+
             # local positive
             local_positive  = torch.einsum('ij,ji->i', object_i, local_i.T)  # [opixels]
 
 
             # local negative
-            neg_indexes = torch.randint(low=0, high=zero_indexes.shape[0], size=(one_indexes.shape[0] * num_negatives, ))
-            neg_indexes = zero_indexes[neg_indexes].view(-1, num_negatives)
-            
+            neg_indexes = torch.randint(low=0, high=q_i.shape[0], size=(indexes.shape[0], num_negatives))
             neg = q_i[neg_indexes]
             local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
             
@@ -193,13 +202,11 @@ class ContrastiveModel(nn.Module):
             local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
 
             l_logits.append(local_logits)
-            
 
         l_logits = torch.cat(l_logits, dim=0)
-        l_labels = torch.zeros(l_logits.shape[0], dtype=torch.long).to(sal_q.device)  
+        l_labels = torch.zeros(l_logits.shape[0])  
 
 
-        
         # q: pixels x dim
         # k: pixels x dim
         # prototypes_k: proto x dim
@@ -216,7 +223,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, l_logits, l_labels, sal_loss 
+        return logits, tmp, l_logits, l_labels, sal_loss, icc_loss
 
 
 
