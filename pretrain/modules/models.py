@@ -11,7 +11,7 @@ from torch.nn import functional as F
     ContrastiveSegmentationModel
 """
 class ContrastiveSegmentationModel(nn.Module):
-    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, use_y_head=True, C=20):
+    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, use_y_head=False, C=20):
         super(ContrastiveSegmentationModel, self).__init__()
         self.backbone = backbone
         self.upsample = upsample
@@ -33,7 +33,7 @@ class ContrastiveSegmentationModel(nn.Module):
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
         if self.use_y_head:
-            self.y_head = nn.Conv1d(self.head.in_channels, self.C, 1, bias=False)
+            self.y_head = nn.Conv2d(self.head.in_channels, self.C, 1, bias=False)
 
 
     def forward(self, x):
@@ -62,7 +62,6 @@ class ContrastiveSegmentationModel(nn.Module):
         # Return outputs
         if self.use_classification_head and self.use_y_head:
             return x, sal.squeeze(), y
-        
         elif self.use_classification_head:
             return x, sal.squeeze()
         elif self.use_y_head:

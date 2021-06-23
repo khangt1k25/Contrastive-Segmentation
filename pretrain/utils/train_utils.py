@@ -11,12 +11,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     local_losses = AverageMeter('Local', ':.4e')
-    icc_losses = AverageMeter('ICC', ':.4e')
+    #icc_losses = AverageMeter('ICC', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, local_losses, icc_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, local_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -30,7 +30,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels,l_logits, l_labels, icc_loss, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, l_logits, l_labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -50,7 +50,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         loss = contrastive_loss + local_loss + saliency_loss 
         contrastive_losses.update(contrastive_loss.item())
         local_losses.update(local_loss.item())
-        icc_losses.update(icc_loss.item())
+        #icc_losses.update(icc_loss.item())
 
         saliency_losses.update(saliency_loss.item())
         losses.update(loss.item())
@@ -73,7 +73,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-            save_plot_curve(contrastive_losses, local_losses, icc_losses, saliency_losses, losses)
+            save_plot_curve(contrastive_losses, local_losses, saliency_losses, losses)
        
 
 @torch.no_grad()
@@ -85,13 +85,13 @@ def accuracy(output, target, topk=(1,)):
     correct = pred.eq(target.view(1, -1).expand_as(pred))
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
 
 def save_plot_curve(
-    contrastive_losses, local_losses, icc_losses, saliency_losses, losses,
+    contrastive_losses, local_losses, saliency_losses, losses,
     path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/'):
 
     with open(path+'cl.txt', 'a') as f:
@@ -100,9 +100,9 @@ def save_plot_curve(
     with open(path+'localcl.txt', 'a') as f:  
         f.write(str(local_losses.avg))
         f.write("\n")
-    with open(path + 'iic.txt', 'a') as f:
-        f.write(str(icc_losses.avg))
-        f.write("\n")
+    # with open(path + 'iic.txt', 'a') as f:
+    #     f.write(str(icc_losses.avg))
+    #     f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
         f.write(str(saliency_losses.avg))
         f.write("\n")
