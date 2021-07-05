@@ -12,7 +12,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     #local_losses = AverageMeter('Local', ':.4e')
     #icc_losses = AverageMeter('ICC', ':.4e')
-    cluster_losses = AverageMeter('Contrastive', ':.4e')
+    cluster_losses = AverageMeter('Cluster', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')

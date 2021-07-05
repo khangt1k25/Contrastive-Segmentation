@@ -47,7 +47,7 @@ class ContrastiveModel(nn.Module):
         self.C = p['model_kwargs']['C']
         self.smooth_prob = p['model_kwargs']['smooth_prob']
         self.smooth_coeff = p['model_kwargs']['smooth_coeff']
-        self.cons_y = CatInstConsistency(reduction="mean", cons_type="neg_log_dt_prod")
+        self.cons_y = CatInstConsistency(reduction="mean", cons_type="neg_log_dot_prod")
 
               
 
@@ -202,7 +202,7 @@ class ContrastiveModel(nn.Module):
 
         cluster_loss = self.cons_y(py_1_smt, py_2_smt) - 1.0 * entropy
 
-        
+
 
         ''' Compute local contrastive logits, labels '''
         # l_logits = []
