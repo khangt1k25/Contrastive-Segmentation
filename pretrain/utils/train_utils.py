@@ -10,13 +10,14 @@ from utils.utils import AverageMeter, ProgressMeter, freeze_layers
 def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
-    local_losses = AverageMeter('Local', ':.4e')
-    icc_losses = AverageMeter('ICC', ':.4e')
+    #local_losses = AverageMeter('Local', ':.4e')
+    #icc_losses = AverageMeter('ICC', ':.4e')
+    cluster_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, local_losses, icc_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, cluster_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -30,7 +31,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels,l_logits, l_labels, icc_loss, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, saliency_loss, cluster_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -42,16 +43,21 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                                             reduction='mean')
       
         ## Calculate local contrastive loss
-        local_loss = cross_entropy(l_logits, l_labels, reduction='mean')
+        # uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
+        # p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+        # p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
+        # p_class_local[uniq] = p_class_non_zero_classes_local
+        # w_class_local = 1 / torch.log(1.02 + p_class_local)
+        # local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
 
 
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + local_loss + saliency_loss 
+        loss = contrastive_loss + saliency_loss + cluster_loss 
         contrastive_losses.update(contrastive_loss.item())
-        local_losses.update(local_loss.item())
-        icc_losses.update(icc_loss.item())
-
+        cluster_losses.update(cluster_loss.item())
+        # local_losses.update(local_loss.item())
+        # icc_losses.update(icc_loss.item())   
         saliency_losses.update(saliency_loss.item())
         losses.update(loss.item())
 
@@ -73,7 +79,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-            save_plot_curve(contrastive_losses, local_losses, icc_losses, saliency_losses, losses)
+            save_plot_curve(contrastive_losses=contrastive_losses, 
+                            saliency_losses=saliency_loss,
+                            cluster_losses=cluster_losses,
+                            losses=losses
+                            )
        
 
 @torch.no_grad()
@@ -91,17 +101,20 @@ def accuracy(output, target, topk=(1,)):
 
 
 def save_plot_curve(
-    contrastive_losses, local_losses, icc_losses, saliency_losses, losses,
+    contrastive_losses, saliency_losses, cluster_losses, losses,
     path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/'):
 
     with open(path+'cl.txt', 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
-    with open(path+'localcl.txt', 'a') as f:  
-        f.write(str(local_losses.avg))
-        f.write("\n")
-    with open(path + 'iic.txt', 'a') as f:
-        f.write(str(icc_losses.avg))
+    # with open(path+'localcl.txt', 'a') as f:  
+    #     f.write(str(local_losses.avg))
+    #     f.write("\n")
+    # with open(path + 'iic.txt', 'a') as f:
+    #     f.write(str(icc_losses.avg))
+    #     f.write("\n")
+    with open(path + 'cluster.txt', 'a') as f:
+        f.write(str(cluster_losses.avg))
         f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
         f.write(str(saliency_losses.avg))

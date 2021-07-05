@@ -15,7 +15,7 @@ from termcolor import colored
 from joblib import Parallel, delayed
 from sklearn import metrics
 
-N_JOBS = 16 # set to number of threads
+N_JOBS = 1 # set to number of threads
 
 
 def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=True):

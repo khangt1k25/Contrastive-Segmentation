@@ -76,7 +76,9 @@ def get_model(p):
     from modules.models import ContrastiveSegmentationModel
     return ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                 p['model_kwargs']['upsample'], 
-                                                p['model_kwargs']['use_classification_head'])
+                                                p['model_kwargs']['use_classification_head'],
+                                                p['model_kwargs']['use_cluster_head'],
+                                                p['model_kwargs']['C'])
 
 
 def get_train_dataset(p, transform=None):

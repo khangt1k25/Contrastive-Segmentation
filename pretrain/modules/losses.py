@@ -58,6 +58,54 @@ class BalancedCrossEntropyLoss(Module):
 
 
 
+class CatInstConsistency:
+    def __init__(self, reduction="mean", cons_type="neg_log_dot_prod"):
+        assert reduction in ("none", "mean", "sum"), f"reduction={reduction}!"
+        self.reduction = reduction
+
+        possible_cons_types = ("xent", "jsd", "l2", "l1",
+                               "neg_dot_prod", "neg_log_dot_prod")
+        assert cons_type in possible_cons_types, \
+            f"cons_type must be in {possible_cons_types}. Found {cons_type}!"
+        self.cons_type = cons_type
+
+    def get_cons(self, p_1, p_2):
+        cons_type = self.cons_type
+
+        if cons_type == "neg_log_dot_prod":
+            cons = -(p_1 * p_2).sum(-1).log()
+        elif cons_type == "neg_dot_prod":
+            cons = -(p_1 * p_2).sum(-1)
+        elif cons_type == "xent":
+            cons = -(p_1.detach() * p_2.log()).sum(-1) \
+                   -(p_2.detach() * p_1.log()).sum(-1)
+            cons = cons * 0.5
+        elif cons_type == "jsd":
+            p_avg = 0.5 * (p_1 + p_2)
+
+            cons = 0.5 * ((p_1 * (p_1.log() - p_avg.log())).sum(-1) +
+                          (p_2 * (p_2.log() - p_avg.log())).sum(-1))
+        elif cons_type == "l2":
+            cons = (p_1 - p_2).pow(2).sum(-1)
+        elif cons_type == "l1":
+            cons = (p_1 - p_2).abs().sum(-1)
+        else:
+            raise ValueError(f"Do not support cons_type={cons_type}!")
+
+        return cons
+
+    def __call__(self, p_1, p_2):
+        loss = self.get_cons(p_1, p_2)
+        print(loss.shape)
+        if self.reduction == "mean":
+            loss = loss.mean(0)
+        elif self.reduction == "sum":
+            loss = loss.sum(0)
+
+        return loss
+
+
+
 def IIC_Loss(y, y_neighbor,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
     p_i_j = y.unsqueeze(2) * y_neighbor.unsqueeze(1)  # bn, k, k
 
