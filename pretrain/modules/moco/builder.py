@@ -176,10 +176,12 @@ class ContrastiveModel(nn.Module):
             
             # prototypes cluster
             y_k = torch.softmax(y_k, dim=1)
-            y_k = torch.reshape(batch_size, -1, 1).type(k.dtype)
+            y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
             prototypes_cluster = torch.bmm(y_k, sal_k).squeeze()
-            prototypes_cluster  = prototypes_cluster/prototypes_cluster[0].sum()
-            
+         
+            prototypes_cluster = prototypes_cluster.t()/prototypes_cluster.sum(dim=1)  # norm
+            prototypes_cluster = prototypes_cluster.t()
+            prototypes_cluster = prototypes_cluster[tmp_for_cluster]
 
         '''Compute cluster loss'''
         y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
