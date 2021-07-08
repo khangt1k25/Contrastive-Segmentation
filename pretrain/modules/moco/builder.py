@@ -202,7 +202,27 @@ class ContrastiveModel(nn.Module):
         entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
                                     (py_avg_2 * py_avg_2.log()).sum(0))
 
-        cluster_loss = self.cons_y(py_1_smt, py_2_smt) - 1.0 * entropy
+        zero = torch.zeros([], dtype=torch.float32,
+                           device=q.device, requires_grad=False)
+        min_rate=0.7
+        max_rate=1.3
+        lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
+        lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
+        lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
+                              (py_avg_2 * lower_clamp_coeff_2).sum(0))
+        tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
+                                      lower_clamp_coeff_2.pow(2).sum(0))
+
+
+        upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
+        upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
+        upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
+                              (py_avg_2 * upper_clamp_coeff_2).sum(0))
+        tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
+                                      upper_clamp_coeff_2.pow(2).sum(0))
+        
+
+        cluster_loss = self.cons_y(py_1_smt, py_2_smt)+ 0.01*lower_clamp + 0.01* upper_clamp - 5.0 * entropy
 
 
 

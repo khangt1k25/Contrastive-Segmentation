@@ -53,7 +53,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + cluster_loss 
+        loss = contrastive_loss + saliency_loss + 0.1*cluster_loss 
         contrastive_losses.update(contrastive_loss.item())
         cluster_losses.update(cluster_loss.item())
         # local_losses.update(local_loss.item())
