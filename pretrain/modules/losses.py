@@ -96,7 +96,7 @@ class CatInstConsistency:
 
     def __call__(self, p_1, p_2):
         loss = self.get_cons(p_1, p_2)
-        print(loss.shape)
+
         if self.reduction == "mean":
             loss = loss.mean(0)
         elif self.reduction == "sum":

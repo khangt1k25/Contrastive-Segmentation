@@ -80,7 +80,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         if i % 25 == 0:
             progress.display(i)
             save_plot_curve(contrastive_losses=contrastive_losses, 
-                            saliency_losses=saliency_loss,
+                            saliency_losses=saliency_losses,
                             cluster_losses=cluster_losses,
                             losses=losses
                             )
@@ -95,7 +95,7 @@ def accuracy(output, target, topk=(1,)):
     correct = pred.eq(target.view(1, -1).expand_as(pred))
     res = []
     for k in topk:
-        correct_k = correct[:k].view(-1).float().sum(0, keepdim=True)
+        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
 
