@@ -57,6 +57,32 @@ class BalancedCrossEntropyLoss(Module):
         return final_loss
 
 
+class ConInstContrast:
+    def __init__(self, num_samples, temperature, device, reduction="mean"):
+        super(ConInstContrast, self).__init__()
+        self.num_samples = num_samples
+        self.temperature = temperature
+        self.device = device
+        self.reduction = reduction
+
+        # This mask is different from the mask in version 2
+        # It also mask 2 sub-diagonals
+        self.mask = self.get_mask(num_samples)
+        self.criterion = nn.CrossEntropyLoss(reduction=reduction)
+
+    def get_mask(self, num_samples):
+        B = num_samples
+
+        mask = torch.full((2 * B, 2 * B), True, dtype=torch.bool,
+                          device=self.device, requires_grad=False)
+        mask = mask.fill_diagonal_(False)
+
+        for i in range(B):
+            mask[i, B + i] = False
+            mask[B + i, i] = False
+
+        return mask
+
 
 class CatInstConsistency:
     def __init__(self, reduction="mean", cons_type="neg_log_dot_prod"):
@@ -103,6 +129,41 @@ class CatInstConsistency:
             loss = loss.sum(0)
 
         return loss
+
+class CatInstContrast(ConInstContrast):
+    def __init__(self, num_samples, device, reduction="mean",
+                 critic_type="log_dot_prod"):
+        super(CatInstContrast, self).__init__(num_samples, None, device, reduction)
+        self.critic_type = critic_type
+
+    def critic(self, p, normalized):
+        if self.critic_type == "log_dot_prod":
+            return torch.matmul(p, p.t()).log()
+
+        elif self.critic_type == "dot_prod":
+            return torch.matmul(p, p.t())
+
+        elif self.critic_type == "neg_l2" or self.critic_type == "nsse":
+            return -(p.unsqueeze(1) - p.unsqueeze(0)).pow(2).sum(-1)
+
+        elif self.critic_type == "neg_jsd":
+            p1 = p.unsqueeze(1)
+            p2 = p.unsqueeze(0)
+            p_avg = 0.5 * (p1 + p2)
+
+            out = -0.5 * ((p1 * (p1.log() - p_avg.log())).sum(-1) +
+                          (p2 * (p2.log() - p_avg.log())).sum(-1))
+
+            return out
+
+        else:
+            raise ValueError(f"Do not support critic_type={self.critic_type}!")
+
+    def __call__(self, p_1, p_2, return_sim_matrix=False):
+        return super(CatInstContrast, self).__call__(
+            p_1, p_2, normalized=True,
+            return_sim_matrix=return_sim_matrix)
+
 
 
 

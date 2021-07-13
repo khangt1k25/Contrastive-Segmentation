@@ -128,15 +128,23 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     all_sals = torch.zeros((len(val_loader.sampler), 512, 512)).cuda()
     names = []
     for i, batch in enumerate(val_loader):
-        output, sal = model(batch['image'].cuda(non_blocking=True))
+        output, sal, y = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
 
         # compute prototypes
+        # bs, dim, _, _ = y.shape
+        # y = torch.softmax(y, dim=1)
+        # y = y.reshape(bs, dim, -1)
+        # sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        # prototypes = torch.bmm(y, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
         sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
         prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)        
+        # prototypes = prototypes.t()/prototypes.sum(dim=1)  # norm
+        # prototypes = prototypes.t()
+        # prototypes = torch.nn.functional.normalize(prototypes, dim=1, p=1.0)
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
         ptr += bs
@@ -146,19 +154,28 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         if ptr % 300 == 0:
             print('Computing prototype {}'.format(ptr))
 
+    # print(all_prototypes[1232])
+    # print(all_prototypes[1231].sum())
     # perform kmeans
     all_prototypes = all_prototypes.cpu().numpy()
     all_sals = all_sals.cpu().numpy()
     n_clusters = n_clusters - 1
+    # print(all_prototypes[0:2])
     print('Kmeans clustering to {} clusters'.format(n_clusters))
     
     print(colored('Starting kmeans with scikit', 'green'))
+    print(np.where(np.isnan(all_prototypes)))
+
     pca = PCA(n_components = 32, whiten = True)
     all_prototypes = pca.fit_transform(all_prototypes)
     kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
     prediction_kmeans = kmeans.fit_predict(all_prototypes)
 
-    # save predictions
+    # prediction_kmeans = np.argmax(all_prototypes, axis=1)
+
+    # print(prediction_kmeans[0:100])
+    # print(prediction_kmeans[-100:-1])
+    # # save predictions
     for i, fname, pred in zip(range(len(val_loader.sampler)), names, prediction_kmeans):
         prediction = all_sals[i].copy()
         prediction[prediction == 1] = pred + 1

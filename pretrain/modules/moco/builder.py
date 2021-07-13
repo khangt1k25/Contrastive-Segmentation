@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import random
 
 from utils.common_config import get_model
-from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency
+from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -48,7 +48,7 @@ class ContrastiveModel(nn.Module):
         self.smooth_prob = p['model_kwargs']['smooth_prob']
         self.smooth_coeff = p['model_kwargs']['smooth_coeff']
         self.cons_y = CatInstConsistency(reduction="mean", cons_type="neg_log_dot_prod")
-
+        
               
 
     @torch.no_grad()
@@ -132,7 +132,7 @@ class ContrastiveModel(nn.Module):
         """
         self.C = C
         batch_size = im_q.size(0)
- 
+        
 
         q, q_bg, y_q = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -145,7 +145,7 @@ class ContrastiveModel(nn.Module):
         
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
-    
+
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
             tmp = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
@@ -184,6 +184,9 @@ class ContrastiveModel(nn.Module):
             prototypes_cluster = prototypes_cluster[tmp_for_cluster]
 
         '''Compute cluster loss'''
+        self.contrast_y_criterion = CatInstContrast(
+            batch_size, q.device, reduction='none', critic_type='log_dot_prod')
+
         y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
         
         if self.smooth_prob:
@@ -222,8 +225,8 @@ class ContrastiveModel(nn.Module):
                                       upper_clamp_coeff_2.pow(2).sum(0))
         
 
-        cluster_loss = self.cons_y(py_1_smt, py_2_smt)+ 0.01*lower_clamp + 0.01* upper_clamp - 5.0 * entropy
-
+        cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+        
 
 
         ''' Compute local contrastive logits, labels '''
@@ -272,7 +275,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, sal_loss, cluster_loss
+        return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
 
 
 

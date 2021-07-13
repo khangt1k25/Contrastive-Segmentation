@@ -13,11 +13,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     #local_losses = AverageMeter('Local', ':.4e')
     #icc_losses = AverageMeter('ICC', ':.4e')
     cluster_losses = AverageMeter('Cluster', ':.4e')
+    entropy_losses = AverageMeter('Entropy', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, cluster_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, cluster_losses, entropy_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -31,7 +32,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels, saliency_loss, cluster_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, saliency_loss, cluster_loss, entropy, upper_clamp, lower_clamp = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -53,14 +54,16 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + 0.1*cluster_loss 
+        loss = contrastive_loss + saliency_loss + 0.1*(cluster_loss - 5*entropy + 0.01 * upper_clamp + 0.01 * lower_clamp )
         contrastive_losses.update(contrastive_loss.item())
         cluster_losses.update(cluster_loss.item())
         # local_losses.update(local_loss.item())
         # icc_losses.update(icc_loss.item())   
         saliency_losses.update(saliency_loss.item())
-        losses.update(loss.item())
+        entropy_losses.update(entropy.item())
 
+        losses.update(loss.item())
+        
 
         acc1, acc5 = accuracy(logits, labels, topk=(1, 5))
         top1.update(acc1[0], im_q.size(0))
@@ -82,6 +85,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             save_plot_curve(contrastive_losses=contrastive_losses, 
                             saliency_losses=saliency_losses,
                             cluster_losses=cluster_losses,
+                            entropy_losses= entropy_losses,
                             losses=losses
                             )
        
@@ -101,7 +105,7 @@ def accuracy(output, target, topk=(1,)):
 
 
 def save_plot_curve(
-    contrastive_losses, saliency_losses, cluster_losses, losses,
+    contrastive_losses, saliency_losses, cluster_losses, entropy_losses, losses,
     path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/'):
 
     with open(path+'cl.txt', 'a') as f:
@@ -118,6 +122,9 @@ def save_plot_curve(
         f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
         f.write(str(saliency_losses.avg))
+        f.write("\n")
+    with open(path+'entropy.txt', 'a') as f:
+        f.write(str(entropy_losses.avg))
         f.write("\n")
     with open(path+'total.txt', 'a') as f:
         f.write(str(losses.avg))
