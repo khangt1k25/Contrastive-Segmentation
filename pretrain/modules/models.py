@@ -32,7 +32,7 @@ class ContrastiveSegmentationModel(nn.Module):
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
         if self.use_y_head:
-            self.y_head = nn.Conv1d(self.head.in_channels, self.C, 1, bias=False)
+            self.y_head = nn.Conv2d(self.head.in_channels, self.C, 1, bias=False)
 
 
     def forward(self, x):
