@@ -167,8 +167,8 @@ class CatInstContrast(ConInstContrast):
 
 
 
-def IIC_Loss(y, y_neighbor,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
-    p_i_j = y.unsqueeze(2) * y_neighbor.unsqueeze(1)  # bn, k, k
+def IIC_Loss(y1, y2 ,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
+    p_i_j = y1.unsqueeze(2) * y2.unsqueeze(1)  # bn, k, k
 
     p_i_j = p_i_j.mean(dim=0)
 
@@ -189,6 +189,6 @@ def IIC_Loss(y, y_neighbor,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
     # Compute the mutual information
     loss = -p_i_j * (torch.log(p_i_j) - lamb * torch.log(p_j) - lamb * torch.log(p_i))
 
-    loss = torch.sum(loss)
+    loss = torch.mean(loss)
 
     return loss 

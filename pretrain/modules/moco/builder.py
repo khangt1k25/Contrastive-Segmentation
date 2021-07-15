@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import random
 
 from utils.common_config import get_model
-from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast
+from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, IIC_Loss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -155,7 +155,6 @@ class ContrastiveModel(nn.Module):
             tmp_for_cluster = tmp.long()
         
 
-
         # compute key prototypes
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
@@ -174,58 +173,60 @@ class ContrastiveModel(nn.Module):
             prototypes_foreground = torch.bmm(k_flat, sal_k).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
             
-            # prototypes cluster
+            #prototypes cluster
             y_k = torch.softmax(y_k, dim=1)
             y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
             prototypes_cluster = torch.bmm(y_k, sal_k).squeeze()
-         
-            prototypes_cluster = prototypes_cluster.t()/prototypes_cluster.sum(dim=1)  # norm
-            prototypes_cluster = prototypes_cluster.t()
+
+            prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0)  
             prototypes_cluster = prototypes_cluster[tmp_for_cluster]
-
-        '''Compute cluster loss'''
-        self.contrast_y_criterion = CatInstContrast(
-            batch_size, q.device, reduction='none', critic_type='log_dot_prod')
-
+        
+        '''Compute IIC loss'''
         y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
+        iic_loss = IIC_Loss(y_q_object, prototypes_cluster, C=self.C)
+        '''Compute cluster loss'''
+        # self.contrast_y_criterion = CatInstContrast(
+        #     batch_size, q.device, reduction='none', critic_type='log_dot_prod')
+
+        # y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
         
-        if self.smooth_prob:
-        # Smoothing
-            alpha = self.smooth_coeff
-            py_1_smt = (1.0 - alpha) * y_q_object + alpha * (1.0 / self.C)
-            py_2_smt = (1.0 - alpha) * prototypes_cluster + alpha * (1.0 / self.C)
-        else:
-            py_1_smt = torch.clamp(y_q_object, 1e-6, 1e6)
-            py_2_smt = torch.clamp(prototypes_cluster, 1e-6, 1e6)
+        # if self.smooth_prob:
+        # # Smoothing
+        #     alpha = self.smooth_coeff
+        #     py_1_smt = (1.0 - alpha) * y_q_object + alpha * (1.0 / self.C)
+        #     py_2_smt = (1.0 - alpha) * prototypes_cluster + alpha * (1.0 / self.C)
+        # else:
+        #     py_1_smt = torch.clamp(y_q_object, 1e-6, 1e6)
+        #     py_2_smt = torch.clamp(prototypes_cluster, 1e-6, 1e6)
 
-        py_avg_1 = y_q_object.mean(0)
-        py_avg_2 = prototypes_cluster.mean(0)
-
-
-        entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
-                                    (py_avg_2 * py_avg_2.log()).sum(0))
-
-        zero = torch.zeros([], dtype=torch.float32,
-                           device=q.device, requires_grad=False)
-        min_rate=0.7
-        max_rate=1.3
-        lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
-        lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
-        lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
-                              (py_avg_2 * lower_clamp_coeff_2).sum(0))
-        tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
-                                      lower_clamp_coeff_2.pow(2).sum(0))
+        # py_avg_1 = y_q_object.mean(0)
+        # py_avg_2 = prototypes_cluster.mean(0)
 
 
-        upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
-        upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
-        upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
-                              (py_avg_2 * upper_clamp_coeff_2).sum(0))
-        tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
-                                      upper_clamp_coeff_2.pow(2).sum(0))
+        # entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
+        #                             (py_avg_2 * py_avg_2.log()).sum(0))
+
+        # zero = torch.zeros([], dtype=torch.float32,
+        #                    device=q.device, requires_grad=False)
+        # min_rate=0.7
+        # max_rate=1.3
+        # lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
+        # lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
+        # lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
+        #                       (py_avg_2 * lower_clamp_coeff_2).sum(0))
+        # tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
+        #                               lower_clamp_coeff_2.pow(2).sum(0))
+
+
+        # upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
+        # upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
+        # upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
+        #                       (py_avg_2 * upper_clamp_coeff_2).sum(0))
+        # tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
+        #                               upper_clamp_coeff_2.pow(2).sum(0))
         
 
-        cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+        # cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
         
 
 
@@ -275,8 +276,8 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
-
+        #return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
+        return logits, tmp, sal_loss, iic_loss
 
 
 # utils
