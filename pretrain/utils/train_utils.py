@@ -2,7 +2,6 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
-from pretrain.modules.losses import IIC_Loss
 import torch
 from torch.nn.functional import cross_entropy
 from utils.utils import AverageMeter, ProgressMeter, freeze_layers

@@ -1,2 +1,6 @@
 .vscode/*
 test.py
+PASCAL_VOC/*
+PASCAL_VOC.tgz
+*__pycache__
+*.jpg
