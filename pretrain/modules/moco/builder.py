@@ -12,8 +12,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import random
 
-from utils.common_config import get_model
-from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, IIC_Loss
+from utils.common_config import get_model, get_next_transformations
+from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, IIC_Loss, RegressionLoss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -39,7 +39,7 @@ class ContrastiveModel(nn.Module):
         self.dim = p['model_kwargs']['ndim']
         self.register_buffer("queue", torch.randn(self.dim, self.K))
         self.queue = nn.functional.normalize(self.queue, dim=0)
-
+    
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
         # balanced cross-entropy loss
@@ -47,7 +47,10 @@ class ContrastiveModel(nn.Module):
         self.C = p['model_kwargs']['C']
         self.smooth_prob = p['model_kwargs']['smooth_prob']
         self.smooth_coeff = p['model_kwargs']['smooth_coeff']
-        self.cons_y = CatInstConsistency(reduction="mean", cons_type="neg_log_dot_prod")
+        
+        self.transforms = get_next_transformations()
+
+        # self.cons_y = CatInstConsistency(reduction="mean", cons_type="neg_log_dot_prod")
         
               
 
@@ -122,7 +125,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, kernel=3, num_negatives = 48, C=20, lamb=1.):
+    def forward(self, im_q, im_k, sal_q, sal_k, state_dict, kernel=3, num_negatives = 48, C=20, lamb=1.):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -136,6 +139,18 @@ class ContrastiveModel(nn.Module):
 
         q, q_bg, y_q = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
+        
+        forward_q = []
+        forward_sal_q = []
+        for i in range(len(state_dict)):
+            sample = {"image": q[i], 'sal': q_bg[i]}
+            new_q, new_sal_q = self.transforms.forward_with_params(sample, state_dict[i]) 
+            forward_q.append(new_q)
+            forward_sal_q.append(new_sal_q)
+
+        forward_q = torch.stack(forward_q, dim=0)
+        forward_sal_q = torch.stack(forward_sal_q, dim=0)
+
         q_flat = q.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
         q_flat = torch.reshape(q_flat, [-1, self.dim])    # queries: pixels x dim
 
@@ -167,6 +182,8 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
+
+             
             # prototypes k
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
@@ -174,16 +191,23 @@ class ContrastiveModel(nn.Module):
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
             
             #prototypes cluster
-            y_k = torch.softmax(y_k, dim=1)
-            y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
-            prototypes_cluster = torch.bmm(y_k, sal_k).squeeze()
+            # y_k = torch.softmax(y_k, dim=1)
+            # y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
+            # prototypes_cluster = torch.bmm(y_k, sal_k).squeeze()
 
-            prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0)  
-            prototypes_cluster = prototypes_cluster[tmp_for_cluster]
+            # prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0)  
+            # prototypes_cluster = prototypes_cluster[tmp_for_cluster]
         
+
+
+        '''
+        Compute Consistency loss
+        '''
+        
+
         '''Compute IIC loss'''
-        y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
-        iic_loss = IIC_Loss(y_q_object, prototypes_cluster, C=self.C)
+        # y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
+        # iic_loss = IIC_Loss(y_q_object, prototypes_cluster, C=self.C)
         '''Compute cluster loss'''
         # self.contrast_y_criterion = CatInstContrast(
         #     batch_size, q.device, reduction='none', critic_type='log_dot_prod')
@@ -263,6 +287,7 @@ class ContrastiveModel(nn.Module):
         # q: pixels x dim
         # k: pixels x dim
         # prototypes_k: proto x dim
+
         q = torch.index_select(q_flat, index=mask_indexes, dim=0)
         l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
         negatives = self.queue.clone().detach()          # shape: dim x negatives
