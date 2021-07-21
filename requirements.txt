@@ -30,6 +30,7 @@ imageio                   2.9.0                      py_0
 joblib                    0.16.0                     py_0  
 jpeg                      9b                   hcb7ba68_2  
 kiwisolver                1.2.0            py38hfd86e86_0  
+kornia                    0.5.6                    pypi_0    pypi
 krb5                      1.18.2               h597af5e_0  
 lcms2                     2.11                 h396b838_0  
 ld_impl_linux-ppc64le     2.33.1               h0f24833_7  

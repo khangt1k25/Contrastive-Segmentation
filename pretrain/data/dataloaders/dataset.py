@@ -144,8 +144,13 @@ class TwoTransformDataset(data.Dataset):
                 count = 100
  
             query_sample = self.base_transform(deepcopy(sample_))
-            key_sample = self.next_transform(deepcopy(query_sample))
-         
+            
+            key_sample, state_dict = self.next_transform(deepcopy(query_sample))
+            
+
+            key_sample['image'] = key_sample['image'].squeeze(0)
+            key_sample['sal'] = key_sample['sal'].squeeze(0).squeeze(0)
+
             # inverted_sample = self.next_transform.inverse(deepcopy(key_sample))
                            
             if self.downsample_sal: # Downsample
@@ -157,7 +162,7 @@ class TwoTransformDataset(data.Dataset):
             query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
             
             if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area: # Ok. Foreground/Background has proper ratio.
-                return {'key': key_sample, 'query': query_sample, "T": self.next_transform}
+                return {'key': key_sample, 'query': query_sample, "T": state_dict}
 
             else:
                 count += 1 # Try again. Areas of foreground/background to small.
