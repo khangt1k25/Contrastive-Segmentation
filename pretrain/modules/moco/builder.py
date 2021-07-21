@@ -141,22 +141,27 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
         
         forward_q = []
-        forward_sal_q = []
+        # forward_sal_q = []
         for i in range(len(state_dict)):
-            sample = {"image": q[i], 'sal': q_bg[i]}
-            new_q, new_sal_q = self.transforms.forward_with_params(sample, state_dict[i]) 
-            forward_q.append(new_q)
-            forward_sal_q.append(new_sal_q)
 
-        forward_q = torch.stack(forward_q, dim=0)
-        forward_sal_q = torch.stack(forward_sal_q, dim=0)
+            sample = {"image": q[i], 'sal': q_bg[i]}
+            new_sample = self.transforms.forward_with_params(sample, state_dict[i])
+  
+            forward_q.append(new_sample['image'].squeeze(0))
+            # forward_sal_q.append(new_sample['sal'].squeeze(0).squeeze(0))
+
+        forward_q = torch.stack(forward_q, dim=0).squeeze(0)
+        # forward_sal_q = torch.stack(forward_sal_q, dim=0).squeeze(0).squeeze(0)
+        
+        
+
 
         q_flat = q.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
         q_flat = torch.reshape(q_flat, [-1, self.dim])    # queries: pixels x dim
 
-        y_q = torch.softmax(y_q, dim=1)
-        y_q = y_q.permute(0, 2, 3, 1)
-        y_q = torch.reshape(y_q, [-1, self.C])
+        # y_q = torch.softmax(y_q, dim=1)
+        # y_q = y_q.permute(0, 2, 3, 1)
+        # y_q = torch.reshape(y_q, [-1, self.C])
         
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
@@ -168,7 +173,12 @@ class ContrastiveModel(nn.Module):
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
             tmp_for_cluster = tmp.long()
-        
+        with torch.no_grad():
+            offset_k = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
+            tmp2 = (sal_k + torch.reshape(offset_k, [-1, 1, 1]))*sal_k # all bg's to 0
+            tmp2 = tmp2.view(-1)
+            mask_indexes_2 = torch.nonzero((tmp2)).view(-1).squeeze()
+            tmp2 = torch.index_select(tmp2, index=mask_indexes_2, dim=0) // 2
 
         # compute key prototypes
         with torch.no_grad():  # no gradient to keys
@@ -177,7 +187,7 @@ class ContrastiveModel(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k, _, y_k = self.model_k(im_k)  # keys: N x C x H x W
+            k, k_bg, y_k = self.model_k(im_k)  # keys: N x C x H x W
             k = nn.functional.normalize(k, dim=1)       
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
@@ -198,11 +208,21 @@ class ContrastiveModel(nn.Module):
             # prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0)  
             # prototypes_cluster = prototypes_cluster[tmp_for_cluster]
         
-
+        
 
         '''
         Compute Consistency loss
         '''
+
+        forward_q_flat = forward_q.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
+        forward_q_flat = torch.reshape(forward_q_flat, [-1, self.dim])     # queries: pixels x dim
+        forward_q_flat = torch.index_select(forward_q_flat, index=mask_indexes_2, dim=0)
+        k_selected = k.permute((0, 2, 3, 1))                  # queries: B x H x W x dim 
+        k_selected = torch.reshape(k_selected, [-1, self.dim]) 
+        k_selected = torch.index_select(k_selected, index=mask_indexes_2, dim=0)
+
+
+        consistency_loss = RegressionLoss(forward_q_flat, k_selected)
         
 
         '''Compute IIC loss'''
@@ -302,7 +322,7 @@ class ContrastiveModel(nn.Module):
         self._dequeue_and_enqueue(prototypes) 
 
         #return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
-        return logits, tmp, sal_loss, iic_loss
+        return logits, tmp, sal_loss, consistency_loss
 
 
 # utils

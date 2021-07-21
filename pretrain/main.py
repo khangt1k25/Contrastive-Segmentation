@@ -13,13 +13,14 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import DatasetKeyQuery
+from data.dataloaders.dataset import DatasetKeyQuery, TwoTransformDataset
 
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
 from utils.common_config import get_train_dataset, get_train_transformations,\
-                                get_train_dataloader, get_optimizer, adjust_learning_rate
+                                get_train_dataloader, get_optimizer, adjust_learning_rate,\
+                                get_base_transformations, get_next_transformations
 
 from utils.train_utils import train
 from utils.logger import Logger
@@ -127,10 +128,15 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    train_transform = get_train_transformations()
-    print(train_transform)
-    train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
+    #train_transform = get_train_transformations()
+    base_transform = get_base_transformations()
+    next_transform = get_next_transformations()
+    print(base_transform)
+    print(next_transform)
+
+    train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
                                 downsample_sal=not p['model_kwargs']['upsample'])
+
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),
                     num_workers=p['num_workers'], pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_custom)

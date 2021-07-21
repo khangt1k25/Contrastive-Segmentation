@@ -33,8 +33,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        state_dict =  batch['T'].cuda(p['gpu'], non_blocking=True)
-
+        #state_dict =  batch['T'].cuda(p['gpu'], non_blocking=True)
+        state_dict = batch['T']
         logits, labels, saliency_loss, consistency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
@@ -64,7 +64,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # local_losses.update(local_loss.item())
         #iic_losses.update(iic_loss.item())   
         saliency_losses.update(saliency_loss.item())
-        consistency_losses.update(consistency_losses.item())
+        consistency_losses.update(consistency_loss.item())
         #entropy_losses.update(entropy.item())
 
         losses.update(loss.item())

@@ -168,7 +168,7 @@ class CatInstContrast(ConInstContrast):
 def RegressionLoss(x, y):
     x = F.normalize(x, dim=1)
     y = F.normalize(y, dim=1)
-    return 2 - 2 * (x * y).sum(dim=-1)
+    return (2 - 2 * (x * y).sum(dim=-1)).mean()
 
 
 def IIC_Loss(y1, y2 ,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):
