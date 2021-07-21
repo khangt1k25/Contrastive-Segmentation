@@ -12,15 +12,14 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     consistency_losses = AverageMeter('Consistency', ':.4e')
-    #local_losses = AverageMeter('Local', ':.4e')
-    #iic_losses = AverageMeter('ICC', ':.4e')
-    #cluster_losses = AverageMeter('Cluster', ':.4e')
-    #entropy_losses = AverageMeter('Entropy', ':.4e')
+    local_losses = AverageMeter('Local', ':.4e')
+    cluster_losses = AverageMeter('Cluster', ':.4e')
+    entropy_losses = AverageMeter('Entropy', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, consistency_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, consistency_losses, local_losses, saliency_losses, cluster_losses, entropy_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -33,9 +32,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        #state_dict =  batch['T'].cuda(p['gpu'], non_blocking=True)
         state_dict = batch['T']
-        logits, labels, saliency_loss, consistency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
+        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -47,25 +45,28 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                                             reduction='mean')
       
         ## Calculate local contrastive loss
-        # uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
-        # p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-        # p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
-        # p_class_local[uniq] = p_class_non_zero_classes_local
-        # w_class_local = 1 / torch.log(1.02 + p_class_local)
-        # local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
+        uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
+        p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+        p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
+        p_class_local[uniq] = p_class_non_zero_classes_local
+        w_class_local = 1 / torch.log(1.02 + p_class_local)
+        local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
 
 
 
         # Calculate total loss and update meters
-        #loss = contrastive_loss + saliency_loss + 0.1*(cluster_loss - 5*entropy + 0.01 * upper_clamp + 0.01 * lower_clamp )
-        loss = contrastive_loss + saliency_loss + consistency_loss 
+        loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
+                p['loss_coeff']['saliency'] * saliency_loss + \
+                p['loss_coeff']['local_contrastive'] * local_loss +\
+                p['loss_coeff']['consistency']* consistency_loss +\
+                p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss) 
+        
         contrastive_losses.update(contrastive_loss.item())
-        #cluster_losses.update(cluster_loss.item())
-        # local_losses.update(local_loss.item())
-        #iic_losses.update(iic_loss.item())   
+        cluster_losses.update(cluster_loss.item())
+        local_losses.update(local_loss.item())
         saliency_losses.update(saliency_loss.item())
         consistency_losses.update(consistency_loss.item())
-        #entropy_losses.update(entropy.item())
+        entropy_losses.update(entropy_loss.item())
 
         losses.update(loss.item())
         
@@ -87,11 +88,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-            save_plot_curve(contrastive_losses=contrastive_losses, 
+            save_plot_curve(contrastive_losses=contrastive_losses,
+                            local_contrastive_losses= local_losses, 
                             saliency_losses=saliency_losses,
-                            # cluster_losses=cluster_losses,
-                            # entropy_losses= entropy_losses,
-                            #iic_losses = iic_losses,
+                            cluster_losses=cluster_losses,
+                            entropy_losses= entropy_losses,
                             consistency_losses=consistency_losses,
                             losses=losses
                             )
@@ -112,7 +113,13 @@ def accuracy(output, target, topk=(1,)):
 
 
 def save_plot_curve(
-    contrastive_losses, saliency_losses, consistency_losses, losses,
+    contrastive_losses, 
+    saliency_losses,
+    consistency_losses,
+    local_contrastive_losses,
+    cluster_losses,
+    entropy_losses,
+    losses,
     path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/'):
 
     with open(path+'cl.txt', 'a') as f:
@@ -121,21 +128,19 @@ def save_plot_curve(
     with open(path+'consistency.txt', 'a') as f:
         f.write(str(consistency_losses.avg))
         f.write("\n")
-    # with open(path+'localcl.txt', 'a') as f:  
-    #     f.write(str(local_losses.avg))
-    #     f.write("\n")
-    # with open(path + 'iic.txt', 'a') as f:
-    #     f.write(str(iic_losses.avg))
-    #     f.write("\n")
-    # with open(path + 'cluster.txt', 'a') as f:
-    #     f.write(str(cluster_losses.avg))
-    #     f.write("\n")
+    with open(path+'localcl.txt', 'a') as f:  
+        f.write(str(local_contrastive_losses.avg))
+        f.write("\n")
+
+    with open(path + 'cluster.txt', 'a') as f:
+        f.write(str(cluster_losses.avg))
+        f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
         f.write(str(saliency_losses.avg))
         f.write("\n")
-    # with open(path+'entropy.txt', 'a') as f:
-    #     f.write(str(entropy_losses.avg))
-    #     f.write("\n")
+    with open(path+'entropy.txt', 'a') as f:
+        f.write(str(entropy_losses.avg))
+        f.write("\n")
     with open(path+'total.txt', 'a') as f:
         f.write(str(losses.avg))
         f.write("\n")

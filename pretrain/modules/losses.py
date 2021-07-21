@@ -165,10 +165,33 @@ class CatInstContrast(ConInstContrast):
             return_sim_matrix=return_sim_matrix)
 
 
-def RegressionLoss(x, y):
-    x = F.normalize(x, dim=1)
-    y = F.normalize(y, dim=1)
-    return (2 - 2 * (x * y).sum(dim=-1)).mean()
+
+class ConsistencyLoss(Module):
+    """
+    Consistency Loss  
+    """
+
+    def __init__(self, type='l2norm'):
+        super(ConsistencyLoss, self).__init__()
+        self.type = type
+        assert(self.type in ['l2norm', 'l2', 'negativecosine'])
+
+    def forward(self, output, labels):
+        assert (output.size() == labels.size())
+
+        if self.type == 'l2norm':
+            output = F.normalize(output, dim=1)
+            labels = F.normalize(labels, dim=1)
+            return (2 - 2 * (output * labels).sum(dim=-1)).mean()
+        
+        elif self.type == 'l2':
+            return ((output - labels).pow(2).sum(-1)).mean()
+
+
+
+        
+
+
 
 
 def IIC_Loss(y1, y2 ,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):

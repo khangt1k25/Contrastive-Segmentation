@@ -66,4 +66,17 @@ class MyAugmentation(nn.Module):
 
         sample['sal'] = self.k2(sample['sal'].float(), state_dict).int()
         
-        return sample;
+        return sample
+
+class MyAugmentationPipeline(nn.Module):
+    def __init__(self):
+        super(MyAugmentationPipeline, self).__init__()
+        self.mixup = K.RandomMixUp(p=1.)
+        self.aff = K.RandomAffine(360, p=0.5)
+        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15])
+        self.crp = K.RandomCrop((200, 200))
+    def forward(self, input, label):
+        input, label = self.mixup(input, label)
+        input = self.crp(self.jitter(self.aff(input)))
+        return input, label
+        aug = MyAugmentationPipeline()
