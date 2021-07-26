@@ -26,6 +26,7 @@ class ContrastiveModel(nn.Module):
         self.K = p['moco_kwargs']['K'] 
         self.m = p['moco_kwargs']['m'] 
         self.T = p['moco_kwargs']['T']
+        self.p = p
 
         # create the model 
         self.model_q = get_model(p)
@@ -60,6 +61,7 @@ class ContrastiveModel(nn.Module):
         # for local contrastive loss
         self.kernel = p['local_contrastive_kwargs']['kernel']
         self.num_local_negatives = p['local_contrastive_kwargs']['num_negatives']
+
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -153,29 +155,10 @@ class ContrastiveModel(nn.Module):
         sal_loss = self.bce(bg_q, sal_q)
 
 
-        '''
-            Augment in Z 
-        '''
-        augmented_q = []
-        for i in range(len(state_dict)):
-
-            sample = {"image": q[i], 'sal': bg_q[i]}
-            new_sample = self.transforms.forward_with_params(sample, state_dict[i])
-  
-            augmented_q.append(new_sample['image'].squeeze(0))
-
-        augmented_q = torch.stack(augmented_q, dim=0).squeeze(0)
-
-        
-
-
-        
-
        
-        
        
         '''
-            Prepare mask_indexes with both query and key size.
+        Prepare mask_indexes with both query and key size.
         '''
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
@@ -184,15 +167,15 @@ class ContrastiveModel(nn.Module):
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
             tmp_for_cluster = tmp.long()
-        with torch.no_grad():
-            offset_k = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
-            tmp2 = (sal_k + torch.reshape(offset_k, [-1, 1, 1]))*sal_k # all bg's to 0
-            tmp2 = tmp2.view(-1)
-            mask_indexes_2 = torch.nonzero((tmp2)).view(-1).squeeze()
-            tmp2 = torch.index_select(tmp2, index=mask_indexes_2, dim=0) // 2
+        # with torch.no_grad():
+        #     offset_k = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
+        #     tmp2 = (sal_k + torch.reshape(offset_k, [-1, 1, 1]))*sal_k # all bg's to 0
+        #     tmp2 = tmp2.view(-1)
+        #     mask_indexes_2 = torch.nonzero((tmp2)).view(-1).squeeze()
+        #     tmp2 = torch.index_select(tmp2, index=mask_indexes_2, dim=0) // 2
 
         '''
-            Prepare prototypes in key size
+        Prepare prototypes in key size
         '''
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
@@ -209,109 +192,120 @@ class ContrastiveModel(nn.Module):
              
             # prototypes k
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-            prototypes_foreground = torch.bmm(k_flat, sal_k).squeeze() # B x dim
+            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
             
             #prototypes cluster
-            y_k = torch.softmax(y_k, dim=1)
-            y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
-            prototypes_cluster = torch.bmm(y_k, sal_k).squeeze()
+            if self.p['loss_coeff']['cluster'] > 0:
+                y_k = torch.softmax(y_k, dim=1)
+                y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
+                prototypes_cluster = torch.bmm(y_k, sal_k_flat).squeeze()
 
-            prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0)  
-            prototypes_cluster = prototypes_cluster[tmp_for_cluster] 
+                prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0) # softmax = 1 
+                prototypes_cluster = prototypes_cluster[tmp_for_cluster] 
         
 
 
         '''
         Compute Consistency loss
         '''
+        consistency_loss = 0 
+        if self.p['loss_coeff']['consistency'] > 0:
+            augmented_q = []
+            for i in range(len(state_dict)):
 
-        augmented_q = augmented_q.permute((0, 2, 3, 1))                  
-        augmented_q = torch.reshape(augmented_q, [-1, self.dim])     
-        augmented_q = torch.index_select(augmented_q, index=mask_indexes_2, dim=0)
-        k_selected = k.permute((0, 2, 3, 1))                
-        k_selected = torch.reshape(k_selected, [-1, self.dim]) 
-        k_selected = torch.index_select(k_selected, index=mask_indexes_2, dim=0)
-        
-        consistency_loss = self.consistency(augmented_q, k_selected)
-        
+                sample = {"image": q[i], 'sal': bg_q[i]}
+                new_sample = self.transforms.forward_with_params(sample, state_dict[i])
+    
+                augmented_q.append(new_sample['image'].squeeze(0))
 
-        '''Compute IIC loss'''
-        # y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
-        # iic_loss = IIC_Loss(y_q_object, prototypes_cluster, C=self.C)
-        '''Compute cluster loss'''
-        y_q = torch.softmax(y_q, dim=1)
-        y_q = y_q.permute(0, 2, 3, 1)
-        y_q = torch.reshape(y_q, [-1, self.C])
-        y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
-        
-        if self.smooth_prob:
-            alpha = self.smooth_coeff
-            py_1_smt = (1.0 - alpha) * y_q_object + alpha * (1.0 / self.C)
-            py_2_smt = (1.0 - alpha) * prototypes_cluster + alpha * (1.0 / self.C)
-        else:
-            py_1_smt = torch.clamp(y_q_object, 1e-6, 1e6)
-            py_2_smt = torch.clamp(prototypes_cluster, 1e-6, 1e6)
+            augmented_q = torch.stack(augmented_q, dim=0).squeeze(0)
+            augmented_q = augmented_q.permute((0, 2, 3, 1))                  
+    
+            k_selected = k.permute((0, 2, 3, 1))                
 
-        py_avg_1 = y_q_object.mean(0)
-        py_avg_2 = prototypes_cluster.mean(0)
+            consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_k)
 
 
-        entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
-                                    (py_avg_2 * py_avg_2.log()).sum(0))
-
-        # zero = torch.zeros([], dtype=torch.float32,
-        #                    device=q.device, requires_grad=False)
-        # min_rate=0.7
-        # max_rate=1.3
-        # lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
-        # lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
-        # lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
-        #                       (py_avg_2 * lower_clamp_coeff_2).sum(0))
-        # tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
-        #                               lower_clamp_coeff_2.pow(2).sum(0))
-
-
-        # upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
-        # upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
-        # upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
-        #                       (py_avg_2 * upper_clamp_coeff_2).sum(0))
-        # tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
-        #                               upper_clamp_coeff_2.pow(2).sum(0))
-        
-
-        cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
-        
-
-
-        ''' Compute local contrastive logits, labels '''
-        l_logits = []
-        for i in range(q.shape[0]):
-            # Working with each image
-            indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
-            q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
-            object_i = q_i[indexes]                                     # object_i: opixels x dim
+        '''
+        Compute cluster loss
+        '''
+        if self.p['loss_coeff']['cluster'] > 0:
+            y_q = torch.softmax(y_q, dim=1)
+            y_q = y_q.permute(0, 2, 3, 1)
+            y_q = torch.reshape(y_q, [-1, self.C])
+            y_q_object = torch.index_select(y_q, index=mask_indexes, dim=0)
             
-            local_i = F.avg_pool2d(q[i], kernel_size=self.kernel, stride=1, padding=1)
-            local_i = local_i.view(-1, self.dim)[indexes]
+            if self.smooth_prob:
+                alpha = self.smooth_coeff
+                py_1_smt = (1.0 - alpha) * y_q_object + alpha * (1.0 / self.C)
+                py_2_smt = (1.0 - alpha) * prototypes_cluster + alpha * (1.0 / self.C)
+            else:
+                py_1_smt = torch.clamp(y_q_object, 1e-6, 1e6)
+                py_2_smt = torch.clamp(prototypes_cluster, 1e-6, 1e6)
+
+            py_avg_1 = y_q_object.mean(0)
+            py_avg_2 = prototypes_cluster.mean(0)
 
 
-            local_positive  = torch.einsum('ij,ji->i', object_i, local_i.T)  # [opixels]
+            entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
+                                        (py_avg_2 * py_avg_2.log()).sum(0))
+
+            # zero = torch.zeros([], dtype=torch.float32,
+            #                    device=q.device, requires_grad=False)
+            # min_rate=0.7
+            # max_rate=1.3
+            # lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
+            # lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
+            # lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
+            #                       (py_avg_2 * lower_clamp_coeff_2).sum(0))
+            # tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
+            #                               lower_clamp_coeff_2.pow(2).sum(0))
 
 
-            neg_indexes = torch.randint(low=0, high=q_i.shape[0], size=(indexes.shape[0], self.num_local_negatives))
-            neg = q_i[neg_indexes]
-            local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
+            # upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
+            # upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
+            # upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
+            #                       (py_avg_2 * upper_clamp_coeff_2).sum(0))
+            # tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
+            #                               upper_clamp_coeff_2.pow(2).sum(0))
             
 
-            local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
+            cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+        
 
-            l_logits.append(local_logits)
 
-        l_logits = torch.cat(l_logits, dim=0)
-        l_labels = torch.zeros(l_logits.shape[0])  
-        l_logits /= self.T
+        ''' 
+        Compute local contrastive logits, labels 
+        '''
+        if self.p['loss_coeff']['local_contrastive'] > 0:
+            l_logits = []
+            for i in range(q.shape[0]):
+                # Working with each image
+                indexes = torch.nonzero((sal_q[i]).view(-1)).squeeze()      # indexes: opixels
+                q_i = q[i].view(-1, self.dim)                               # q_i:  HW x dim
+                object_i = q_i[indexes]                                     # object_i: opixels x dim
+                
+                local_i = F.avg_pool2d(q[i], kernel_size=self.kernel, stride=1, padding=1)
+                local_i = local_i.view(-1, self.dim)[indexes]
+
+
+                local_positive  = torch.einsum('ij,ji->i', object_i, local_i.T)  # [opixels]
+
+
+                neg_indexes = torch.randint(low=0, high=q_i.shape[0], size=(indexes.shape[0], self.num_local_negatives))
+                neg = q_i[neg_indexes]
+                local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
+                
+
+                local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
+
+                l_logits.append(local_logits)
+
+            l_logits = torch.cat(l_logits, dim=0)
+            l_labels = torch.zeros(l_logits.shape[0])  
+            l_logits /= self.T
 
         
 
