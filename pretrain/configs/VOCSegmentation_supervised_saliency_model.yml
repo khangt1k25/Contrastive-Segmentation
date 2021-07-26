@@ -26,8 +26,8 @@ model_kwargs:
 loss_coeff:
    contrastive: 1
    saliency: 1
-   local_contrastive: 1
-   cluster: 0.1
+   local_contrastive: 0
+   cluster: 0
    consistency: 0.1
 
 local_contrastive_kwargs:

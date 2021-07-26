@@ -138,13 +138,6 @@ def get_base_transformations():
     return torchvision.transforms.Compose(augmentation)
 
 def get_next_transformations():
-    # augmentation = [
-    #     kornia_transforms.KorniaColorJitter([0.15, 0.25, 0.25, 0.25]),
-    #     kornia_transforms.KorniaRandomAffine([[-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15]])
-    # ]
-
-    # return  K.augmentation.AugmentationSequential(augmentation)
-    # return torch.nn.Sequential(*augmentation)
     return kornia_transforms.MyAugmentation()
 
 def get_val_transformations():

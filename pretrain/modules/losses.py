@@ -176,17 +176,28 @@ class ConsistencyLoss(Module):
         self.type = type
         assert(self.type in ['l2norm', 'l2', 'negativecosine'])
 
-    def forward(self, output, labels):
+    def forward(self, output, labels, mask):
         assert (output.size() == labels.size())
 
         if self.type == 'l2norm':
-            output = F.normalize(output, dim=1)
-            labels = F.normalize(labels, dim=1)
-            return (2 - 2 * (output * labels).sum(dim=-1)).mean()
+            output = F.normalize(output, dim=-1)
+            labels = F.normalize(labels, dim=-1)
+            mask = mask.unsqueeze(-1)
+            x = output * mask
+            y = labels * mask
+            x =  x.reshape((-1, x.shape[-1]))
+            y =  y.reshape((-1, y.shape[-1]))
+
+            return (((x-y) ** 2).sum(dim=-1)).mean()
         
         elif self.type == 'l2':
-            return ((output - labels).pow(2).sum(-1)).mean()
+            mask = mask.unsqueeze(-1)
+            x = output * mask
+            y = labels * mask
+            x =  x.reshape((-1, x.shape[-1]))
+            y =  y.reshape((-1, y.shape[-1]))
 
+            return (((x-y) ** 2).sum(dim=-1)).mean()
 
 
         

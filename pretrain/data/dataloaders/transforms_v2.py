@@ -1,5 +1,6 @@
 
 from os import stat, stat_result
+from kornia.geometry import transform
 import numpy.random as random
 import numpy as np
 import torch
@@ -11,56 +12,27 @@ import torch.nn as nn
 
 
 
-class KorniaColorJitter(nn.Module):
-    def __init__(self, jitter):
-        super(KorniaColorJitter, self).__init__()
-        self.jitter = K.augmentation.ColorJitter(jitter[0], jitter[1], jitter[2], jitter[3])
 
-
-    def __call__(self, sample):
-        sample['image'] = self.jitter(sample['image']) 
-        return sample
-
-    def __str__(self):
-        return 'KorniaColorJitter'
-
-
-class KorniaRandomAffine(nn.Module):
-    def __init__(self, affine):
-        super(KorniaRandomAffine, self).__init__()
-        self.affine = K.augmentation.RandomAffine(affine[0], affine[1], affine[2], affine[3])
-
-    def __call__(self, sample):
-        sample['image'] = self.affine(sample['image'])
-        sample['sal'] = sample['sal'].unsqueeze(0)
-        sample['sal'] = self.affine(sample['sal'].float())
-        sample['sal'] = sample['sal'].squeeze(0)
-        sample['sal'] = sample['sal'].int()
-        return sample
-
-    def __str__(self):
-        return 'KorniaRandomAffine'
 
 class MyAugmentation(nn.Module):
     def __init__(self):
         super(MyAugmentation, self).__init__()
-        # we define and cache our operators as class members
-        #self.k1 = K.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8)
-        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15])
-    
+        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=False)
+
     def forward(self, sample) -> torch.Tensor:
-        #sample['image'] = self.k2(self.k1(sample['image']))
         
         sample['image'] = self.k2(sample['image'])
 
         state_dict = self.k2._params
-        sample['sal'] = self.k2(sample['sal'].float(), self.k2._params).int()
+        
+        sample['sal'] = self.k2(sample['sal'].float(), self.k2._params)
+        sample['sal'] = sample['sal'].int()
         
         return sample, state_dict
+
     
     def forward_with_params(self, sample, state_dict):
-        
-      
+             
 
         sample['image'] = self.k2(sample['image'], state_dict)
 
@@ -68,15 +40,59 @@ class MyAugmentation(nn.Module):
         
         return sample
 
-class MyAugmentationPipeline(nn.Module):
-    def __init__(self):
-        super(MyAugmentationPipeline, self).__init__()
-        self.mixup = K.RandomMixUp(p=1.)
-        self.aff = K.RandomAffine(360, p=0.5)
-        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15])
-        self.crp = K.RandomCrop((200, 200))
-    def forward(self, input, label):
-        input, label = self.mixup(input, label)
-        input = self.crp(self.jitter(self.aff(input)))
-        return input, label
-        aug = MyAugmentationPipeline()
+
+
+# class MyAugmentationV1(nn.Module):
+#     def __init__(self):
+#         super(MyAugmentationV1, self).__init__()
+#         self.pipeline = K.augmentation.AugmentationSequential(
+#             K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15]),
+#             data_keys=['input', 'mask'],
+#             same_on_batch=True,
+#             return_transform=True
+#         )
+#     def forward(self, sample) -> torch.Tensor:
+        
+#         output = self.pipeline(sample['image'], sample['sal'].float())
+
+
+#         sample['image'] = output[0][0]
+#         sample['sal'] = output[1][0].int()
+#         matrix = output[0][1]
+#         return sample, self.pipeline._params
+
+#     def apply(self, sample, matrix):
+#         output = self.pipeline(sample['image'],sample['sal'].float, params=matrix)
+        
+
+#         # print(output1.shape)
+#         # print(output2.shape)
+#         return output
+
+# class MyAugmentation(nn.Module):
+#     def __init__(self):
+#         super(MyAugmentation, self).__init__()
+#         self.aff = K.augmentation.RandomAffine(
+#             [-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], return_transform=True, same_on_batch=True
+#         )
+
+#     def forward(self, sample) -> torch.Tensor:
+        
+#         sample['image'], transform = self.aff(sample['image'])
+
+#         state_dict = self.aff._params
+        
+#         sample['sal'], transform = self.aff(sample['sal'].float(), state_dict)
+#         sample['sal'] = sample['sal'].int()
+        
+#         return sample, transform, state_dict
+
+#     def forward_with_params(self, sample, state_dict):
+             
+
+#         sample['image'], transform = self.aff(sample['image'], state_dict)
+
+#         sample['sal'], transform = self.aff(sample['sal'].float(), state_dict)
+#         sample['sal'] = sample['sal'].int()
+        
+#         return sample, transform
