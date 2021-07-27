@@ -153,9 +153,7 @@ class ContrastiveModel(nn.Module):
         Compute saliency loss
         '''
         sal_loss = self.bce(bg_q, sal_q)
-
-
-       
+      
        
         '''
         Prepare mask_indexes with both query and key size.
@@ -167,12 +165,7 @@ class ContrastiveModel(nn.Module):
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
             tmp_for_cluster = tmp.long()
-        # with torch.no_grad():
-        #     offset_k = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
-        #     tmp2 = (sal_k + torch.reshape(offset_k, [-1, 1, 1]))*sal_k # all bg's to 0
-        #     tmp2 = tmp2.view(-1)
-        #     mask_indexes_2 = torch.nonzero((tmp2)).view(-1).squeeze()
-        #     tmp2 = torch.index_select(tmp2, index=mask_indexes_2, dim=0) // 2
+   
 
         '''
         Prepare prototypes in key size
