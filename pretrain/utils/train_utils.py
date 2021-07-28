@@ -45,12 +45,14 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                                             reduction='mean')
       
         ## Calculate local contrastive loss
-        uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
-        p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-        p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
-        p_class_local[uniq] = p_class_non_zero_classes_local
-        w_class_local = 1 / torch.log(1.02 + p_class_local)
-        local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
+        local_loss = 0
+        if p['loss_coeff']['local_contrastive'] > 0:
+            uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
+            p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+            p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
+            p_class_local[uniq] = p_class_non_zero_classes_local
+            w_class_local = 1 / torch.log(1.02 + p_class_local)
+            local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
 
 
 
@@ -61,12 +63,34 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                 p['loss_coeff']['consistency']* consistency_loss +\
                 p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss) 
         
-        contrastive_losses.update(contrastive_loss.item())
-        cluster_losses.update(cluster_loss.item())
-        local_losses.update(local_loss.item())
-        saliency_losses.update(saliency_loss.item())
-        consistency_losses.update(consistency_loss.item())
-        entropy_losses.update(entropy_loss.item())
+        if p['loss_coeff']['cluster'] > 0:
+            contrastive_losses.update(contrastive_loss.item())
+        else:
+            contrastive_losses.update(contrastive_loss)
+            
+        if p['loss_coeff']['cluster'] > 0:
+            cluster_losses.update(cluster_loss.item())
+            entropy_losses.update(entropy_loss.item())
+        else:
+            cluster_losses.update(cluster_loss)
+            entropy_losses.update(entropy_loss)
+        
+        if p['loss_coeff']['local_contrastive'] > 0:
+            local_losses.update(local_loss.item())
+        else:
+            local_losses.update(local_loss)
+        
+        
+        if p['loss_coeff']['consistency'] > 0:
+            consistency_losses.update(consistency_loss.item())
+        else:
+            consistency_losses.update(consistency_loss)
+
+        if p['loss_coeff']['saliency'] > 0:
+            saliency_losses.update(saliency_loss.item())
+        else:
+            saliency_losses.update(saliency_loss)
+        
 
         losses.update(loss.item())
         

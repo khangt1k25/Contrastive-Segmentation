@@ -20,9 +20,6 @@ model_kwargs:
    upsample: True
    use_classification_head: True
    use_cluster_head: True
-
-
-
 loss_coeff:
    contrastive: 1
    saliency: 1

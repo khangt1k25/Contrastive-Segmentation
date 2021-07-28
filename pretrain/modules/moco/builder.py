@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import random
 
 from utils.common_config import get_model, get_next_transformations
-from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, ConsistencyLoss, IIC_Loss, RegressionLoss
+from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, ConsistencyLoss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -320,7 +320,7 @@ class ContrastiveModel(nn.Module):
         self._dequeue_and_enqueue(prototypes) 
 
         #return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
-        return logits, tmp, sal_loss, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy
+        return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy
 
 
 # utils

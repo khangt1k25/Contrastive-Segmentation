@@ -81,7 +81,7 @@ def get_model(p):
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'],
                                                 p['model_kwargs']['use_cluster_head'],
-                                                p['model_kwargs']['C'])
+                                                p['cluster_kwargs']['C'])
 
 
 def get_train_dataset(p, transform=None):

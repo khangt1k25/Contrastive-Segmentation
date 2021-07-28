@@ -85,7 +85,6 @@ def main():
     
  
     image = torch.cat([image, embedding], dim=0)
-    
     image = image.permute(1, 2, 0).contiguous()
     
 
@@ -93,11 +92,6 @@ def main():
 
 
     def normalize(x):
-      """
-      Normalize a list of sample image data in the range of 0 to 1
-      : x: List of image data.  The image shape is (N, N, 3)
-      : return: Numpy array of normalized data
-      """
       return np.array((x - np.min(x)) / (np.max(x) - np.min(x)))
     
     new = normalize(image.numpy())

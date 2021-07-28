@@ -7,28 +7,46 @@ train_db_name: VOCSegmentation
 train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 8
-train_batch_size: 128
+train_batch_size: 32
 
 # Model
-backbone: resnet50
+backbone: resnet18
 backbone_kwargs:
    dilated: True
-   pretraining: imagenet_moco 
-   moco_state_dict: /path/to/moco_v2_800ep_pretrain.pth.tar # see MoCo repo
+   pretraining: imagenet_classification 
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
    use_cluster_head: True
+loss_coeff:
+   contrastive: 1
+   saliency: 1
+   local_contrastive: 0
+   cluster: 0
+   consistency: 0.1
+
+local_contrastive_kwargs:
+   num_negatives:  48
+   kernel: 3
+
+cluster_kwargs:
    C: 20
    smooth_prob: True
    smooth_coeff: 0.1
-head: deeplab
-freeze_layers: False
+   entropy_coeff: 5
 
+consistency_kwargs:
+   type: l2norm
+
+
+
+head: deeplab
+# Freeze block 1 and 2 in backbone (~1% miou improvement)
+freeze_layers: True 
 # Optimizer
-epochs: 40
+epochs: 45
 optimizer: sgd
 optimizer_kwargs:
    lr: 0.004
@@ -41,4 +59,7 @@ scheduler: poly
 moco_kwargs:
    T: 0.5 # Temperature
    m: 0.999 # Momentum
-   K: 256 # Negatives
+   K: 128 # Negatives
+
+
+
