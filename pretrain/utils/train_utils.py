@@ -2,6 +2,7 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
+from os import stat
 import torch
 from torch.nn.functional import cross_entropy
 from torchvision import transforms
@@ -32,7 +33,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        state_dict = batch['T']
+        if p['type_dataset'] == 'baseline':
+            state_dict = None
+        elif p['type_dataset'] == 'kornia':
+            state_dict = batch['T']
+            
         logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
@@ -67,7 +72,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             contrastive_losses.update(contrastive_loss.item())
         else:
             contrastive_losses.update(contrastive_loss)
-            
+
         if p['loss_coeff']['cluster'] > 0:
             cluster_losses.update(cluster_loss.item())
             entropy_losses.update(entropy_loss.item())

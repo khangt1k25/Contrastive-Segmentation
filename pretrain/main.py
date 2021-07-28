@@ -128,14 +128,23 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    #train_transform = get_train_transformations()
-    base_transform = get_base_transformations()
-    next_transform = get_next_transformations()
-    print(base_transform)
-    print(next_transform)
-    
-    train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
+    train_transform = None
+    base_transform = None
+    next_transform = None
+    if p['type_dataset'] == 'baseline':
+        train_transform = get_train_transformations()
+        print(train_transform)
+        train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
                                 downsample_sal=not p['model_kwargs']['upsample'])
+    elif p['type_dataset'] == 'kornia':
+        base_transform = get_base_transformations()
+        next_transform = get_next_transformations()   
+        print(base_transform)
+        print(next_transform)
+        train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
+                                downsample_sal=not p['model_kwargs']['upsample'])
+    
+    
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),
