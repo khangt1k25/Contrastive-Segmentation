@@ -14,33 +14,70 @@ import torch.nn as nn
 
 
 
+# class MyAugmentation(nn.Module):
+#     def __init__(self):
+#         super(MyAugmentation, self).__init__()
+#         self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=False)
+
+#     def forward(self, sample) -> torch.Tensor:
+        
+#         sample['image'] = self.k2(sample['image'])
+
+#         state_dict = self.k2._params
+        
+#         sample['sal'] = self.k2(sample['sal'].float(), self.k2._params)
+#         sample['sal'] = sample['sal'].int()
+        
+#         return sample, state_dict
+
+    
+#     def forward_with_params(self, sample, state_dict):
+             
+
+#         sample['image'] = self.k2(sample['image'], state_dict)
+
+#         sample['sal'] = self.k2(sample['sal'].float(), state_dict).int()
+        
+#         return sample
+
 class MyAugmentation(nn.Module):
     def __init__(self):
         super(MyAugmentation, self).__init__()
-        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=False)
+        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=True)
 
     def forward(self, sample) -> torch.Tensor:
         
-        sample['image'] = self.k2(sample['image'])
+        sample['image'], transform = self.k2(sample['image'])
+
+        sample['image'] = sample['image'].squeeze(0)
 
         state_dict = self.k2._params
         
-        sample['sal'] = self.k2(sample['sal'].float(), self.k2._params)
-        sample['sal'] = sample['sal'].int()
+        sample['sal'], transform = self.k2(sample['sal'].float(), self.k2._params)
         
-        return sample, state_dict
+        sample['sal'] = sample['sal'].squeeze(0).int()
+        
+        return sample, state_dict, transform
 
     
     def forward_with_params(self, sample, state_dict):
              
 
-        sample['image'] = self.k2(sample['image'], state_dict)
+        sample['image'], _ = self.k2(sample['image'], state_dict)
+        sample['image'] = sample['image'].squeeze(0)
+        sample['sal'], _ = self.k2(sample['sal'].float(), state_dict)
 
-        sample['sal'] = self.k2(sample['sal'].float(), state_dict).int()
+        sample['sal']  = sample['sal'].squeeze(0).int()
         
         return sample
+    
+    def inverse(self, sample, transform):
+        sample['image'] = self.k2.inverse((sample['image'], transform)).squeeze(0)
 
-
+        sample['sal'] = self.k2.inverse((sample['sal'].float(), transform)).squeeze(0)
+        sample['sal']  = sample['sal'].int()
+        return sample
+    
 
 # class MyAugmentationV1(nn.Module):
 #     def __init__(self):

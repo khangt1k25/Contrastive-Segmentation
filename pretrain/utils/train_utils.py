@@ -3,6 +3,7 @@
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
 from os import stat
+from kornia.geometry import transform
 import torch
 from torch.nn.functional import cross_entropy
 from torchvision import transforms
@@ -35,9 +36,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         if p['type_dataset'] == 'baseline':
             state_dict = None
+            transform = None
         elif p['type_dataset'] == 'kornia':
             state_dict = batch['T']
+            transform = batch['transform']
             
+        
         logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
       
         # Use E-Net weighting for calculating the pixel-wise loss.

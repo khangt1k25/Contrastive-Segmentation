@@ -134,7 +134,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, state_dict):
+    def forward(self, im_q, im_k, sal_q, sal_k, state_dict, transform):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -205,21 +205,36 @@ class ContrastiveModel(nn.Module):
         '''
         consistency_loss = 0 
         if self.p['loss_coeff']['consistency'] > 0:
-            augmented_q = []
-            for i in range(len(state_dict)):
+            if self.p['kornia_version'] == 1:
+                inverse_k = []
+                for i in range(len(q.shape[0])):
 
-                sample = {"image": q[i], 'sal': bg_q[i]}
-                new_sample = self.transforms.forward_with_params(sample, state_dict[i])
-    
-                augmented_q.append(new_sample['image'].squeeze(0))
+                    sample = {"image": k[i], 'sal': bg_k[i]}
+                    new_sample = self.transforms.inverse(sample, transform[i])
 
-            augmented_q = torch.stack(augmented_q, dim=0).squeeze(0)
-            augmented_q = augmented_q.permute((0, 2, 3, 1))                  
-    
-            k_selected = k.permute((0, 2, 3, 1))                
+                    inverse_k.append(new_sample['image'].squeeze(0))
 
-            consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_k)
+                inverse_k = torch.stack(inverse_k, dim=0).squeeze(0)
+                inverse_k = inverse_k.permute((0, 2, 3, 1))                  
+                q_selected = q.permute((0, 2, 3, 1))                
 
+                consistency_loss = self.consistency(inverse_k, q_selected, mask=sal_k)
+
+            elif self.p['kornia_version'] == 2:
+                augmented_q = []
+                for i in range(len(state_dict)):
+
+                    sample = {"image": q[i], 'sal': bg_q[i]}
+                    new_sample = self.transforms.forward_with_params(sample, state_dict[i])
+        
+                    augmented_q.append(new_sample['image'].squeeze(0))
+
+                augmented_q = torch.stack(augmented_q, dim=0).squeeze(0)
+                augmented_q = augmented_q.permute((0, 2, 3, 1))                  
+        
+                k_selected = k.permute((0, 2, 3, 1))                
+
+                consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_q)
 
         '''
         Compute cluster loss
