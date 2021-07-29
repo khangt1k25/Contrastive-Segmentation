@@ -55,7 +55,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
             p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
             p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
-            p_class_local[uniq] = p_class_non_zero_classes_local
+            p_class_local[uniq_local] = p_class_non_zero_classes_local
             w_class_local = 1 / torch.log(1.02 + p_class_local)
             local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
 

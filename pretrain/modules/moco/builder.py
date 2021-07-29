@@ -224,6 +224,8 @@ class ContrastiveModel(nn.Module):
         '''
         Compute cluster loss
         '''
+        cluster_loss =  0
+        entropy = 0
         if self.p['loss_coeff']['cluster'] > 0:
             y_q = torch.softmax(y_q, dim=1)
             y_q = y_q.permute(0, 2, 3, 1)
