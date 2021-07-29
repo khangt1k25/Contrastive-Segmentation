@@ -274,6 +274,8 @@ class ContrastiveModel(nn.Module):
         ''' 
         Compute local contrastive logits, labels 
         '''
+        l_logits = []
+        l_labels = []
         if self.p['loss_coeff']['local_contrastive'] > 0:
             l_logits = []
             for i in range(q.shape[0]):
@@ -299,7 +301,8 @@ class ContrastiveModel(nn.Module):
                 l_logits.append(local_logits)
 
             l_logits = torch.cat(l_logits, dim=0)
-            l_labels = torch.zeros(l_logits.shape[0])  
+            l_labels = torch.zeros(l_logits.shape[0]).to(sal_q.device)
+            l_labels = l_labels.long()
             l_logits /= self.T
 
         

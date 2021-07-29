@@ -149,7 +149,7 @@ def save_plot_curve(
     cluster_losses,
     entropy_losses,
     losses,
-    path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/'):
+    path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/'):
 
     with open(path+'cl.txt', 'a') as f:
         f.write(str(contrastive_losses.avg))
