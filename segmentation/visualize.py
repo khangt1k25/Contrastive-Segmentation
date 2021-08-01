@@ -73,7 +73,7 @@ def main():
 
     i = 16
     sample = val_dataset[i]
-    p['embedding_dir'] = '/content/drive/MyDrive/UCS_local/kmeans_result_3/kmeans_VOCSegmentation_supervised_saliency/embeddings'
+    p['embedding_dir'] = '/content/drive/MyDrive/UCS_local/kmeans_result/kmeans_VOCSegmentation_unsupervised_saliency/embeddings'
     filename = os.path.join(p['embedding_dir'], sample['meta']['image'] + '.npy')
     embedding = np.load(filename)
     semseg = sample['semseg']
@@ -95,9 +95,17 @@ def main():
       return np.array((x - np.min(x)) / (np.max(x) - np.min(x)))
     
     new = normalize(image.numpy())
-    plt.imsave("./origin.jpg", new[:,:,:-1])
-    plt.imsave("./segmented.jpg", new)
-    plt.imsave("./mask.jpg", new[:,:,-1])
+    
+    directory = 'visualize'
+    parent_dir = '/content/drive/MyDrive/UCS_local/kmeans_result/kmeans_VOCSegmentation_unsupervised_saliency/'
+    mypath = os.path.join(parent_dir, directory)
+    
+    if not os.path.exists(mypath):
+      os.makedirs(mypath)
+    
+    plt.imsave(mypath+'/'+str(i)+'_origin.jpg', new[:,:,:-1])
+    plt.imsave(mypath+'/'+str(i)+'_segmented.jpg', new)
+    plt.imsave(mypath+'/'+str(i)+'_mask.jpg', new[:,:,-1])
 
 
     

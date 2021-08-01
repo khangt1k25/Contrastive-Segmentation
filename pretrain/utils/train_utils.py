@@ -42,7 +42,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             transform = batch['transform']
             
         
-        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict)
+        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -56,13 +56,13 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         ## Calculate local contrastive loss
         local_loss = 0
         if p['loss_coeff']['local_contrastive'] > 0:
-            uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
-            p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-            p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
-            p_class_local[uniq_local] = p_class_non_zero_classes_local
-            w_class_local = 1 / torch.log(1.02 + p_class_local)
-            local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
-
+            # uniq_local, freq_local = torch.unique(l_labels, return_counts=True)
+            # p_class_local = torch.zeros(l_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+            # p_class_non_zero_classes_local = freq_local.float() / l_labels.numel()
+            # p_class_local[uniq_local] = p_class_non_zero_classes_local
+            # w_class_local = 1 / torch.log(1.02 + p_class_local)
+            # local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
+            local_loss = cross_entropy(l_logits, l_labels,reduction='mean')
 
 
         # Calculate total loss and update meters
