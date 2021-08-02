@@ -13,10 +13,12 @@ from utils.config import create_config
 from utils.common_config import get_val_dataset, get_val_transformations,\
                                 get_val_dataloader,\
                                 get_model
-from utils.kmeans_utils import save_embeddings_to_disk, eval_kmeans
 from termcolor import colored
 import torchvision.transforms as transforms
 from termcolor import colored
+from utils.visualization import visualize_sample, visualize_sample_with_prediction, visualize_sample_with_saved_prediction
+
+
 
 # Parser
 parser = argparse.ArgumentParser(description='Fully-supervised segmentation')
@@ -39,7 +41,7 @@ def main():
     model = get_model(p)
     print(model)
     model = model.cuda()
-
+    
     # Load pre-trained weights
     state_dict = torch.load(p['pretraining'], map_location='cpu')
         # State dict follows our lay-out
@@ -71,42 +73,18 @@ def main():
 
 
 
-    i = 16
+    i = 99
     sample = val_dataset[i]
     p['embedding_dir'] = '/content/drive/MyDrive/UCS_local/kmeans_result/kmeans_VOCSegmentation_unsupervised_saliency/embeddings'
     filename = os.path.join(p['embedding_dir'], sample['meta']['image'] + '.npy')
     embedding = np.load(filename)
-    semseg = sample['semseg']
-    image = sample['image']
-  
 
-    embedding = torch.from_numpy(embedding)
-    embedding = embedding.unsqueeze(0)
+    print(sample.keys())
+    # visualize origin vs gt
+    visualize_sample(sample, '/content/drive/MyDrive/UCS_local/kmeans_result/origin.jpg')
+    # 
+    visualize_sample_with_prediction(sample['image'], sample['semseg'], embedding, '/content/drive/MyDrive/UCS_local/kmeans_result/segmented.jpg')
     
- 
-    image = torch.cat([image, embedding], dim=0)
-    image = image.permute(1, 2, 0).contiguous()
-    
-
-
-
-
-    def normalize(x):
-      return np.array((x - np.min(x)) / (np.max(x) - np.min(x)))
-    
-    new = normalize(image.numpy())
-    
-    directory = 'visualize'
-    parent_dir = '/content/drive/MyDrive/UCS_local/kmeans_result/kmeans_VOCSegmentation_unsupervised_saliency/'
-    mypath = os.path.join(parent_dir, directory)
-    
-    if not os.path.exists(mypath):
-      os.makedirs(mypath)
-    
-    plt.imsave(mypath+'/'+str(i)+'_origin.jpg', new[:,:,:-1])
-    plt.imsave(mypath+'/'+str(i)+'_segmented.jpg', new)
-    plt.imsave(mypath+'/'+str(i)+'_mask.jpg', new[:,:,-1])
-
 
     
 

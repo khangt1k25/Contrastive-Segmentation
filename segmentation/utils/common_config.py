@@ -80,7 +80,10 @@ def get_model(p):
         import torch.nn as nn
         model = ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                     p['model_kwargs']['upsample'], 
-                                                    p['model_kwargs']['use_classification_head'], p['freeze_layer'])
+                                                    p['model_kwargs']['use_classification_head'],
+                                                    p['model_kwargs']['use_cluster_head'],
+                                                    p['cluster_kwargs']['C'],
+                                                    p['freeze_layer'])
     else:
         from models.models import SimpleSegmentationModel
         model = SimpleSegmentationModel(backbone, head)

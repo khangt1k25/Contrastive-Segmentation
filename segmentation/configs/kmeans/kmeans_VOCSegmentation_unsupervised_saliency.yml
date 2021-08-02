@@ -6,16 +6,37 @@ val_db_kwargs:
 num_workers: 4
 
 # Model
-backbone: 'resnet50'
+backbone: resnet18
 backbone_kwargs:
    dilated: True
-   pretrained: True
+   pretrained: True 
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
+   use_cluster_head: True
+loss_coeff:
+   contrastive: 1
+   saliency: 1
+   local_contrastive: 0
+   cluster: 0
+   consistency: 0.1
+
+local_contrastive_kwargs:
+   num_negatives:  48
+   kernel: 3
+
+cluster_kwargs:
+   C: 20
+   smooth_prob: True
+   smooth_coeff: 0.1
+   entropy_coeff: 5
+
+consistency_kwargs:
+   type: l2norm
+
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /path/to/checkpoint.pth.tar # Change this.
+pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
 kmeans_eval: True
