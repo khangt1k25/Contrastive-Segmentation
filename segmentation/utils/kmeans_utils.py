@@ -154,13 +154,11 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         if ptr % 300 == 0:
             print('Computing prototype {}'.format(ptr))
 
-    # print(all_prototypes[1232])
-    # print(all_prototypes[1231].sum())
+
     # perform kmeans
     all_prototypes = all_prototypes.cpu().numpy()
     all_sals = all_sals.cpu().numpy()
     n_clusters = n_clusters - 1
-    # print(all_prototypes[0:2])
     print('Kmeans clustering to {} clusters'.format(n_clusters))
     
     print(colored('Starting kmeans with scikit', 'green'))
@@ -173,8 +171,6 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
 
     # prediction_kmeans = np.argmax(all_prototypes, axis=1)
 
-    # print(prediction_kmeans[0:100])
-    # print(prediction_kmeans[-100:-1])
     # # save predictions
     for i, fname, pred in zip(range(len(val_loader.sampler)), names, prediction_kmeans):
         prediction = all_sals[i].copy()

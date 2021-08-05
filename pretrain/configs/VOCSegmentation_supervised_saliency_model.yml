@@ -25,19 +25,16 @@ loss_coeff:
    contrastive: 1
    saliency: 1
    local_contrastive: 0
-   cluster: 0
-   consistency: 0.1
-
+   cluster: 0.1
+   consistency: 0
 local_contrastive_kwargs:
    num_negatives:  48
    kernel: 3
-
 cluster_kwargs:
    C: 20
    smooth_prob: True
    smooth_coeff: 0.1
    entropy_coeff: 5
-
 consistency_kwargs:
    type: l2norm
 

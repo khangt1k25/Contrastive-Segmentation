@@ -123,7 +123,9 @@ def visualize_sample_with_prediction(image, gt, prediction, filename=None):
         array_gt[gt == class_i]  = cmap[class_i]
 
     # Prediction
-    prediction = prediction.cpu().numpy().astype(np.uint8) 
+    # prediction = prediction.cpu().numpy().astype(np.uint8)
+    prediction = prediction.astype(np.uint8)
+     
     array_pred = np.empty((prediction.shape[0], prediction.shape[1], cmap.shape[1]), dtype=cmap.dtype)
     for class_i in np.unique(prediction):
         array_pred[prediction == class_i]  = cmap[class_i]
