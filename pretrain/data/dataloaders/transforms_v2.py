@@ -43,10 +43,14 @@ import torch.nn as nn
 class MyAugmentation(nn.Module):
     def __init__(self):
         super(MyAugmentation, self).__init__()
+        self.k1 = K.augmentation.ColorJitter(0.2, 0.3, 0.2, 0.3, same_on_batch=True)
         self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=True)
 
     def forward(self, sample) -> torch.Tensor:
         
+        sample['image'] = self.k1(sample['image'])
+        sample['image'] = sample['image'].squeeze(0)
+
         sample['image'], transform = self.k2(sample['image'])
 
         sample['image'] = sample['image'].squeeze(0)

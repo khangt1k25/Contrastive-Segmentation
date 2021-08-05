@@ -235,7 +235,22 @@ class ContrastiveModel(nn.Module):
                 k_selected = k.permute((0, 2, 3, 1))                
 
                 consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_q)
+            elif self.p['kornia_version'] == 4:
+                augmented_k = []
+                for i in range(len(state_dict)):
 
+                    sample = {"image": k[i], 'sal': bg_k[i]}
+                    new_sample = self.transforms.forward_with_params(sample, state_dict[i])
+        
+                    augmented_k.append(new_sample['image'].squeeze(0))
+
+                augmented_k = torch.stack(augmented_k, dim=0).squeeze(0)
+                augmented_k = augmented_k.permute((0, 2, 3, 1))                  
+        
+                q_selected = q.permute((0, 2, 3, 1))                
+
+                consistency_loss = self.consistency(augmented_k, q_selected, mask=sal_q)
+        
         '''
         Compute cluster loss
         '''
