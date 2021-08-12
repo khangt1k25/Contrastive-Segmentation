@@ -82,7 +82,7 @@ class ConInstContrast:
             mask[B + i, i] = False
 
         return mask
-
+        
 
 class CatInstConsistency:
     def __init__(self, reduction="mean", cons_type="neg_log_dot_prod"):
@@ -176,8 +176,10 @@ class ConsistencyLoss(Module):
         self.type = type
         assert(self.type in ['l2norm', 'l2', 'negativecosine'])
 
-    def forward(self, output, labels, mask):
+    def forward(self, output, labels, mask=None):
         assert (output.size() == labels.size())
+        if mask is None:
+            mask = torch.ones_like(labels, requires_grad=False)
 
         if self.type == 'l2norm':
             output = F.normalize(output, dim=-1)
