@@ -82,7 +82,7 @@ class ConInstContrast:
             mask[B + i, i] = False
 
         return mask
-
+        
 
 class CatInstConsistency:
     def __init__(self, reduction="mean", cons_type="neg_log_dot_prod"):
