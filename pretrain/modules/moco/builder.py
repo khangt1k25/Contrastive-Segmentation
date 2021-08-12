@@ -196,8 +196,8 @@ class ContrastiveModel(nn.Module):
                 prototypes_cluster = torch.bmm(y_k, sal_k_flat).squeeze()
 
                 prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0) # softmax = 1 
-                prototypes_cluster = prototypes_cluster[tmp_for_cluster] 
-        
+                # prototypes_cluster = prototypes_cluster[tmp_for_cluster]
+
 
 
         '''
@@ -276,6 +276,16 @@ class ContrastiveModel(nn.Module):
 
             entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
                                         (py_avg_2 * py_avg_2.log()).sum(0))
+            
+            y_batch = torch.matmul(py_1_smt, py_2_smt.t()).log()
+            
+            cluster_loss = F.cross_entropy(y_batch, tmp, reduce='mean')
+            
+
+
+            # cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+
+
 
             # zero = torch.zeros([], dtype=torch.float32,
             #                    device=q.device, requires_grad=False)
@@ -296,8 +306,8 @@ class ContrastiveModel(nn.Module):
             # tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
             #                               upper_clamp_coeff_2.pow(2).sum(0))
             
-
-            cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+            
+            
         
 
 
@@ -354,7 +364,6 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        #return logits, tmp, sal_loss, cluster_loss, entropy, upper_clamp, lower_clamp
         return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy
 
 
