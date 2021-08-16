@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+from torchvision import transforms
 import torchvision.transforms.functional as F
 import  kornia as K
 import torch.nn as nn
@@ -14,126 +15,60 @@ import torch.nn as nn
 
 
 
-# class MyAugmentation(nn.Module):
-#     def __init__(self):
-#         super(MyAugmentation, self).__init__()
-#         self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=False)
-
-#     def forward(self, sample) -> torch.Tensor:
-        
-#         sample['image'] = self.k2(sample['image'])
-
-#         state_dict = self.k2._params
-        
-#         sample['sal'] = self.k2(sample['sal'].float(), self.k2._params)
-#         sample['sal'] = sample['sal'].int()
-        
-#         return sample, state_dict
-
-    
-#     def forward_with_params(self, sample, state_dict):
-             
-
-#         sample['image'] = self.k2(sample['image'], state_dict)
-
-#         sample['sal'] = self.k2(sample['sal'].float(), state_dict).int()
-        
-#         return sample
 
 class MyAugmentation(nn.Module):
     def __init__(self):
         super(MyAugmentation, self).__init__()
-        self.k1 = K.augmentation.ColorJitter(0.2, 0.3, 0.2, 0.3, same_on_batch=True)
-        self.k2 = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=True)
+        self.colorJiter = K.augmentation.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, same_on_batch=True)
+        self.randGrayScale = K.augmentation.RandomGrayscale(p=0.2, same_on_batch=True)
+        self.randHorizontalFlip = K.augmentation.RandomHorizontalFlip(p=0.5, same_on_batch=True, return_transform=True)
+        # self.randAffine = K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], same_on_batch=True, return_transform=True)
 
     def forward(self, sample) -> torch.Tensor:
         
-        sample['image'] = self.k1(sample['image'])
+        sample['image'] = self.colorJiter(sample['image']).squeeze(0)
+        sample['image'] = self.randGrayScale(sample['image']).squeeze(0)
+
+        sample['image'], transform_1 = self.randHorizontalFlip(sample['image'])
         sample['image'] = sample['image'].squeeze(0)
 
-        sample['image'], transform = self.k2(sample['image'])
-
-        sample['image'] = sample['image'].squeeze(0)
-
-        state_dict = self.k2._params
+        # sample['image'], transform_2 = self.randAffine(sample['image'])
         
-        sample['sal'], transform = self.k2(sample['sal'].float(), self.k2._params)
+        # sample['image'] = sample['image'].squeeze(0)
+        
+        state_dict_1 = self.randHorizontalFlip._params
+        # state_dict_2 = self.randAffine._params    
+        
+        sample['sal'], transform_1 = self.randHorizontalFlip(sample['sal'].float(), self.randHorizontalFlip._params)
+        # sample['sal'], transform_2 = self.randAffine(sample['sal'].float(), self.randAffine._params)
         
         sample['sal'] = sample['sal'].squeeze(0).int()
         
-        return sample, state_dict, transform
+        return sample, [state_dict_1], [transform_1]
 
     
     def forward_with_params(self, sample, state_dict):
              
-
-        sample['image'], _ = self.k2(sample['image'], state_dict)
+        sample['image'], _ = self.randHorizontalFlip(sample['image'], state_dict[0])
         sample['image'] = sample['image'].squeeze(0)
-        sample['sal'], _ = self.k2(sample['sal'].float(), state_dict)
 
-        sample['sal']  = sample['sal'].squeeze(0).int()
+        #sample['image'], _ = self.randAffine(sample['image'], state_dict[1])
+        #sample['image'] = sample['image'].squeeze(0)
+
+        sample['sal'], _ = self.randHorizontalFlip(sample['sal'].float(), state_dict[0])
+        sample['sal']  = sample['sal'].squeeze(0)
+        #sample['sal'], _ = self.randAffine(sample['sal'].float(), state_dict[1])
+        #sample['sal']  = sample['sal'].squeeze(0).int()
         
         return sample
     
     def inverse(self, sample, transform):
-        sample['image'] = self.k2.inverse((sample['image'], transform)).squeeze(0)
+        sample['image'] = self.randHorizontalFlip.inverse(sample['image']).squeeze(0)
+        #sample['image'] = self.randAffine.inverse((sample['image'], transform[1])).squeeze(0)
 
-        sample['sal'] = self.k2.inverse((sample['sal'].float(), transform)).squeeze(0)
+        sample['sal'] = self.randHorizontalFlip.inverse(sample['sal'].float()).squeeze(0)
+        #sample['sal'] = self.randAffine.inverse((sample['sal'].float(), transform[1])).squeeze(0)
         sample['sal']  = sample['sal'].int()
         return sample
     
 
-# class MyAugmentationV1(nn.Module):
-#     def __init__(self):
-#         super(MyAugmentationV1, self).__init__()
-#         self.pipeline = K.augmentation.AugmentationSequential(
-#             K.augmentation.RandomAffine([-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15]),
-#             data_keys=['input', 'mask'],
-#             same_on_batch=True,
-#             return_transform=True
-#         )
-#     def forward(self, sample) -> torch.Tensor:
-        
-#         output = self.pipeline(sample['image'], sample['sal'].float())
-
-
-#         sample['image'] = output[0][0]
-#         sample['sal'] = output[1][0].int()
-#         matrix = output[0][1]
-#         return sample, self.pipeline._params
-
-#     def apply(self, sample, matrix):
-#         output = self.pipeline(sample['image'],sample['sal'].float, params=matrix)
-        
-
-#         # print(output1.shape)
-#         # print(output2.shape)
-#         return output
-
-# class MyAugmentation(nn.Module):
-#     def __init__(self):
-#         super(MyAugmentation, self).__init__()
-#         self.aff = K.augmentation.RandomAffine(
-#             [-45., 45.], [0., 0.15], [0.5, 1.5], [0., 0.15], return_transform=True, same_on_batch=True
-#         )
-
-#     def forward(self, sample) -> torch.Tensor:
-        
-#         sample['image'], transform = self.aff(sample['image'])
-
-#         state_dict = self.aff._params
-        
-#         sample['sal'], transform = self.aff(sample['sal'].float(), state_dict)
-#         sample['sal'] = sample['sal'].int()
-        
-#         return sample, transform, state_dict
-
-#     def forward_with_params(self, sample, state_dict):
-             
-
-#         sample['image'], transform = self.aff(sample['image'], state_dict)
-
-#         sample['sal'], transform = self.aff(sample['sal'].float(), state_dict)
-#         sample['sal'] = sample['sal'].int()
-        
-#         return sample, transform
