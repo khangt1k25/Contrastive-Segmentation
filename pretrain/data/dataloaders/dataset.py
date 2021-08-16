@@ -143,13 +143,6 @@ class TwoTransformDataset(data.Dataset):
                 sample_ = self.base_dataset.__getitem__(random.randint(0, self.__len__()-1))
                 count = 100
  
-            # query_sample = self.base_transform(deepcopy(sample_))
-            
-            # key_sample, state_dict, transform = self.next_transform(deepcopy(query_sample))
-            
-
-            # key_sample['image'] = key_sample['image'].squeeze(0)
-            # key_sample['sal'] = key_sample['sal'].squeeze(0).squeeze(0)
 
             key_sample = self.base_transform(deepcopy(sample_))
 
