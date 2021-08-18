@@ -42,7 +42,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             transform = batch['transform']
             
         
-        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
+        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss, clamp_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -70,8 +70,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['local_contrastive'] * local_loss +\
                 p['loss_coeff']['consistency']* consistency_loss +\
-                p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss) 
-        
+                p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss + clamp_loss)
+                 
+
         if p['loss_coeff']['cluster'] > 0:
             contrastive_losses.update(contrastive_loss.item())
         else:

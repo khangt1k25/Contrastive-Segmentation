@@ -197,7 +197,7 @@ class ContrastiveModel(nn.Module):
 
                 prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0) # softmax = 1 
                 # prototypes_cluster = prototypes_cluster[tmp_for_cluster]
-
+                prototypes_cluster = torch.index_select(prototypes_cluster, dim=0, index=tmp_for_cluster)
 
 
         '''
@@ -257,6 +257,7 @@ class ContrastiveModel(nn.Module):
         '''
         cluster_loss =  0
         entropy = 0
+        clamp = 0
         if self.p['loss_coeff']['cluster'] > 0:
             y_q = torch.softmax(y_q, dim=1)
             y_q = y_q.permute(0, 2, 3, 1)
@@ -278,38 +279,38 @@ class ContrastiveModel(nn.Module):
             entropy = -0.5 * ((py_avg_1 * py_avg_1.log()).sum(0) +
                                         (py_avg_2 * py_avg_2.log()).sum(0))
             
-            y_batch = torch.matmul(py_1_smt, py_2_smt.t()).log()
+            #y_batch = torch.matmul(py_1_smt, py_2_smt.t()).log()
             
-            cluster_loss = F.cross_entropy(y_batch, tmp, reduce='mean')
+            #cluster_loss = F.cross_entropy(y_batch, tmp, reduce='mean')
             
 
 
-            # cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
+            cluster_loss = self.cons_y(py_1_smt, py_2_smt).mean(0)
 
 
 
-            # zero = torch.zeros([], dtype=torch.float32,
-            #                    device=q.device, requires_grad=False)
-            # min_rate=0.7
-            # max_rate=1.3
-            # lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
-            # lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
-            # lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
-            #                       (py_avg_2 * lower_clamp_coeff_2).sum(0))
-            # tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
-            #                               lower_clamp_coeff_2.pow(2).sum(0))
+            zero = torch.zeros([], dtype=torch.float32,
+                               device=q.device, requires_grad=False)
+            min_rate=0.7
+            max_rate=1.3
+            lower_clamp_coeff_1 = torch.min(py_avg_1.data - min_rate / self.C, zero).detach()
+            lower_clamp_coeff_2 = torch.min(py_avg_2.data - min_rate / self.C, zero).detach()
+            lower_clamp = 0.5 * ((py_avg_1 * lower_clamp_coeff_1).sum(0) +
+                                  (py_avg_2 * lower_clamp_coeff_2).sum(0))
+            tracked_lower_clamp = 0.5 * (lower_clamp_coeff_1.pow(2).sum(0) +
+                                          lower_clamp_coeff_2.pow(2).sum(0))
 
 
-            # upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
-            # upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
-            # upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
-            #                       (py_avg_2 * upper_clamp_coeff_2).sum(0))
-            # tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
-            #                               upper_clamp_coeff_2.pow(2).sum(0))
+            upper_clamp_coeff_1 = torch.max(py_avg_1.data - max_rate / self.C, zero).detach()
+            upper_clamp_coeff_2 = torch.max(py_avg_2.data - max_rate / self.C, zero).detach()
+            upper_clamp = 0.5 * ((py_avg_1 * upper_clamp_coeff_1).sum(0) +
+                                  (py_avg_2 * upper_clamp_coeff_2).sum(0))
+            tracked_upper_clamp = 0.5 * (upper_clamp_coeff_1.pow(2).sum(0) +
+                                          upper_clamp_coeff_2.pow(2).sum(0))
             
             
-            
-        
+            clamp = 0.01 * upper_clamp + 0.01 * lower_clamp
+
 
 
         ''' 
@@ -365,7 +366,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy
+        return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy, clamp
 
 
 # utils
