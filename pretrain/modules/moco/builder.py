@@ -235,6 +235,7 @@ class ContrastiveModel(nn.Module):
                 k_selected = k.permute((0, 2, 3, 1))                
 
                 consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_q)
+            
             elif self.p['kornia_version'] == 4:
                 augmented_k = []
                 for i in range(len(state_dict)):
