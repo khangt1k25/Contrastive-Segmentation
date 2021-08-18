@@ -32,7 +32,9 @@ class ContrastiveSegmentationModel(nn.Module):
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
         if self.use_y_head:
-            self.y_head = nn.Conv2d(self.head.in_channels, self.C, 1, bias=False)
+            self.y_head = nn.Conv2d(self.head.in_channels, self.C, 1)
+
+        
 
 
     def forward(self, x):
@@ -47,15 +49,15 @@ class ContrastiveSegmentationModel(nn.Module):
             sal = self.classification_head(embedding)
         if self.use_y_head:
             y = self.y_head(embedding)
-
+        
         
         # Upsample to input resolution
         if self.upsample: 
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
-            # if self.use_y_head:
-            #     y = F.interpolate(y, size=input_shape, mode='bilinear',  align_corners=False)
+            if self.use_y_head:
+                y = F.interpolate(y, size=input_shape, mode='bilinear',  align_corners=False)
         
         # Return outputs
         if self.use_classification_head and self.use_y_head:
