@@ -191,6 +191,7 @@ class ContrastiveModel(nn.Module):
             
             #prototypes cluster
             if self.p['loss_coeff']['cluster'] > 0:
+                ly_2 = y_k
                 y_k = torch.softmax(y_k, dim=1)
                 y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
                 prototypes_cluster = torch.bmm(y_k, sal_k_flat).squeeze()
@@ -259,6 +260,7 @@ class ContrastiveModel(nn.Module):
         entropy = 0
         clamp = 0
         if self.p['loss_coeff']['cluster'] > 0:
+            ly_1 = y_q
             y_q = torch.softmax(y_q, dim=1)
             y_q = y_q.permute(0, 2, 3, 1)
             y_q = torch.reshape(y_q, [-1, self.C])
@@ -309,10 +311,33 @@ class ContrastiveModel(nn.Module):
                                           upper_clamp_coeff_2.pow(2).sum(0))
             
             
-            clamp = 0.01 * upper_clamp + 0.01 * lower_clamp
+            
 
+            max_abs_logit = 25
+            if max_abs_logit > 0:
+                lower_logit_clamp_coeff = torch.min(ly_1.data + max_abs_logit, zero).detach()
+                lower_logit_clamp_coeff_b = torch.min(ly_2.data + max_abs_logit, zero).detach()
+                lower_logit_clamp = 0.5 * ((ly_1 * lower_logit_clamp_coeff).sum(1).mean() +
+                                        (ly_2 * lower_logit_clamp_coeff_b).sum(1).mean())
+                tracked_lower_logit_clamp = 0.5 * (lower_logit_clamp_coeff.pow(2).sum(1).mean() +
+                                                lower_logit_clamp_coeff_b.pow(2).sum(1).mean())
 
+                upper_logit_clamp_coeff = torch.max(ly_1.data - max_abs_logit, zero).detach()
+                upper_logit_clamp_coeff_b = torch.max(ly_2.data - max_abs_logit, zero).detach()
+                upper_logit_clamp = 0.5 * ((ly_1 * upper_logit_clamp_coeff).sum(1).mean() +
+                                        (ly_2 * upper_logit_clamp_coeff_b).sum(1).mean())
 
+                tracked_upper_logit_clamp = 0.5 * (upper_logit_clamp_coeff.pow(2).sum(1).mean() +
+                                                upper_logit_clamp_coeff_b.pow(2).sum(1).mean())
+
+            else:
+                lower_logit_clamp = zero
+                tracked_lower_logit_clamp = zero
+
+                upper_logit_clamp = zero
+                tracked_upper_logit_clamp = zero
+            
+            clamp = 0.01 * upper_clamp + 0.01 * lower_clamp + 0.01*lower_logit_clamp+0.01*upper_logit_clamp
         ''' 
         Compute local contrastive logits, labels 
         '''
