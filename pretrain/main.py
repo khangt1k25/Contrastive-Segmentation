@@ -131,6 +131,7 @@ def main_worker(gpu, ngpus_per_node, args):
     train_transform = None
     base_transform = None
     next_transform = None
+    
     if p['type_dataset'] == 'baseline':
         train_transform = get_train_transformations()
         print(train_transform)

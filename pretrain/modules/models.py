@@ -54,8 +54,8 @@ class ContrastiveSegmentationModel(nn.Module):
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
-            if self.use_y_head:
-                y = F.interpolate(y, size=input_shape, mode='bilinear',  align_corners=False)
+            # if self.use_y_head:
+            #     y = F.interpolate(y, size=input_shape, mode='bilinear',  align_corners=False)
         
         # Return outputs
         if self.use_classification_head and self.use_y_head:
