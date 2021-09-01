@@ -146,7 +146,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 downsample_sal=not p['model_kwargs']['upsample'])
     
     
-
+    
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),
                     num_workers=p['num_workers'], pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_custom)
