@@ -401,7 +401,8 @@ class ContrastiveModel(nn.Module):
             l_positive = torch.matmul(q_mean, prototypes.t())
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
-            mean_labels = torch.zeros(mean_logits.shape[0]).to(q.device)
+            # mean_labels = torch.zeros(mean_logits.shape[0]).to(q.device)
+            mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
             mean_labels = mean_labels.long()
         
         
