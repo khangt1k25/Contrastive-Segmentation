@@ -370,7 +370,7 @@ class ContrastiveModel(nn.Module):
                 neg = q_i[neg_indexes]
                 local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
                 
-
+                
                 local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
 
                 l_logits.append(local_logits)
