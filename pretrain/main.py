@@ -143,7 +143,7 @@ def main_worker(gpu, ngpus_per_node, args):
         print(base_transform)
         print(next_transform)
         train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
-                                downsample_sal=not p['model_kwargs']['upsample'])
+                                downsample_sal=not p['model_kwargs']['upsample'], type_kornia=p['kornia_version'])
     
     
 

@@ -8,7 +8,7 @@ train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 8
 train_batch_size: 32
-type_dataset: baseline
+type_dataset: kornia
 
 # 
 kornia_version: 1
@@ -31,7 +31,7 @@ loss_coeff:
    saliency: 1
    local_contrastive: 0
    cluster: 0
-   consistency: 0
+   consistency: 0.1
 
 local_contrastive_kwargs:
    num_negatives:  48

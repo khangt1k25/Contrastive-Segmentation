@@ -131,8 +131,8 @@ def get_base_transformations():
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.0)),
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406],
+        #                          std=[0.229, 0.224, 0.225])
     ]
 
     return torchvision.transforms.Compose(augmentation)

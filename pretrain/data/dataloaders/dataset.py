@@ -5,7 +5,7 @@
 import torch.utils.data as data
 import random
 import warnings
-
+import torchvision
 from copy import deepcopy
 from torch.nn.functional import interpolate
 
@@ -111,13 +111,16 @@ class DatasetKeyQuery(data.Dataset):
 
 class TwoTransformDataset(data.Dataset):
     def __init__(self, base_dataset, base_transform, next_transform, downsample_sal=False,
-                    scale_factor_sal=0.125, min_area=0.01, max_area=0.99):
+                    scale_factor_sal=0.125, min_area=0.01, max_area=0.99, type_kornia=1):
         super(TwoTransformDataset, self).__init__()
         self.base_dataset = base_dataset
         self.base_transform = base_transform
         self.next_transform = next_transform
         self.downsample_sal = downsample_sal
-        
+        self.type_kornia = type_kornia
+        self.normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                 std=[0.229, 0.224, 0.225])
+
         if isinstance(scale_factor_sal, float):
             self.scale_factor_sal = (scale_factor_sal, scale_factor_sal)
         else:
@@ -125,6 +128,8 @@ class TwoTransformDataset(data.Dataset):
 
         self.min_area = min_area
         self.max_area = max_area
+
+
 
     def __len__(self):
         return len(self.base_dataset) 
@@ -143,14 +148,30 @@ class TwoTransformDataset(data.Dataset):
                 sample_ = self.base_dataset.__getitem__(random.randint(0, self.__len__()-1))
                 count = 100
  
+            if self.type_kornia == 1:
+                query_sample = self.base_transform(deepcopy(sample_))
 
-            key_sample = self.base_transform(deepcopy(sample_))
+                key_sample, state_dict, transform = self.next_transform(deepcopy(query_sample))
+                
+                
 
-            query_sample, state_dict, transform = self.next_transform(deepcopy(key_sample))
-            
+                key_sample['image'] = key_sample['image'].squeeze(0)
+                key_sample['sal'] = key_sample['sal'].squeeze(0).squeeze(0)
 
-            query_sample['image'] = query_sample['image'].squeeze(0)
-            query_sample['sal'] = query_sample['sal'].squeeze(0).squeeze(0)
+                query_sample['image'] = self.normalize(query_sample['image'])
+                key_sample['image'] = self.normalize(key_sample['image'])
+
+            elif self.type_kornia == 2:
+                key_sample = self.base_transform(deepcopy(sample_))
+
+                query_sample, state_dict, transform = self.next_transform(deepcopy(key_sample))
+                
+                
+                query_sample['image'] = query_sample['image'].squeeze(0)
+                query_sample['sal'] = query_sample['sal'].squeeze(0).squeeze(0)
+
+                query_sample['image'] = self.normalize(query_sample['image'])
+                key_sample['image'] = self.normalize(key_sample['image'])
                            
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
