@@ -41,6 +41,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             state_dict = batch['T']
             transform = batch['transform']
             
+            
         
         logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss, clamp_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
       

@@ -7,6 +7,7 @@ from data.dataloaders.dataset import TwoTransformDataset
 from utils.common_config import get_train_dataset,get_base_transformations, get_next_transformations
 from PIL import Image
 import torch
+from utils.collate import collate_custom
 
 toPIL = transforms.ToPILImage()
 # img = Image.open('../examples/pic.jpg')
@@ -25,26 +26,40 @@ print(next_transform)
 
 p = {'train_db_name':'VOCSegmentation', 'train_db_kwargs': {'saliency':'unsupervised_model'}}
 train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, type_kornia=1)
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32, collate_fn=collate_custom)
 
-sample = train_dataset[1234]
+for i, batch in enumerate(train_dataloader):
+    # Forward pass
+    im_q = batch['query']['image']
+    im_k = batch['key']['image']
+    sal_q = batch['query']['sal']
+    sal_k = batch['key']['sal']
 
-key = sample['key']
-query = sample['query']
+    state_dict = batch['T']
+    transform = batch['transform']
+
+    print(len(transform))
+    print(len(state_dict))
+    break
+# sample = train_dataset[1234]
+
+# key = sample['key']
+# query = sample['query']
 
 
 # print(torch.unique(key['sal']))
 
 # toPIL(key['image']).show(title='key')
-# toPIL(key['sal'].float()).show()
-toPIL(query['image']).show(title='query')
-# toPIL(query['sal'].float()).show()
+# # toPIL(key['sal'].float()).show()
+# toPIL(query['image']).show(title='query')
+# # toPIL(query['sal'].float()).show()
 
 
-next = next_transform.forward_with_params(deepcopy(query), state_dict=sample['T'])
+# next = next_transform.forward_with_params(deepcopy(query), state_dict=sample['T'])
 
-inv = next_transform.inverse(deepcopy(key), transform=sample['transform'])
+# inv = next_transform.inverse(deepcopy(key), transform=sample['transform'])
 
-toPIL(inv['image']).show(title='inv')
+# toPIL(inv['image']).show(title='inv')
 # toPIL(next['image']).show()
 
 # toPIL(inv['sal'].float()).show()
