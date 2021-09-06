@@ -162,13 +162,14 @@ class TwoTransformDataset(data.Dataset):
                 key_sample['image'] = self.normalize(key_sample['image'])
 
             elif self.type_kornia == 2:
+                
                 key_sample = self.base_transform(deepcopy(sample_))
 
                 query_sample, state_dict, transform = self.next_transform(deepcopy(key_sample))
                 
                 
                 query_sample['image'] = query_sample['image'].squeeze(0)
-                query_sample['sal'] = query_sample['sal'].squeeze(0).squeeze(0)
+                query_sample['sal'] = query_sample['sal'].squeeze(0)
 
                 query_sample['image'] = self.normalize(query_sample['image'])
                 key_sample['image'] = self.normalize(key_sample['image'])
@@ -181,6 +182,8 @@ class TwoTransformDataset(data.Dataset):
             key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
             query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
             
+            # print(key_area)
+            # print(query_area)
             if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area: # Ok. Foreground/Background has proper ratio.
                 return {'key': key_sample, 'query': query_sample, "T": state_dict, "transform": transform}
 

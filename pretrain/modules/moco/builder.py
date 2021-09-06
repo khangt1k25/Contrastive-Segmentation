@@ -214,8 +214,8 @@ class ContrastiveModel(nn.Module):
                 inverse_sal = []
                 for i in range(len(q.shape[0])):
 
-                    sample = {"image": k[i], 'sal': bg_k[i]}
-                    new_sample = self.transforms.inverse(deepcopy(sample), transform[i])
+                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
+                    new_sample = self.transforms.inverse(sample, transform[i])
                     inverse_k.append(new_sample['image'].squeeze(0))
                     inverse_sal.append(new_sample['sal'].squeeze(0))
 
@@ -226,14 +226,14 @@ class ContrastiveModel(nn.Module):
                 q_selected = q.permute((0, 2, 3, 1))                
 
                 consistency_loss = self.consistency(inverse_k, q_selected, mask=inverse_sal)
-        
+                
             elif self.p['kornia_version'] == 2:
                 augmented_k = []
                 augmented_sal = []
                 for i in range(len(state_dict)):
 
-                    sample = {"image": k[i], 'sal': bg_k[i]}
-                    new_sample = self.transforms.forward_with_params(deepcopy(sample), state_dict[i])
+                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
+                    new_sample = self.transforms.forward_with_params(sample, state_dict[i])
                     augmented_sal.append(new_sample['sal'].squeeze(0))
                     augmented_k.append(new_sample['image'].squeeze(0))
 
