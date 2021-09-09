@@ -158,8 +158,8 @@ class TwoTransformDataset(data.Dataset):
                 key_sample['image'] = key_sample['image'].squeeze(0)
                 key_sample['sal'] = key_sample['sal'].squeeze(0).squeeze(0)
 
-                query_sample['image'] = self.normalize(query_sample['image'])
-                key_sample['image'] = self.normalize(key_sample['image'])
+                # query_sample['image'] = self.normalize(query_sample['image'])
+                # key_sample['image'] = self.normalize(key_sample['image'])
 
             elif self.type_kornia == 2:
                 
@@ -171,8 +171,8 @@ class TwoTransformDataset(data.Dataset):
                 query_sample['image'] = query_sample['image'].squeeze(0)
                 query_sample['sal'] = query_sample['sal'].squeeze(0)
 
-                query_sample['image'] = self.normalize(query_sample['image'])
-                key_sample['image'] = self.normalize(key_sample['image'])
+                # query_sample['image'] = self.normalize(query_sample['image'])
+                # key_sample['image'] = self.normalize(key_sample['image'])
                            
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),

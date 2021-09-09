@@ -212,7 +212,7 @@ class ContrastiveModel(nn.Module):
             if self.p['kornia_version'] == 1:
                 inverse_k = []
                 inverse_sal = []
-                for i in range(len(q.shape[0])):
+                for i in range(len(transform)):
 
                     sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
                     new_sample = self.transforms.inverse(sample, transform[i])
@@ -241,7 +241,7 @@ class ContrastiveModel(nn.Module):
                 augmented_k = augmented_k.permute((0, 2, 3, 1))                  
                 augmented_sal = torch.stack(augmented_sal, dim=0)
 
-                q_selected = q.permute((0, 2, 3, 1))                
+                q_selected = q.permute((0, 2, 3, 1))
 
                 consistency_loss = self.consistency(augmented_k, q_selected, mask=augmented_sal)
         
