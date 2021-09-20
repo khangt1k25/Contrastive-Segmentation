@@ -7,10 +7,12 @@
 # Pixel-wise contrastive loss based upon our paper
 
 
+from copy import deepcopy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
+import torchvision
 
 from utils.common_config import get_model, get_next_transformations
 from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, ConsistencyLoss
@@ -197,7 +199,7 @@ class ContrastiveModel(nn.Module):
                 prototypes_cluster = torch.bmm(y_k, sal_k_flat).squeeze()
 
                 prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0) # softmax = 1 
-                # prototypes_cluster = prototypes_cluster[tmp_for_cluster]
+     
                 prototypes_cluster = torch.index_select(prototypes_cluster, dim=0, index=tmp_for_cluster)
 
 
@@ -208,50 +210,39 @@ class ContrastiveModel(nn.Module):
         if self.p['loss_coeff']['consistency'] > 0:
             if self.p['kornia_version'] == 1:
                 inverse_k = []
-                for i in range(len(q.shape[0])):
+                inverse_sal = []
+                for i in range(len(transform)):
 
-                    sample = {"image": k[i], 'sal': bg_k[i]}
+                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
                     new_sample = self.transforms.inverse(sample, transform[i])
-
                     inverse_k.append(new_sample['image'].squeeze(0))
+                    inverse_sal.append(new_sample['sal'].squeeze(0))
 
                 inverse_k = torch.stack(inverse_k, dim=0).squeeze(0)
                 inverse_k = inverse_k.permute((0, 2, 3, 1))                  
+                inverse_sal = torch.stack(inverse_sal, dim=0)
+
                 q_selected = q.permute((0, 2, 3, 1))                
 
-                consistency_loss = self.consistency(inverse_k, q_selected, mask=sal_k)
-
+                consistency_loss = self.consistency(inverse_k, q_selected, mask=inverse_sal)
+                
             elif self.p['kornia_version'] == 2:
-                augmented_q = []
-                for i in range(len(state_dict)):
-
-                    sample = {"image": q[i], 'sal': bg_q[i]}
-                    new_sample = self.transforms.forward_with_params(sample, state_dict[i])
-        
-                    augmented_q.append(new_sample['image'].squeeze(0))
-
-                augmented_q = torch.stack(augmented_q, dim=0).squeeze(0)
-                augmented_q = augmented_q.permute((0, 2, 3, 1))                  
-        
-                k_selected = k.permute((0, 2, 3, 1))                
-
-                consistency_loss = self.consistency(augmented_q, k_selected, mask=sal_q)
-            
-            elif self.p['kornia_version'] == 4:
                 augmented_k = []
+                augmented_sal = []
                 for i in range(len(state_dict)):
 
-                    sample = {"image": k[i], 'sal': bg_k[i]}
+                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
                     new_sample = self.transforms.forward_with_params(sample, state_dict[i])
-        
+                    augmented_sal.append(new_sample['sal'].squeeze(0))
                     augmented_k.append(new_sample['image'].squeeze(0))
 
                 augmented_k = torch.stack(augmented_k, dim=0).squeeze(0)
                 augmented_k = augmented_k.permute((0, 2, 3, 1))                  
-        
-                q_selected = q.permute((0, 2, 3, 1))                
+                augmented_sal = torch.stack(augmented_sal, dim=0)
 
-                consistency_loss = self.consistency(augmented_k, q_selected, mask=sal_q)
+                q_selected = q.permute((0, 2, 3, 1))
+
+                consistency_loss = self.consistency(augmented_k, q_selected, mask=augmented_sal)
         
         '''
         Compute cluster loss
