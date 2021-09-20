@@ -32,6 +32,7 @@ loss_coeff:
    local_contrastive: 0
    cluster: 0
    consistency: 0
+   mean: 1
 
 local_contrastive_kwargs:
    num_negatives:  48

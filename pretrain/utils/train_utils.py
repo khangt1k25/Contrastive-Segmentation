@@ -18,10 +18,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     cluster_losses = AverageMeter('Cluster', ':.4e')
     entropy_losses = AverageMeter('Entropy', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
+    mean_losses = AverageMeter('Mean-Contrast', ':.4e')
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, consistency_losses, local_losses, saliency_losses, cluster_losses, entropy_losses, top1, top5],
+                        [losses, contrastive_losses, consistency_losses,saliency_losses, mean_losses, local_losses, cluster_losses, entropy_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -42,7 +43,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             transform = batch['transform']
             
         
-        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss, clamp_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
+        logits, labels, l_logits, l_labels, saliency_loss, consistency_loss, cluster_loss, entropy_loss, clamp_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -63,15 +64,29 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             # w_class_local = 1 / torch.log(1.02 + p_class_local)
             # local_loss = cross_entropy(l_logits, l_labels, weight= w_class_local,reduction='mean')
             local_loss = cross_entropy(l_logits, l_labels,reduction='mean')
-
+        
+        mean_loss = 0
+        if p['loss_coeff']['mean'] > 0:
+            uniq_mean, freq_mean = torch.unique(m_labels, return_counts=True)
+            p_class_mean = torch.zeros(m_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+            p_class_non_zero_classes_mean = freq_mean.float() / m_labels.numel()
+            p_class_mean[uniq_mean] = p_class_non_zero_classes_mean
+            w_class_mean = 1 / torch.log(1.02 + p_class_mean)
+            mean_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean,reduction='mean')
+            #mean_loss = cross_entropy(m_logits, m_labels, reduction='mean')
 
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['local_contrastive'] * local_loss +\
                 p['loss_coeff']['consistency']* consistency_loss +\
-                p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss + clamp_loss)
+                p['loss_coeff']['cluster'] * (cluster_loss - p['cluster_kwargs']['entropy_coeff'] * entropy_loss + clamp_loss)+\
+                p['loss_coeff']['mean'] * mean_loss
                  
+        if p['loss_coeff']['mean'] > 0:
+            mean_losses.update(mean_loss.item())
+        else:
+            mean_losses.update(mean_loss)
 
         if p['loss_coeff']['cluster'] > 0:
             contrastive_losses.update(contrastive_loss.item())
@@ -128,6 +143,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                             cluster_losses=cluster_losses,
                             entropy_losses= entropy_losses,
                             consistency_losses=consistency_losses,
+                            mean_losses=mean_losses,
                             losses=losses
                             )
        
@@ -153,6 +169,7 @@ def save_plot_curve(
     local_contrastive_losses,
     cluster_losses,
     entropy_losses,
+    mean_losses,
     losses,
     path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/'):
 
@@ -178,4 +195,6 @@ def save_plot_curve(
     with open(path+'total.txt', 'a') as f:
         f.write(str(losses.avg))
         f.write("\n")
-    
+    with open(path+'mean-contrast.txt', 'a') as f:
+        f.write(str(mean_losses.avg))
+        f.write("\n")
