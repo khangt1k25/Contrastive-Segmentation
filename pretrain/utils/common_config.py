@@ -94,16 +94,6 @@ def get_train_dataset(p, transform=None):
     else:    
         raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
 
-def get_train_dataset_v2(p, transform=None):
-    if p['train_db_name'] == 'VOCSegmentation':
-        from data.dataloaders.pascal_voc import VOCSegmentation
-        return VOCSegmentation(root=Path.db_root_dir(p['train_db_name']),
-                            saliency=p['train_db_kwargs']['saliency'],
-                            transform=transform,
-                            download=False)
-    
-    else:    
-        raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
 
 def get_train_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 

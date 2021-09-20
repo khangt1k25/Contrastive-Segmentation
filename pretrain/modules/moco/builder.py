@@ -150,7 +150,15 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
         flat_q = q.permute((0, 2, 3, 1))                  
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
-        
+            
+        # anchor mean
+        if self.p['loss_coeff']['mean'] > 0:
+            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+            q_mean = nn.functional.normalize(q_mean, dim=1)    
+
+
         '''
         Compute saliency loss
         '''
@@ -329,6 +337,7 @@ class ContrastiveModel(nn.Module):
                 tracked_upper_logit_clamp = zero
             
             clamp = 0.01 * upper_clamp + 0.01 * lower_clamp + 0.01*lower_logit_clamp+0.01*upper_logit_clamp
+        
         ''' 
         Compute local contrastive logits, labels 
         '''
@@ -353,7 +362,7 @@ class ContrastiveModel(nn.Module):
                 neg = q_i[neg_indexes]
                 local_negative = torch.bmm(neg, object_i.unsqueeze(-1)).squeeze(-1)
                 
-
+                
                 local_logits = torch.cat([local_positive.view(-1, 1), local_negative], dim=1)
 
                 l_logits.append(local_logits)
@@ -364,7 +373,7 @@ class ContrastiveModel(nn.Module):
             l_logits /= self.T
 
         
-
+        
 
         '''
         Compute Object Contrastive loss 
@@ -374,15 +383,29 @@ class ContrastiveModel(nn.Module):
         negatives = self.queue.clone().detach()          # shape: dim x negatives
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
-
+        
+        '''
+        Compute Mean Pixel Contrastive loss 
+        '''
+        mean_logits = 0
+        mean_labels = 0
+        if self.p['loss_coeff']['mean'] > 0:
+            l_positive = torch.matmul(q_mean, prototypes.t())
+            l_negative = torch.matmul(q_mean, negatives)
+            mean_logits = torch.cat([l_positive, l_negative], dim=1)
+            # mean_labels = torch.zeros(mean_logits.shape[0]).to(q.device)
+            mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
+            mean_labels = mean_labels.long()
+        
+        
         # apply temperature
         logits /= self.T
-        
+        mean_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy, clamp
+        return logits, tmp, l_logits, l_labels, sal_loss, consistency_loss, cluster_loss, entropy, clamp, mean_logits, mean_labels
 
 
 # utils
