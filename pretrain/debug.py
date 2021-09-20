@@ -30,21 +30,33 @@ import numpy as np
 # key['sal'].show()
 # query['image'].show()
 # query['sal'].show()
-batch_size = 32
-dim = 28
-q = torch.randn(size=(batch_size, dim, 224, 224))
-sal_q = torch.randn(size=(batch_size, 224, 224))
-sal_q = torch.round(sal_q)
+# batch_size = 32
+# dim = 28
+# q = torch.randn(size=(batch_size, dim, 224, 224))
+# sal_q = torch.randn(size=(batch_size, 224, 224))
+# sal_q = torch.round(sal_q)
 
 
-q_mean = q.reshape(batch_size, dim, -1) # B x dim x H.W
-sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-q_mean = nn.functional.normalize(q_mean, dim=1)  
+# q_mean = q.reshape(batch_size, dim, -1) # B x dim x H.W
+# sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+# q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+# q_mean = nn.functional.normalize(q_mean, dim=1)  
 
-prototypes = torch.randn(size=(batch_size, dim))
-print(q_mean.shape)
+# prototypes = torch.randn(size=(batch_size, dim))
+# print(q_mean.shape)
 
-l_batch = torch.matmul(q_mean, prototypes.t())
+# l_batch = torch.matmul(q_mean, prototypes.t())
 
-print(l_batch.shape)
+# print(l_batch.shape)
+
+
+from modules.models import AttentionHead
+
+z = torch.randn(size=(2, 64, 224, 224))
+sal_z = torch.rand(size=(2, 224, 224))
+sal_z = torch.round(sal_z)
+head = AttentionHead(dim=64)
+
+out = head(z, sal_z)
+
+print(out.shape)

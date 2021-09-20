@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import random
 import torchvision
 
-from utils.common_config import get_model, get_next_transformations
+from utils.common_config import get_model, get_next_transformations, get_attention
 from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, ConsistencyLoss
 
 class ContrastiveModel(nn.Module):
@@ -34,10 +34,20 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
 
+        self.attention_q = get_attention(p)
+        self.attention_k = get_attention(p)
+
+
+
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
+
+        for param_q, param_k in zip(self.attention_q.parameters(), self.attention_k.parameters()):
+            param_k.data.copy_(param_q.data)  # initialize
+            param_k.requires_grad = False  # not update by gradient
+
 
         # create the queue
         self.dim = p['model_kwargs']['ndim']
@@ -72,6 +82,10 @@ class ContrastiveModel(nn.Module):
         """
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
+        
+        for param_q, param_k in zip(self.attention_q.parameters(), self.attention_k.parameters()):
+            param_k.data = param_k.data * self.m + param_q.data * (1. - self.m)
+
 
     @torch.no_grad()
     def _dequeue_and_enqueue(self, keys):
@@ -153,10 +167,16 @@ class ContrastiveModel(nn.Module):
             
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
-            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-            q_mean = nn.functional.normalize(q_mean, dim=1)    
+            if self.p['mean_pixel_kwargs']['type'] == 'mean':
+                q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+                q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+                q_mean = nn.functional.normalize(q_mean, dim=1)    
+            
+            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+ 
+                q_mean = self.attention_q(q, sal_q)
+                q_mean = nn.functional.normalize(q_mean, dim=1)    
 
 
         '''
@@ -194,16 +214,23 @@ class ContrastiveModel(nn.Module):
 
              
             # prototypes k
-            k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+            if self.p['mean_pixel_kwargs']['type'] == 'mean':
+                k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+                prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+            
+            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+                prototypes_foreground = self.attention_q(k, sal_q)
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+
             
             #prototypes cluster
             if self.p['loss_coeff']['cluster'] > 0:
                 ly_2 = y_k
                 y_k = torch.softmax(y_k, dim=1)
                 y_k = y_k.reshape(batch_size, self.C, -1).type(k.dtype)
+                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
                 prototypes_cluster = torch.bmm(y_k, sal_k_flat).squeeze()
 
                 prototypes_cluster = nn.functional.normalize(prototypes_cluster, dim=1, p=1.0) # softmax = 1 
@@ -378,6 +405,7 @@ class ContrastiveModel(nn.Module):
         '''
         Compute Object Contrastive loss 
         '''
+
         q = torch.index_select(flat_q, index=mask_indexes, dim=0)
         l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
         negatives = self.queue.clone().detach()          # shape: dim x negatives
@@ -390,13 +418,14 @@ class ContrastiveModel(nn.Module):
         mean_logits = 0
         mean_labels = 0
         if self.p['loss_coeff']['mean'] > 0:
+
             l_positive = torch.matmul(q_mean, prototypes.t())
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
             # mean_labels = torch.zeros(mean_logits.shape[0]).to(q.device)
             mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
             mean_labels = mean_labels.long()
-        
+    
         
         # apply temperature
         logits /= self.T

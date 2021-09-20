@@ -2,6 +2,7 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
+from numpy.core.fromnumeric import shape
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -71,3 +72,40 @@ class ContrastiveSegmentationModel(nn.Module):
         
         else:
             return x
+
+
+
+
+
+
+class AttentionHead(nn.Module):
+    def __init__(self, dim):
+        super(AttentionHead, self).__init__()
+        
+        self.dim = dim
+
+        self.attention = nn.Conv2d(in_channels=dim, out_channels=1, kernel_size=3, stride=1, padding=1)
+    
+    def forward(self, z, sal_z):
+        '''
+        Input:
+        z: (bsz, dim, H, W)
+        sal_z: (bsz, H, W)
+        Output:
+        zM = (bsz, dim)
+        '''
+        mask = self.attention(z)
+        mask = mask.squeeze(1) 
+        mask  = mask * sal_z
+        mask[mask==0.] = float('-inf') 
+        mask = torch.reshape(mask, shape=(mask.shape[0], -1))
+        mask = torch.softmax(mask, dim=1)
+        mask = mask.unsqueeze(1)
+
+        z_flat = torch.reshape(z, shape=(z.shape[0], z.shape[1], -1))
+
+        z_m = (z_flat * mask).sum(-1)
+   
+        return z_m
+
+    

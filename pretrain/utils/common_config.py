@@ -83,6 +83,10 @@ def get_model(p):
                                                 p['model_kwargs']['use_cluster_head'],
                                                 p['cluster_kwargs']['C'])
 
+def get_attention(p):
+    from modules.models import AttentionHead
+    return AttentionHead(dim=p['model_kwargs']['ndim'])
+
 
 def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':

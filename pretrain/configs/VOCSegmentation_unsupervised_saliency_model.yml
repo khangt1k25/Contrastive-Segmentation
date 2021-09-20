@@ -47,7 +47,8 @@ cluster_kwargs:
 consistency_kwargs:
    type: l2norm
 
-
+mean_pixel_kwargs:
+   type: mean
 
 head: deeplab
 # Freeze block 1 and 2 in backbone (~1% miou improvement)
