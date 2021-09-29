@@ -57,6 +57,10 @@ sal_z = torch.rand(size=(2, 224, 224))
 sal_z = torch.round(sal_z)
 head = AttentionHead(dim=64)
 
-out = head(z, sal_z)
+out, mask = head(z, sal_z)
 
-print(out.shape)
+sal_z = sal_z.view(sal_z.shape[0], -1)
+mask = mask.view(mask.shape[0], -1)
+l = ((sal_z-mask)**2).sum(dim=1).mean()
+print(l.shape)
+print(l)

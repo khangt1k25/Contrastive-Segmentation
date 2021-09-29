@@ -55,7 +55,7 @@ class BalancedCrossEntropyLoss(Module):
             final_loss /= labels.size()[0]
 
         return final_loss
-
+        
 
 class ConInstContrast:
     def __init__(self, num_samples, temperature, device, reduction="mean"):
