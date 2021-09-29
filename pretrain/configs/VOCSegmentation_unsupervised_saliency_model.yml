@@ -11,7 +11,7 @@ train_batch_size: 32
 type_dataset: baseline
 
 # 
-kornia_version: 1
+kornia_version: 1 # if dataset is kornia
 
 
 # Model
@@ -24,7 +24,7 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_cluster_head: True
+   use_attention_head: True
 
 loss_coeff:
    contrastive: 1
@@ -32,21 +32,15 @@ loss_coeff:
    local_contrastive: 0
    cluster: 0
    consistency: 0
-   mean: 1
+   mean: 0.1
+   attention: 1
 
-local_contrastive_kwargs:
-   num_negatives:  48
-   kernel: 3
-
-cluster_kwargs:
-   C: 20
-   smooth_prob: True
-   smooth_coeff: 0.1
-   entropy_coeff: 5
 
 consistency_kwargs:
    type: l2norm
 
+mean_pixel_kwargs:
+   type: attention
 
 
 head: deeplab

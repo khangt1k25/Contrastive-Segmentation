@@ -128,7 +128,7 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     all_sals = torch.zeros((len(val_loader.sampler), 512, 512)).cuda()
     names = []
     for i, batch in enumerate(val_loader):
-        output, sal, y = model(batch['image'].cuda(non_blocking=True))
+        output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
 
         # compute prototypes
