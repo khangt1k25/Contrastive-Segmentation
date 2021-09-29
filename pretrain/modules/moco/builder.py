@@ -14,8 +14,8 @@ import torch.nn.functional as F
 import random
 import torchvision
 
-from utils.common_config import get_model, get_next_transformations, get_attention
-from modules.losses import BalancedCrossEntropyLoss, CatInstConsistency, CatInstContrast, ConsistencyLoss
+from utils.common_config import get_model, get_next_transformations
+from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -53,7 +53,7 @@ class ContrastiveModel(nn.Module):
 
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-
+        self.at = AttentionLoss()
     
 
 
@@ -147,8 +147,9 @@ class ContrastiveModel(nn.Module):
             logits, targets, local_logits, local_targets
         """
         
-        batch_size = im_q.size(0)
-        q, bg_q, q_m, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
+        batch_size, channel, H, W = im_q.size
+
+        q, bg_q, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
         flat_q = q.permute((0, 2, 3, 1))                  
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
@@ -162,14 +163,13 @@ class ContrastiveModel(nn.Module):
                 q_mean = nn.functional.normalize(q_mean, dim=1)    
             
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                q_mean = q_m
-                q_mean = nn.functional.normalize(q_mean, dim=1)
-                
-
+                q_mean, attention_loss = self.at(q, q_mask, sal_q)
+                q_mean = nn.functional.normalize(q_mean, dim=1)   
 
         '''
         Compute saliency loss
         '''
+
         sal_loss = self.bce(bg_q, sal_q)
       
        
@@ -181,9 +181,10 @@ class ContrastiveModel(nn.Module):
             tmp = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
+       
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
 
-   
+
 
         '''
         Prepare prototypes in key size
@@ -194,7 +195,7 @@ class ContrastiveModel(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k, bg_k, k_m, k_mask = self.model_k(im_k)  # keys: N x C x H x W
+            k, bg_k, k_mask = self.model_k(im_k)  # keys: N x C x H x W
             k = nn.functional.normalize(k, dim=1)       
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
@@ -209,8 +210,9 @@ class ContrastiveModel(nn.Module):
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
             
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                prototypes_foreground = k_m
+                prototypes_foreground, _ = self.at(k, k_mask, sal_k)
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+         
             
             
             
@@ -218,13 +220,9 @@ class ContrastiveModel(nn.Module):
         '''
         Compute attention loss
         '''
-        if self.p['mean_pixel_kwargs']['type'] == 'attention':
-            q_mask[sal_q==1.0] = 1.0
-            sal_q = torch.reshape(sal_q, (sal_q.shape[0], -1))
-            q_mask = torch.reshape(q_mask, (q_mask.shape[0], -1))
-            attention_loss = ((sal_q-q_mask)**2).sum(dim=1).mean()
-        else:
+        if self.p['loss_coeff']['attention'] <= 0:
             attention_loss = 0
+            
         
 
         '''

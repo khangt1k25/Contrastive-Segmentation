@@ -50,17 +50,33 @@ import numpy as np
 # print(l_batch.shape)
 
 
-from modules.models import AttentionHead
+# from modules.models import AttentionHead
 
-z = torch.randn(size=(2, 64, 224, 224))
-sal_z = torch.rand(size=(2, 224, 224))
-sal_z = torch.round(sal_z)
-head = AttentionHead(dim=64)
+# z = torch.randn(size=(2, 64, 224, 224))
+# sal_z = torch.rand(size=(2, 224, 224))
+# sal_z = torch.round(sal_z)
+# head = AttentionHead(dim=64)
 
-out, mask = head(z, sal_z)
+# out, mask = head(z, sal_z)
 
-sal_z = sal_z.view(sal_z.shape[0], -1)
-mask = mask.view(mask.shape[0], -1)
-l = ((sal_z-mask)**2).sum(dim=1).mean()
-print(l.shape)
-print(l)
+# sal_z = sal_z.view(sal_z.shape[0], -1)
+# mask = mask.view(mask.shape[0], -1)
+# l = ((sal_z-mask)**2).sum(dim=1).mean()
+# print(l.shape)
+# print(l)
+from modules.losses import AttentionLoss
+
+at = AttentionLoss()
+
+q = torch.randn(2, 64, 3, 3)
+q_mask = torch.randn(2, 3, 3)
+sal_q = torch.rand(2, 3, 3)
+sal_q = torch.round(sal_q)
+
+print(torch.unique(sal_q))
+q_mean, loss = at(q, q_mask, sal_q)
+
+loss.backward()
+# q_mean = torch.bmm(q, q_mask.unsqueeze(2))
+
+# print(q_mean.shape)

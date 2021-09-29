@@ -57,112 +57,6 @@ class BalancedCrossEntropyLoss(Module):
         return final_loss
         
 
-class ConInstContrast:
-    def __init__(self, num_samples, temperature, device, reduction="mean"):
-        super(ConInstContrast, self).__init__()
-        self.num_samples = num_samples
-        self.temperature = temperature
-        self.device = device
-        self.reduction = reduction
-
-        # This mask is different from the mask in version 2
-        # It also mask 2 sub-diagonals
-        self.mask = self.get_mask(num_samples)
-        self.criterion = nn.CrossEntropyLoss(reduction=reduction)
-
-    def get_mask(self, num_samples):
-        B = num_samples
-
-        mask = torch.full((2 * B, 2 * B), True, dtype=torch.bool,
-                          device=self.device, requires_grad=False)
-        mask = mask.fill_diagonal_(False)
-
-        for i in range(B):
-            mask[i, B + i] = False
-            mask[B + i, i] = False
-
-        return mask
-        
-
-class CatInstConsistency:
-    def __init__(self, reduction="mean", cons_type="neg_log_dot_prod"):
-        assert reduction in ("none", "mean", "sum"), f"reduction={reduction}!"
-        self.reduction = reduction
-
-        possible_cons_types = ("xent", "jsd", "l2", "l1",
-                               "neg_dot_prod", "neg_log_dot_prod")
-        assert cons_type in possible_cons_types, \
-            f"cons_type must be in {possible_cons_types}. Found {cons_type}!"
-        self.cons_type = cons_type
-
-    def get_cons(self, p_1, p_2):
-        cons_type = self.cons_type
-
-        if cons_type == "neg_log_dot_prod":
-            cons = -(p_1 * p_2).sum(-1).log()
-        elif cons_type == "neg_dot_prod":
-            cons = -(p_1 * p_2).sum(-1)
-        elif cons_type == "xent":
-            cons = -(p_1.detach() * p_2.log()).sum(-1) \
-                   -(p_2.detach() * p_1.log()).sum(-1)
-            cons = cons * 0.5
-        elif cons_type == "jsd":
-            p_avg = 0.5 * (p_1 + p_2)
-
-            cons = 0.5 * ((p_1 * (p_1.log() - p_avg.log())).sum(-1) +
-                          (p_2 * (p_2.log() - p_avg.log())).sum(-1))
-        elif cons_type == "l2":
-            cons = (p_1 - p_2).pow(2).sum(-1)
-        elif cons_type == "l1":
-            cons = (p_1 - p_2).abs().sum(-1)
-        else:
-            raise ValueError(f"Do not support cons_type={cons_type}!")
-
-        return cons
-
-    def __call__(self, p_1, p_2):
-        loss = self.get_cons(p_1, p_2)
-
-        if self.reduction == "mean":
-            loss = loss.mean(0)
-        elif self.reduction == "sum":
-            loss = loss.sum(0)
-
-        return loss
-
-class CatInstContrast(ConInstContrast):
-    def __init__(self, num_samples, device, reduction="mean",
-                 critic_type="log_dot_prod"):
-        super(CatInstContrast, self).__init__(num_samples, None, device, reduction)
-        self.critic_type = critic_type
-
-    def critic(self, p, normalized):
-        if self.critic_type == "log_dot_prod":
-            return torch.matmul(p, p.t()).log()
-
-        elif self.critic_type == "dot_prod":
-            return torch.matmul(p, p.t())
-
-        elif self.critic_type == "neg_l2" or self.critic_type == "nsse":
-            return -(p.unsqueeze(1) - p.unsqueeze(0)).pow(2).sum(-1)
-
-        elif self.critic_type == "neg_jsd":
-            p1 = p.unsqueeze(1)
-            p2 = p.unsqueeze(0)
-            p_avg = 0.5 * (p1 + p2)
-
-            out = -0.5 * ((p1 * (p1.log() - p_avg.log())).sum(-1) +
-                          (p2 * (p2.log() - p_avg.log())).sum(-1))
-
-            return out
-
-        else:
-            raise ValueError(f"Do not support critic_type={self.critic_type}!")
-
-    def __call__(self, p_1, p_2, return_sim_matrix=False):
-        return super(CatInstContrast, self).__call__(
-            p_1, p_2, normalized=True,
-            return_sim_matrix=return_sim_matrix)
 
 
 
@@ -204,7 +98,30 @@ class ConsistencyLoss(Module):
 
         
 
+class AttentionLoss(Module):
+    def __init__(self):
+        super(AttentionLoss, self).__init__()
+    def forward(self, x, mask, sal):
+        bsz, dim, H, W = x.shape
+        x = x.reshape(bsz, dim, -1) # B x dim x H.W
 
+        mask = mask.reshape(bsz, -1)
+        mask = torch.softmax(mask, dim=1)
+        
+        
+
+        x_mean = torch.bmm(x, mask.unsqueeze(2)).squeeze()
+        x_mean = nn.functional.normalize(x_mean, dim=1)
+        
+        
+       
+
+        sal = sal.reshape(bsz, -1)
+        sal = 1. - sal
+        mask = mask * sal
+      
+        attention_loss = ((mask-sal)**2).sum(dim=1).mean()
+        return x_mean, attention_loss
 
 
 def IIC_Loss(y1, y2 ,C = 20,  lamb = 1., EPS= sys.float_info.epsilon):

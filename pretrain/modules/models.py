@@ -50,7 +50,7 @@ class ContrastiveSegmentationModel(nn.Module):
         x = self.head(embedding)
         if self.use_classification_head:
             sal = self.classification_head(embedding)
-        if self.use_attention:
+        if self.use_attention_head:
             mask = self.attention_head(embedding)
             
         
@@ -64,24 +64,17 @@ class ContrastiveSegmentationModel(nn.Module):
                 mask = F.interpolate(mask, size=input_shape, mode='bilinear',  align_corners=False)
 
         # Post Processing and compute [Mask Attention & X attention]
-        bsz, dim, h, w = mask.shape
-        mask = mask.squeeze(1)
-        mask = torch.reshape(mask, shape=(mask.shape[0], -1))
-        mask_flat = torch.softmax(mask, dim=1)  
-        mask = torch.reshape(mask_flat, shape=(mask.shape[0], h, w))
-        x_flat = torch.reshape(x, shape=(x.shape[0], x.shape[1], -1))
-        mask_flat = mask_flat.unsqueeze(1)
-        x_m = (x_flat * mask_flat).sum(-1)
 
+            
 
         # Return outputs
         
         if self.use_classification_head and self.use_attention_head:
-            return x, sal.squeeze(), x_m, mask 
+            return x, sal.squeeze(), mask.squeeze() 
         elif self.use_classification_head and not self.use_classification_head:
             return x, sal.squeeze()
-        elif not self.use_classification_head and self.use_classification_head:
-            return x, x_m, mask
+        elif not self.use_classification_head and self.use_attention_head:
+            return x, mask.squeeze()
         else:
             return x
 
