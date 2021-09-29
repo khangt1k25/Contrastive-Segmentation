@@ -81,11 +81,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             mean_losses.update(mean_loss.item())
         else:
             mean_losses.update(mean_loss)
-
-        if p['loss_coeff']['cluster'] > 0:
-            contrastive_losses.update(contrastive_loss.item())
-        else:
-            contrastive_losses.update(contrastive_loss)       
+   
         
         if p['loss_coeff']['consistency'] > 0:
             consistency_losses.update(consistency_loss.item())

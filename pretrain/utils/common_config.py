@@ -80,12 +80,9 @@ def get_model(p):
     return ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'],
-                                                p['model_kwargs']['use_cluster_head'],
-                                                p['cluster_kwargs']['C'])
+                                                p['model_kwargs']['use_attention_head'])
 
-def get_attention(p):
-    from modules.models import AttentionHead
-    return AttentionHead(dim=p['model_kwargs']['ndim'])
+
 
 
 def get_train_dataset(p, transform=None):

@@ -24,7 +24,7 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_cluster_head: True
+   use_attention_head: True
 
 loss_coeff:
    contrastive: 1
@@ -32,7 +32,7 @@ loss_coeff:
    local_contrastive: 0
    cluster: 0
    consistency: 0
-   mean: 1
+   mean: 0.1
    attention: 1
 
 
@@ -40,7 +40,8 @@ consistency_kwargs:
    type: l2norm
 
 mean_pixel_kwargs:
-   type: mean
+   type: attention
+
 
 head: deeplab
 # Freeze block 1 and 2 in backbone (~1% miou improvement)
