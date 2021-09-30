@@ -65,7 +65,7 @@ class ConsistencyLoss(Module):
     Consistency Loss  
     """
 
-    def __init__(self, type='l2norm'):
+    def __init__(self, type='l2'):
         super(ConsistencyLoss, self).__init__()
         self.type = type
         assert(self.type in ['l2norm', 'l2', 'negativecosine'])

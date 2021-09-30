@@ -51,15 +51,20 @@ class ContrastiveModel(nn.Module):
     
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
-        # balanced cross-entropy loss
+
+        # kornia prototypes
+        self.kornia_tool = get_next_transformations()
+
+        # additional loss
+        
         self.bce = BalancedCrossEntropyLoss(size_average=True)
         self.at = AttentionLoss()
-    
+        self.cons = ConsistencyLoss(type=p['inveqv_kwargs']['type'])
 
 
-        # for augment consistency 
-        self.transforms = get_next_transformations()
-        self.consistency = ConsistencyLoss(type=p['consistency_kwargs']['type'])
+        
+        
+        
         
 
 
@@ -164,12 +169,11 @@ class ContrastiveModel(nn.Module):
             
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
                 q_mean, attention_loss = self.at(q, q_mask, sal_q)
-                q_mean = nn.functional.normalize(q_mean, dim=1)   
+                q_mean = nn.functional.normalize(q_mean, dim=1)
 
         '''
         Compute saliency loss
         '''
-
         sal_loss = self.bce(bg_q, sal_q)
       
        
@@ -181,7 +185,6 @@ class ContrastiveModel(nn.Module):
             tmp = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
-       
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
 
 
@@ -203,19 +206,17 @@ class ContrastiveModel(nn.Module):
 
              
             # prototypes k
-            if self.p['mean_pixel_kwargs']['type'] == 'mean':
-                k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-                prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
-            
-            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                prototypes_foreground, _ = self.at(k, k_mask, sal_k)
-                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+            if self.p['loss_coeff']['mean'] > 0:
+                if self.p['mean_pixel_kwargs']['type'] == 'mean':
+                    k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                    sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+                    prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+                
+                elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+                    prototypes_foreground, _ = self.at(k, k_mask, sal_k)
+                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
          
-            
-            
-            
 
         '''
         Compute attention loss
@@ -228,15 +229,31 @@ class ContrastiveModel(nn.Module):
         '''
         Compute Consistency loss
         '''
-        consistency_loss = 0 
-        if self.p['loss_coeff']['consistency'] > 0:
-            if self.p['kornia_version'] == 1:
+        
+        if self.p['loss_coeff']['inveqv'] > 0:
+            if self.p['kornia_version'] == 2:
+                fw_q = []
+                fw_sal = []
+                for i in range(len(state_dict)):
+                    sample = {"image":deepcopy(q[i]), "sal":deepcopy(bg_q[i])}
+                    new_sample = self.kornia_tool.forward_with_params(sample, state_dict[i])
+                    fw_q.append(new_sample['image'].squeeze(0))
+                    fw_sal.append(new_sample['sal'].squeeze(0))
+                
+                fw_q = torch.stack(fw_q, dim=0).squeeze(0)
+                fw_q = fw_q.permute((0, 2, 3, 1))
+                fw_sal = torch.stack(fw_sal, dim=0)
+                
+                
+                k_selected = k.permute((0, 2, 3, 1))
+                inveqv_loss = self.cons(fw_q, k_selected, mask=sal_k)
+                 
+            elif self.p['kornia_version'] == 1:
                 inverse_k = []
                 inverse_sal = []
                 for i in range(len(transform)):
-
                     sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
-                    new_sample = self.transforms.inverse(sample, transform[i])
+                    new_sample = self.kornia_tool.inverse(sample, transform[i])
                     inverse_k.append(new_sample['image'].squeeze(0))
                     inverse_sal.append(new_sample['sal'].squeeze(0))
 
@@ -244,28 +261,12 @@ class ContrastiveModel(nn.Module):
                 inverse_k = inverse_k.permute((0, 2, 3, 1))                  
                 inverse_sal = torch.stack(inverse_sal, dim=0)
 
-                q_selected = q.permute((0, 2, 3, 1))                
-
-                consistency_loss = self.consistency(inverse_k, q_selected, mask=inverse_sal)
-                
-            elif self.p['kornia_version'] == 2:
-                augmented_k = []
-                augmented_sal = []
-                for i in range(len(state_dict)):
-
-                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
-                    new_sample = self.transforms.forward_with_params(sample, state_dict[i])
-                    augmented_sal.append(new_sample['sal'].squeeze(0))
-                    augmented_k.append(new_sample['image'].squeeze(0))
-
-                augmented_k = torch.stack(augmented_k, dim=0).squeeze(0)
-                augmented_k = augmented_k.permute((0, 2, 3, 1))                  
-                augmented_sal = torch.stack(augmented_sal, dim=0)
-
                 q_selected = q.permute((0, 2, 3, 1))
 
-                consistency_loss = self.consistency(augmented_k, q_selected, mask=augmented_sal)
-        
+                inveqv_loss = self.cons(q_selected, inverse_k, mask=inverse_sal)
+
+        else:
+            inveqv_loss = 0.
 
 
         '''
@@ -281,17 +282,16 @@ class ContrastiveModel(nn.Module):
         '''
         Compute Mean Pixel Contrastive loss 
         '''
-        mean_logits = 0
-        mean_labels = 0
-        if self.p['loss_coeff']['mean'] > 0:
 
+        if self.p['loss_coeff']['mean'] > 0:
             l_positive = torch.matmul(q_mean, prototypes.t())
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
-            # mean_labels = torch.zeros(mean_logits.shape[0]).to(q.device)
             mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
             mean_labels = mean_labels.long()
-    
+        else:
+            mean_logits = 0.
+            mean_labels = 0.
         
         # apply temperature
         logits /= self.T
@@ -300,9 +300,9 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, sal_loss, consistency_loss,  mean_logits, mean_labels, attention_loss
+        return logits, tmp, sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
 
-
+        
 # utils
 @torch.no_grad()
 def concat_all_gather(tensor):

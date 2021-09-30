@@ -8,7 +8,8 @@ import warnings
 
 from copy import deepcopy
 from torch.nn.functional import interpolate
-
+from torchvision import transforms
+from utils.common_config import get_normalize_transformations
 
 class Dataset(data.Dataset):
     def __init__(self, base_dataset, train_transform, downsample_sal=False,
@@ -126,6 +127,8 @@ class TwoTransformDataset(data.Dataset):
         self.min_area = min_area
         self.max_area = max_area
 
+        self.normalize = get_normalize_transformations()
+
     def __len__(self):
         return len(self.base_dataset) 
 
@@ -144,14 +147,24 @@ class TwoTransformDataset(data.Dataset):
                 count = 100
  
 
-            key_sample = self.base_transform(deepcopy(sample_))
+            # key_sample = self.base_transform(deepcopy(sample_))
 
-            query_sample, state_dict, transform = self.next_transform(deepcopy(key_sample))
+            # query_sample, state_dict, transform = self.next_transform(deepcopy(key_sample))
             
 
-            query_sample['image'] = query_sample['image'].squeeze(0)
-            query_sample['sal'] = query_sample['sal'].squeeze(0).squeeze(0)
+            # query_sample['image'] = query_sample['image'].squeeze(0)
+            # query_sample['sal'] = query_sample['sal'].squeeze(0).squeeze(0)
                            
+            query_sample = self.base_transform(deepcopy(sample_))
+
+            key_sample, state_dict, transform = self.next_transform(deepcopy(query_sample))
+
+            key_sample['image'] = key_sample['image'].squeeze(0)
+            key_sample['sal'] = key_sample['sal'].squeeze(0).squeeze(0)
+
+            query_sample = self.normalize(query_sample)
+            key_sample = self.normalize(key_sample)
+
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
                                             scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()

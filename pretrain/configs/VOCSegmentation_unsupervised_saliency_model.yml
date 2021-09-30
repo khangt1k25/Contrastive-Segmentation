@@ -29,14 +29,11 @@ model_kwargs:
 loss_coeff:
    contrastive: 1
    saliency: 1
-   local_contrastive: 0
-   cluster: 0
-   consistency: 0
+   inveqv: 0
    mean: 0.1
    attention: 1
 
-
-consistency_kwargs:
+inveqv_kwargs:
    type: l2norm
 
 mean_pixel_kwargs:

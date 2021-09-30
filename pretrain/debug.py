@@ -1,35 +1,69 @@
 from copy import deepcopy
+from random import sample
 import torch
 import torch.nn as nn
 import numpy as np
-# from matplotlib import pyplot as plt
-# from torch.utils import data
-# from utils.common_config import get_train_dataset
-# import torchvision
-# from utils.collate import collate_custom
+from matplotlib import pyplot as plt
+from torch.utils import data
+from torchvision import transforms
+from utils.common_config import get_train_dataset, get_base_transformations, get_next_transformations
+import torchvision
+from utils.collate import collate_custom
+from data.dataloaders.dataset import TwoTransformDataset
 
-# p = {'train_db_name': 'VOCSegmentation', 'train_db_kwargs':{
-# 'saliency': 'supervised_model'}, 'overfit': False}
+toPIL = torchvision.transforms.ToPILImage()
+
+p = {'train_db_name': 'VOCSegmentation', 'train_db_kwargs':{
+'saliency': 'supervised_model'}, 'overfit': False}
 
 
 # inv_list = ['brightness', 'contrast', 'saturation', 'hue', 'gray', 'blur']
 # eqv_list = ['h_flip', 'v_flip', 'rotation']
 
 
-# train_dataset = get_train_dataset(p, inv_list=inv_list, eqv_list=eqv_list) 
-# train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=2, collate_fn=collate_custom)
+train_dataset = get_train_dataset(p)
+base_transform = get_base_transformations()
+next_transform = get_next_transformations()
+
+my_dataset = TwoTransformDataset(train_dataset, base_transform, next_transform, 
+                                downsample_sal=False) 
+train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=2, collate_fn=collate_custom)
+
+for i in range(10):
+    batch = my_dataset[i]
+
+    # print(batch.keys())
+
+    
+
+    key = batch['key']
+    query = batch['query']
+    T = batch['T']
+    transform = batch['transform']
 
 
-# index, batch = train_dataset[1]
+    # toPIL(query['image']).show()
+    toPIL(query['sal'].float()).show()
+    # toPIL(key['image']).show()
+    # toPIL(key['sal'].float()).show()
 
-# key = batch['key']
-# query = batch['query']
+
+    # next = next_transform.forward_with_params(deepcopy(query), T)
+    inv = next_transform.inverse(deepcopy(key), transform)
 
 
-# key['image'].show()
-# key['sal'].show()
-# query['image'].show()
-# query['sal'].show()
+
+    # toPIL(next['image']).show()
+    # toPIL(next['sal'].float()).show()
+
+    # print(torch.unique(next['sal']-key['sal']))
+    print(torch.unique(inv['sal']-query['sal']))
+
+
+    # toPIL(inv['image']).show()
+    toPIL(inv['sal'].float()).show()
+
+
 # batch_size = 32
 # dim = 28
 # q = torch.randn(size=(batch_size, dim, 224, 224))
@@ -50,33 +84,3 @@ import numpy as np
 # print(l_batch.shape)
 
 
-# from modules.models import AttentionHead
-
-# z = torch.randn(size=(2, 64, 224, 224))
-# sal_z = torch.rand(size=(2, 224, 224))
-# sal_z = torch.round(sal_z)
-# head = AttentionHead(dim=64)
-
-# out, mask = head(z, sal_z)
-
-# sal_z = sal_z.view(sal_z.shape[0], -1)
-# mask = mask.view(mask.shape[0], -1)
-# l = ((sal_z-mask)**2).sum(dim=1).mean()
-# print(l.shape)
-# print(l)
-from modules.losses import AttentionLoss
-
-at = AttentionLoss()
-
-q = torch.randn(2, 64, 3, 3)
-q_mask = torch.randn(2, 3, 3)
-sal_q = torch.rand(2, 3, 3)
-sal_q = torch.round(sal_q)
-
-print(torch.unique(sal_q))
-q_mean, loss = at(q, q_mask, sal_q)
-
-loss.backward()
-# q_mean = torch.bmm(q, q_mask.unsqueeze(2))
-
-# print(q_mean.shape)

@@ -13,7 +13,7 @@ from utils.utils import AverageMeter, ProgressMeter, freeze_layers
 def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
-    consistency_losses = AverageMeter('Consistency', ':.4e')
+    inveqv_losses = AverageMeter('Consistency', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     mean_losses = AverageMeter('Mean-Contrast', ':.4e')
     attention_losses = AverageMeter('Attention', ':.4e')
@@ -21,7 +21,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, consistency_losses,saliency_losses, mean_losses, attention_losses, top1, top5],
+                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, attention_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -42,7 +42,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             transform = batch['transform']
             
         
-        logits, labels, saliency_loss, consistency_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -54,7 +54,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                                             reduction='mean')
       
         
-        mean_loss = 0
+
         if p['loss_coeff']['mean'] > 0:
             uniq_mean, freq_mean = torch.unique(m_labels, return_counts=True)
             p_class_mean = torch.zeros(m_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
@@ -62,16 +62,20 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             p_class_mean[uniq_mean] = p_class_non_zero_classes_mean
             w_class_mean = 1 / torch.log(1.02 + p_class_mean)
             mean_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
-
+        else:
+            mean_loss = 0.
 
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['attention'] * attention_loss+ \
-                p['loss_coeff']['consistency']* consistency_loss +\
+                p['loss_coeff']['inveqv']* inveqv_loss +\
                 p['loss_coeff']['mean'] * mean_loss
                  
         
+
+        contrastive_losses.update(contrastive_loss.item())
+
         if p['loss_coeff']['attention'] > 0:
             attention_losses.update(attention_loss.item())
         else:
@@ -83,10 +87,10 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             mean_losses.update(mean_loss)
    
         
-        if p['loss_coeff']['consistency'] > 0:
-            consistency_losses.update(consistency_loss.item())
+        if p['loss_coeff']['inveqv'] > 0:
+            inveqv_losses.update(inveqv_loss.item())
         else:
-            consistency_losses.update(consistency_loss)
+            inveqv_losses.update(inveqv_loss)
 
         if p['loss_coeff']['saliency'] > 0:
             saliency_losses.update(saliency_loss.item())
@@ -118,7 +122,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     save_plot_curve(
         contrastive_losses=contrastive_losses,
         saliency_losses=saliency_losses,
-        consistency_losses=consistency_losses,
+        inveqv_losses=inveqv_losses,
         mean_losses=mean_losses,
         attention_losses=attention_losses,
         losses=losses
@@ -136,12 +140,12 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
-
+    
 
 def save_plot_curve(
     contrastive_losses, 
     saliency_losses,
-    consistency_losses,
+    inveqv_losses,
     mean_losses,
     attention_losses,
     losses,
@@ -150,9 +154,11 @@ def save_plot_curve(
     with open(path+'cl.txt', 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
-
-    with open(path + 'attention.txt', 'a') as f:
+    with open(path + 'inveqv.txt', 'a') as f:
         f.write(str(attention_losses.avg))
+        f.write("\n")
+    with open(path + 'attention.txt', 'a') as f:
+        f.write(str(inveqv_losses.avg))
         f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
         f.write(str(saliency_losses.avg))

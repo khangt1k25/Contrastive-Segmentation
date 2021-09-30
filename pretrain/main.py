@@ -18,7 +18,7 @@ from data.dataloaders.dataset import DatasetKeyQuery, TwoTransformDataset
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
-from utils.common_config import get_train_dataset, get_train_transformations,\
+from utils.common_config import get_normalize_transformations, get_train_dataset, get_train_transformations,\
                                 get_train_dataloader, get_optimizer, adjust_learning_rate,\
                                 get_base_transformations, get_next_transformations
 
@@ -139,7 +139,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 downsample_sal=not p['model_kwargs']['upsample'])
     elif p['type_dataset'] == 'kornia':
         base_transform = get_base_transformations()
-        next_transform = get_next_transformations()   
+        next_transform = get_next_transformations()
+        
         print(base_transform)
         print(next_transform)
         train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
