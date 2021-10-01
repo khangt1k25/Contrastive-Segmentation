@@ -152,7 +152,7 @@ class ContrastiveModel(nn.Module):
             logits, targets, local_logits, local_targets
         """
         
-        batch_size, channel, H, W = im_q.size
+        batch_size, channel, H, W = im_q.size()
 
         q, bg_q, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -204,18 +204,16 @@ class ContrastiveModel(nn.Module):
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
 
-             
+            
             # prototypes k
-            if self.p['loss_coeff']['mean'] > 0:
-                if self.p['mean_pixel_kwargs']['type'] == 'mean':
-                    k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-                    sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-                    prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
-                
-                elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                    prototypes_foreground, _ = self.at(k, k_mask, sal_k)
-                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+            if self.p['mean_pixel_kwargs']['type'] == 'mean':
+                k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+                prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)   
+            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+                prototypes_foreground, _ = self.at(k, k_mask, sal_k)
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
          
 
         '''
@@ -262,7 +260,6 @@ class ContrastiveModel(nn.Module):
                 inverse_sal = torch.stack(inverse_sal, dim=0)
 
                 q_selected = q.permute((0, 2, 3, 1))
-
                 inveqv_loss = self.cons(q_selected, inverse_k, mask=inverse_sal)
 
         else:

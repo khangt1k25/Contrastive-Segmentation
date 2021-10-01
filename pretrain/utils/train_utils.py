@@ -158,6 +158,9 @@ def save_plot_curve(
         f.write(str(attention_losses.avg))
         f.write("\n")
     with open(path + 'attention.txt', 'a') as f:
+        f.write(str(attention_losses.avg))
+        f.write("\n")
+    with open(path + 'inveqv.txt', 'a') as f:
         f.write(str(inveqv_losses.avg))
         f.write("\n")
     with open(path+'saliency.txt', 'a') as f:
