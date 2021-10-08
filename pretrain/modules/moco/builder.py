@@ -206,7 +206,7 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
-            k_transformed = deepcopy(im_k)
+            k_transformed = deepcopy(k)
 
             for j in range(len(dataloader.dataset.eqv_list)):
                 m = [ele[j] for ele in matrix_eqv]
