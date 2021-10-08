@@ -162,10 +162,10 @@ class KorniaDataset(data.Dataset):
 
             query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
 
-            # key_sample['image'] = self.normalize(key_sample['image']).squeeze()
-            # query_sample['image'] = self.normalize(query_sample['image']).squeeze()
-            key_sample['image'] = key_sample['image']
-            query_sample['image'] = query_sample['image']
+            key_sample['image'] = self.normalize(key_sample['image'])
+            query_sample['image'] = self.normalize(query_sample['image'])
+            # key_sample['image'] = key_sample['image']
+            # query_sample['image'] = query_sample['image']
 
             
             if self.downsample_sal: # Downsample
