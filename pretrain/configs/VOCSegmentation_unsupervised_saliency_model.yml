@@ -8,10 +8,10 @@ train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 8
 train_batch_size: 32
-type_dataset: kornia
+type_dataset: baseline
 
 # 
-kornia_version: 1
+inveqv_version:  1
 
 
 # Model
@@ -24,28 +24,20 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_cluster_head: True
+   use_attention_head: True
 
 loss_coeff:
    contrastive: 1
    saliency: 1
-   local_contrastive: 0
-   cluster: 0
-   consistency: 0.1
+   inveqv: 1
+   mean: 0
+   attention: 0
 
-local_contrastive_kwargs:
-   num_negatives:  48
-   kernel: 3
+inveqv_kwargs:
+   type: l2
 
-cluster_kwargs:
-   C: 20
-   smooth_prob: True
-   smooth_coeff: 0.1
-   entropy_coeff: 5
-
-consistency_kwargs:
-   type: l2norm
-
+mean_pixel_kwargs:
+   type: mean
 
 
 head: deeplab
@@ -66,6 +58,3 @@ moco_kwargs:
    T: 0.5 # Temperature
    m: 0.999 # Momentum
    K: 128 # Negatives
-
-
-

@@ -6,7 +6,7 @@ val_db_kwargs:
 num_workers: 4
 
 # Model
-backbone: 'resnet50'
+backbone: 'resnet18'
 backbone_kwargs:
    dilated: True
    pretrained: True
@@ -15,9 +15,24 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
+   use_attention_head: True
+
+loss_coeff:
+   contrastive: 1
+   saliency: 1
+   inveqv: 1
+   mean: 0
+   attention: 0
+
+inveqv_kwargs:
+   type: l2
+
+mean_pixel_kwargs:
+   type: mean
+   
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /path/to/unsupervised_model.pth.tar # Change this.
+pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
 kmeans_eval: True
 
 # Retrieval kwargs
