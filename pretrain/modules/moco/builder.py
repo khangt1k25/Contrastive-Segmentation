@@ -270,7 +270,7 @@ class ContrastiveModel(nn.Module):
         else:
             inveqv_loss = 0
         
-        
+
 
         '''
         Compute Object Contrastive loss 
@@ -291,6 +291,7 @@ class ContrastiveModel(nn.Module):
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
             mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
+            mean_labels = mean_labels.long()
         else:
             mean_logits = 0.
             mean_labels = 0.
@@ -302,7 +303,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels.long(), attention_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
 
         
 # utils
