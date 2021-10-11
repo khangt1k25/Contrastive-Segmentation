@@ -114,10 +114,11 @@ class DatasetKeyQuery(data.Dataset):
 
 class KorniaDataset(data.Dataset):
     def __init__(self, base_dataset, base_transform, inv_list, eqv_list, downsample_sal=False,
-                    scale_factor_sal=0.125, min_area=0.01, max_area=0.99):
+                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99, inveqv_version=1):
         super(KorniaDataset, self).__init__()
         self.base_dataset = base_dataset 
 
+        self.inveqv_version = inveqv_version
         self.base_transform = base_transform
         self.inv_list = inv_list
         self.eqv_list = eqv_list
@@ -155,18 +156,25 @@ class KorniaDataset(data.Dataset):
                 count = 100
             
             
+            if self.inveqv_version == 1:
+                key_sample, _, _ = self.inv_transform(deepcopy(sample))
 
-            key_sample, _, _ = self.inv_transform(deepcopy(sample))
+                query_sample, _, _ = self.inv_transform(deepcopy(sample))
 
-            query_sample, _, _ = self.inv_transform(deepcopy(sample))
+                query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
 
-            query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
+                
+            else:
+                query_sample, _, _ = self.inv_transform(deepcopy(sample))
 
-            key_sample['image'] = self.normalize(key_sample['image'])
-            query_sample['image'] = self.normalize(query_sample['image'])
-            # key_sample['image'] = key_sample['image']
-            # query_sample['image'] = query_sample['image']
+                key_sample, _, _ = self.inv_transform(deepcopy(sample))
 
+                key_sample, matrix_eqv, size_eqv = self.eqv_transform(key_sample)
+
+            # key_sample['image'] = self.normalize(key_sample['image'])
+            # query_sample['image'] = self.normalize(query_sample['image'])
+            key_sample['image'] = key_sample['image']
+            query_sample['image'] = query_sample['image']    
             
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
@@ -207,7 +215,7 @@ class KorniaDataset(data.Dataset):
             s = tuple(img.shape[-2:])
             params = eqv._params
             sal, _ = eqv(sal.float(), params)
-
+        
             matrix_eqv.append(m)
             size_eqv.append(s)
         
@@ -215,7 +223,7 @@ class KorniaDataset(data.Dataset):
         sample['sal'] = sal.squeeze()
         return sample, matrix_eqv, size_eqv
 
-
+    
 
 if __name__=='__main__':
     import numpy as np

@@ -192,11 +192,11 @@ p = {'train_db_name':'VOCSegmentation', 'train_db_kwargs': {'saliency':'unsuperv
 base_dataset = get_train_dataset(p, transform=None)
 base_transform = get_base_transforms()
 inv_list = ['colorjitter', 'gray']
-eqv_list = ['hflip', 'affine']
+eqv_list = ['hflip', 'vflip', 'affine']
 inv_transform = get_inv_transforms(inv_list)
 eqv_transform = get_eqv_transforms(eqv_list)
 
-train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform)
+train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=2)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=32, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
 for i, batch in enumerate(train_dataloader):
@@ -222,19 +222,39 @@ for i, batch in enumerate(train_dataloader):
     #         # print(tmp.shape)
     #     tmp = tmp.squeeze()
     #     k_transformed.append(tmp)
-    k_transformed = torch.randn(size=(32, 5, 224, 224))
-    # k_transformed = deepcopy(im_k)
-    for j in range(len(eqv_transform)):
+    # k_transformed = torch.randn(size=(32, 5, 224, 224))
+    
+
+    # affine = k_aug.RandomAffine(
+    #             degrees=(10, 30),
+    #             translate=(0.15, 0.15),
+    #             scale=(0.5, 1),
+    #             return_transform=True,
+    #             same_on_batch=False,
+    #             p=0.5
+    #         )
+    sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
+    k_transformed = deepcopy(im_k)
+
+    for j in range(len(eqv_transform)-1, -1, -1):
+
         m = [ele[j] for ele in matrix_eqv]
         m = torch.stack(m, dim=0).squeeze()
-        k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
-    
-    # k_transformed = torch.stack(k_transformed, dim=0)
-    print(k_transformed.shape)
-    for i in range(3):
-        toPIL(im_q[i]).show()
+        if(j==len(eqv_transform)-1):
+            k_transformed = eqv_transform[j].inverse((k_transformed, m),size=size_eqv[0][0])
+            sal_k_transformed = eqv_transform[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
+        else:
+            k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
+            sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
+        
+
+    # print(k_transformed.shape)
+    for i in range(3, 6):
+        # toPIL(im_q[i]).show()
+        # toPIL(im_k[i]).show()
         toPIL(k_transformed[i]).show()
-        toPIL(sal_q[i].float()).show()
+        toPIL(sal_k_transformed[i].float()).show()
+        # toPIL(sal_k[i].float()).show()
     break
 # for i in range(3, 6, 1):
 #     sample = train_dataset[i]

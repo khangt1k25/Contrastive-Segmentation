@@ -132,11 +132,11 @@ def main_worker(gpu, ngpus_per_node, args):
     base_dataset = get_train_dataset(p, transform=None)
     base_transform = get_base_transforms()
     inv_list = ['colorjitter', 'gray']
-    eqv_list = ['hflip', 'affine']
+    eqv_list = ['hflip', 'vflip', 'affine']
     inv_transform = get_inv_transforms(inv_list)
     eqv_transform = get_eqv_transforms(eqv_list)
     
-    train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform)
+    train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=p['inveqv_version'])
 
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),

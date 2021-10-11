@@ -8,6 +8,7 @@
 
 
 from copy import deepcopy
+from numpy.core.fromnumeric import size
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -206,14 +207,30 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
+            sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
             k_transformed = deepcopy(k)
 
-            for j in range(len(dataloader.dataset.eqv_list)):
-                m = [ele[j] for ele in matrix_eqv]
-                m = torch.stack(m, dim=0).squeeze()
-                k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
-            
-            
+            if self.p['inveqv_version'] == 1:
+                # forward reuse
+                for j in range(len(dataloader.dataset.eqv_list)):
+                    m = [ele[j] for ele in matrix_eqv]
+                    m = torch.stack(m, dim=0).squeeze()
+                    k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
+                    sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0])
+
+            elif self.p['inveqv_version'] == 2:
+                # inverse reuse
+                for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
+
+                    m = [ele[j] for ele in matrix_eqv]
+                    m = torch.stack(m, dim=0).squeeze()
+                    if(j==len(dataloader.dataset.eqv_list)-1):
+                        k_transformed = dataloader.dataset.eqv_list[j].inverse((k_transformed, m),size=size_eqv[0][0])
+                        sal_k_transformed = dataloader.dataset.eqv_list[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
+                    else:
+                        k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
+                        sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
+
              
             # prototypes k
             if self.p['mean_pixel_kwargs']['type'] == 'mean':
@@ -227,7 +244,7 @@ class ContrastiveModel(nn.Module):
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
          
 
-   
+
         
 
         
@@ -236,15 +253,24 @@ class ContrastiveModel(nn.Module):
         '''
          
         if self.p['loss_coeff']['inveqv'] > 0:
-            k_transformed = k_transformed.permute((0, 2, 3, 1))                  
-        
-            q_selected = q.permute((0, 2, 3, 1))
+            if self.p['inveqv_version'] == 1:
+                
+                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+            
+                q_selected = q.permute((0, 2, 3, 1))
 
-            inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_q)
+                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_q)
+            elif self.p['inveqv_version'] == 2:
+
+                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+            
+                q_selected = q.permute((0, 2, 3, 1))
+
+                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_k_transformed)
         else:
             inveqv_loss = 0
         
-
+        
 
         '''
         Compute Object Contrastive loss 
@@ -265,7 +291,6 @@ class ContrastiveModel(nn.Module):
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
             mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
-            mean_labels = mean_labels.long()
         else:
             mean_logits = 0.
             mean_labels = 0.
@@ -277,7 +302,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels.long(), attention_loss
 
         
 # utils
