@@ -76,9 +76,13 @@ class ContrastiveSegmentationModel(nn.Module):
         elif not self.use_classification_head and self.use_attention_head:
             return x, mask.squeeze()
         else:
+<<<<<<< HEAD
+            return x
+=======
             return x
 
 
 
 
 
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1

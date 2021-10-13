@@ -68,7 +68,7 @@ class ConsistencyLoss(Module):
     def __init__(self, type='l2'):
         super(ConsistencyLoss, self).__init__()
         self.type = type
-        assert(self.type in ['l2norm', 'l2', 'negativecosine'])
+        assert(self.type in ['l2norm', 'l2'])
 
     def forward(self, output, labels, mask=None):
         assert (output.size() == labels.size())
@@ -79,21 +79,15 @@ class ConsistencyLoss(Module):
             output = F.normalize(output, dim=-1)
             labels = F.normalize(labels, dim=-1)
             mask = mask.unsqueeze(-1)
-            x = output * mask
-            y = labels * mask
-            x =  x.reshape((-1, x.shape[-1]))
-            y =  y.reshape((-1, y.shape[-1]))
-
-            return (((x-y) ** 2).sum(dim=-1)).mean()
+            z = (output-labels)*mask
+            z = z.reshape((-1, z.shape[-1]))
+            return ((z**2).sum(dim=-1)).mean()
         
         elif self.type == 'l2':
             mask = mask.unsqueeze(-1)
-            x = output * mask
-            y = labels * mask
-            x =  x.reshape((-1, x.shape[-1]))
-            y =  y.reshape((-1, y.shape[-1]))
-
-            return (((x-y) ** 2).sum(dim=-1)).mean()
+            z = (output-labels)*mask
+            z = z.reshape((-1, z.shape[-1]))
+            return ((z**2).sum(dim=-1)).mean()
 
 
         
@@ -107,6 +101,11 @@ class AttentionLoss(Module):
 
         mask = mask.reshape(bsz, -1)
         mask = torch.softmax(mask, dim=1)
+<<<<<<< HEAD
+
+        x_mean = torch.bmm(x, mask.unsqueeze(2)).squeeze()
+        x_mean = nn.functional.normalize(x_mean, dim=1)
+=======
         
         
 
@@ -115,6 +114,7 @@ class AttentionLoss(Module):
         
         
        
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
         sal = sal.reshape(bsz, -1)
         sal = 1. - sal

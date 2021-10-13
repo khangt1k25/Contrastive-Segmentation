@@ -19,10 +19,13 @@ class RandomResizedCrop(torchvision.transforms.RandomResizedCrop):
     def __call__(self, sample):
         img = sample['image']
         sal = sample['sal']
-
+        
         i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        
         sample['image'] = F.resized_crop(img, i, j, h, w, self.size, self.interpolation_img)
+
         sample['sal'] = F.resized_crop(sal, i, j, h, w, self.size, self.interpolation_sal)
+    
         return sample
 
 

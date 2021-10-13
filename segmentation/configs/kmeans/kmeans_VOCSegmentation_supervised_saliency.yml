@@ -15,28 +15,22 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_cluster_head: True
+   use_attention_head: True
+
 loss_coeff:
    contrastive: 1
    saliency: 1
-   local_contrastive: 0
-   cluster: 0
-   consistency: 0.1
+   inveqv: 1
+   mean: 0
+   attention: 0
 
-local_contrastive_kwargs:
-   num_negatives:  48
-   kernel: 3
+inveqv_kwargs:
+   type: l2
 
-cluster_kwargs:
-   C: 20
-   smooth_prob: True
-   smooth_coeff: 0.1
-   entropy_coeff: 5
-
-consistency_kwargs:
-   type: l2norm
+mean_pixel_kwargs:
+   type: mean
 
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_supervised_saliency_model/checkpoint.pth.tar # Change this
+pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
 kmeans_eval: True

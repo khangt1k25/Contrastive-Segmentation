@@ -2,8 +2,9 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
-from os import stat
+import os
 from kornia.geometry import transform
+from numpy import matrix
 import torch
 from torch.nn.functional import cross_entropy
 from torchvision import transforms
@@ -13,7 +14,7 @@ from utils.utils import AverageMeter, ProgressMeter, freeze_layers
 def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
-    inveqv_losses = AverageMeter('Consistency', ':.4e')
+    inveqv_losses = AverageMeter('Inveqv', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     mean_losses = AverageMeter('Mean-Contrast', ':.4e')
     attention_losses = AverageMeter('Attention', ':.4e')
@@ -24,25 +25,25 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                         [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, attention_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
+    
 
     if p['freeze_layers']:
         model = freeze_layers(model)
-    
-    for i, batch in enumerate(train_loader):
+
+    for i,  batch in enumerate(train_loader):
         # Forward pass
+        
         im_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        if p['type_dataset'] == 'baseline':
-            state_dict = None
-            transform = None
-        elif p['type_dataset'] == 'kornia':
-            state_dict = batch['T']
-            transform = batch['transform']
+        
+        matrix_eqv = batch['matrix']
+        size_eqv = batch['size']
+
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, state_dict=state_dict, transform=transform)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
       
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -120,13 +121,15 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             progress.display(i)
             
     save_plot_curve(
+        p=p,
         contrastive_losses=contrastive_losses,
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
         mean_losses=mean_losses,
         attention_losses=attention_losses,
         losses=losses
-    )  
+    )
+    return losses.avg
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
@@ -143,29 +146,30 @@ def accuracy(output, target, topk=(1,)):
     
 
 def save_plot_curve(
+    p,
     contrastive_losses, 
     saliency_losses,
     inveqv_losses,
     mean_losses,
     attention_losses,
     losses,
-    path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/'):
+    ):
 
-    with open(path+'cl.txt', 'a') as f:
+    with open(os.path.join(p['outputdir'], 'cl.txt'), 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
-    with open(path + 'inveqv.txt', 'a') as f:
-        f.write(str(attention_losses.avg))
-        f.write("\n")
-    with open(path + 'attention.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'inveqv.txt'), 'a') as f:
         f.write(str(inveqv_losses.avg))
         f.write("\n")
-    with open(path+'saliency.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'attention.txt'), 'a') as f:
+        f.write(str(attention_losses.avg))
+        f.write("\n")
+    with open(os.path.join(p['output_dir'], 'saliency.txt'), 'a') as f:
         f.write(str(saliency_losses.avg))
         f.write("\n")
-    with open(path+'total.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'total.txt'), 'a') as f:
         f.write(str(losses.avg))
         f.write("\n")
-    with open(path+'mean-contrast.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'mean-contrast.txt'), 'a') as f:
         f.write(str(mean_losses.avg))
         f.write("\n")

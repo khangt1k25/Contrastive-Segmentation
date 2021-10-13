@@ -11,7 +11,7 @@ train_batch_size: 32
 type_dataset: baseline
 
 # 
-kornia_version: 1 # if dataset is kornia
+inveqv_version:  1
 
 
 # Model
@@ -29,16 +29,15 @@ model_kwargs:
 loss_coeff:
    contrastive: 1
    saliency: 1
-   consistency: 0
-   mean: 0.1
-   attention: 1
+   inveqv: 1
+   mean: 0
+   attention: 0
 
-
-consistency_kwargs:
-   type: l2norm
+inveqv_kwargs:
+   type: l2
 
 mean_pixel_kwargs:
-   type: attention
+   type: mean
 
 
 head: deeplab
@@ -59,6 +58,3 @@ moco_kwargs:
    T: 0.5 # Temperature
    m: 0.999 # Momentum
    K: 128 # Negatives
-
-
-

@@ -13,14 +13,14 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import DatasetKeyQuery, TwoTransformDataset
+from data.dataloaders.dataset import KorniaDataset
 
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
-from utils.common_config import get_normalize_transformations, get_train_dataset, get_train_transformations,\
+from utils.common_config import get_train_dataset,\
                                 get_train_dataloader, get_optimizer, adjust_learning_rate,\
-                                get_base_transformations, get_next_transformations
+                                get_base_transforms, get_inv_transforms, get_eqv_transforms
 
 from utils.train_utils import train
 from utils.logger import Logger
@@ -128,32 +128,23 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    train_transform = None
-    base_transform = None
-    next_transform = None
     
-    if p['type_dataset'] == 'baseline':
-        train_transform = get_train_transformations()
-        print(train_transform)
-        train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
-                                downsample_sal=not p['model_kwargs']['upsample'])
-    elif p['type_dataset'] == 'kornia':
-        base_transform = get_base_transformations()
-        next_transform = get_next_transformations()
-        
-        print(base_transform)
-        print(next_transform)
-        train_dataset = TwoTransformDataset(get_train_dataset(p, transform = None), base_transform, next_transform, 
-                                downsample_sal=not p['model_kwargs']['upsample'])
+    base_dataset = get_train_dataset(p, transform=None)
+    base_transform = get_base_transforms()
+    inv_list = ['colorjitter', 'gray']
+    eqv_list = ['hflip', 'vflip', 'affine']
+    inv_transform = get_inv_transforms(inv_list)
+    eqv_transform = get_eqv_transforms(eqv_list)
     
-    
-    
+    train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=p['inveqv_version'])
+
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),
                     num_workers=p['num_workers'], pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_custom)
+                    
     print(colored('Train samples %d' %(len(train_dataset)), 'yellow'))
     print(colored(train_dataset, 'yellow'))
-
+    
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
         print(colored('Restart from checkpoint {}'.format(p['checkpoint']), 'blue'))
@@ -173,6 +164,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # Main loop
     print(colored('Starting main loop', 'blue'))
     
+    best_train_before = 999999
     for epoch in range(start_epoch, p['epochs']):
         print(colored('Epoch %d/%d' %(epoch+1, p['epochs']), 'yellow'))
         print(colored('-'*10, 'yellow'))
@@ -183,6 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # Train 
         print('Train ...')
+        
         eval_train = train(p, train_dataloader, model, 
                                     optimizer, epoch, amp)
 
@@ -190,11 +183,24 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.rank % ngpus_per_node == 0:
             print('Checkpoint ...')
             if args.nvidia_apex:
+                
+                if eval_train <= best_train_before: # save the best
+                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
+                            'amp': amp.state_dict(), 'epoch': epoch + 1}, 
+                            p['bestcheckpoint'])
+                    best_train_before = eval_train
+
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
                             'amp': amp.state_dict(), 'epoch': epoch + 1}, 
                             p['checkpoint'])
 
             else:
+                if eval_train <= best_train_before: # save the best
+                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
+                            'epoch': epoch + 1}, 
+                            p['bestcheckpoint'])
+                    best_train_before = eval_train
+                 
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
                             'epoch': epoch + 1}, 
                             p['checkpoint'])
