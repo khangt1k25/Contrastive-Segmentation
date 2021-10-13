@@ -2,6 +2,7 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
+from numpy.core.fromnumeric import shape
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -75,4 +76,13 @@ class ContrastiveSegmentationModel(nn.Module):
         elif not self.use_classification_head and self.use_attention_head:
             return x, mask.squeeze()
         else:
+<<<<<<< HEAD
             return x
+=======
+            return x
+
+
+
+
+
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1

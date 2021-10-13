@@ -80,6 +80,11 @@ def get_model(p):
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'],
                                                 p['model_kwargs']['use_attention_head'])
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 
 def get_train_dataset(p, transform=None):
@@ -92,7 +97,10 @@ def get_train_dataset(p, transform=None):
     else:    
         raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 def get_train_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
@@ -164,6 +172,10 @@ def get_eqv_transforms(eqv_list):
                 )
             )
     return aug
+
+
+
+
 
 def get_val_transformations():
     augmentation = [

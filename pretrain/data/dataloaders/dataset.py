@@ -136,7 +136,6 @@ class KorniaDataset(data.Dataset):
         self.max_area = max_area
 
 
-
     def __len__(self):
         return len(self.base_dataset) 
 

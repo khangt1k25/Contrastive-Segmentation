@@ -8,17 +8,25 @@
 
 
 from copy import deepcopy
+<<<<<<< HEAD
 from numpy.core.fromnumeric import size
+=======
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import random
 import torchvision
 
+<<<<<<< HEAD
 from utils.common_config import get_model
 from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
+=======
+from utils.common_config import get_model, get_next_transformations
+from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -54,12 +62,21 @@ class ContrastiveModel(nn.Module):
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
 
+<<<<<<< HEAD
         
+=======
+        # kornia prototypes
+        self.kornia_tool = get_next_transformations()
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
         # additional loss
         
         self.bce = BalancedCrossEntropyLoss(size_average=True)
+<<<<<<< HEAD
         self.att = AttentionLoss()
+=======
+        self.at = AttentionLoss()
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
         self.cons = ConsistencyLoss(type=p['inveqv_kwargs']['type'])
 
 
@@ -67,6 +84,10 @@ class ContrastiveModel(nn.Module):
         
         
         
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 
     
@@ -153,7 +174,11 @@ class ContrastiveModel(nn.Module):
             logits, targets, local_logits, local_targets
         """
         
+<<<<<<< HEAD
         batch_size, channel, H, W = im_q.size()
+=======
+        batch_size, channel, H, W = im_q.size
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
         q, bg_q, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -169,11 +194,16 @@ class ContrastiveModel(nn.Module):
                 q_mean = nn.functional.normalize(q_mean, dim=1)    
             
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+<<<<<<< HEAD
                 q_mean, attention_loss = self.att(q, q_mask, sal_q)
                 q_mean = nn.functional.normalize(q_mean, dim=1)
         if self.p['loss_coeff']['attention'] <= 0:
             attention_loss = 0.
             
+=======
+                q_mean, attention_loss = self.at(q, q_mask, sal_q)
+                q_mean = nn.functional.normalize(q_mean, dim=1)
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
         '''
         Compute saliency loss
@@ -233,6 +263,7 @@ class ContrastiveModel(nn.Module):
 
              
             # prototypes k
+<<<<<<< HEAD
             if self.p['mean_pixel_kwargs']['type'] == 'mean':
                 k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
                 sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
@@ -271,6 +302,69 @@ class ContrastiveModel(nn.Module):
         else:
             inveqv_loss = 0
         
+=======
+            if self.p['loss_coeff']['mean'] > 0:
+                if self.p['mean_pixel_kwargs']['type'] == 'mean':
+                    k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                    sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+                    prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+                
+                elif self.p['mean_pixel_kwargs']['type'] == 'attention':
+                    prototypes_foreground, _ = self.at(k, k_mask, sal_k)
+                    prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+         
+
+        '''
+        Compute attention loss
+        '''
+        if self.p['loss_coeff']['attention'] <= 0:
+            attention_loss = 0
+            
+        
+
+        '''
+        Compute Consistency loss
+        '''
+        
+        if self.p['loss_coeff']['inveqv'] > 0:
+            if self.p['kornia_version'] == 2:
+                fw_q = []
+                fw_sal = []
+                for i in range(len(state_dict)):
+                    sample = {"image":deepcopy(q[i]), "sal":deepcopy(bg_q[i])}
+                    new_sample = self.kornia_tool.forward_with_params(sample, state_dict[i])
+                    fw_q.append(new_sample['image'].squeeze(0))
+                    fw_sal.append(new_sample['sal'].squeeze(0))
+                
+                fw_q = torch.stack(fw_q, dim=0).squeeze(0)
+                fw_q = fw_q.permute((0, 2, 3, 1))
+                fw_sal = torch.stack(fw_sal, dim=0)
+                
+                
+                k_selected = k.permute((0, 2, 3, 1))
+                inveqv_loss = self.cons(fw_q, k_selected, mask=sal_k)
+                 
+            elif self.p['kornia_version'] == 1:
+                inverse_k = []
+                inverse_sal = []
+                for i in range(len(transform)):
+                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
+                    new_sample = self.kornia_tool.inverse(sample, transform[i])
+                    inverse_k.append(new_sample['image'].squeeze(0))
+                    inverse_sal.append(new_sample['sal'].squeeze(0))
+
+                inverse_k = torch.stack(inverse_k, dim=0).squeeze(0)
+                inverse_k = inverse_k.permute((0, 2, 3, 1))                  
+                inverse_sal = torch.stack(inverse_sal, dim=0)
+
+                q_selected = q.permute((0, 2, 3, 1))
+
+                inveqv_loss = self.cons(q_selected, inverse_k, mask=inverse_sal)
+
+        else:
+            inveqv_loss = 0.
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 
         '''
@@ -304,7 +398,11 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
+<<<<<<< HEAD
         return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+=======
+        return logits, tmp, sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
         
 # utils
