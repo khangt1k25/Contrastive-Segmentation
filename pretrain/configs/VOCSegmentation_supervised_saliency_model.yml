@@ -10,6 +10,10 @@ num_workers: 8
 train_batch_size: 32
 type_dataset: baseline
 
+# 
+inveqv_version:  1
+
+
 # Model
 backbone: resnet18
 backbone_kwargs:
@@ -20,24 +24,20 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_cluster_head: True
+   use_attention_head: True
+
 loss_coeff:
    contrastive: 1
    saliency: 1
-   local_contrastive: 0
-   cluster: 0.1
-   consistency: 0
-local_contrastive_kwargs:
-   num_negatives:  48
-   kernel: 3
-cluster_kwargs:
-   C: 20
-   smooth_prob: True
-   smooth_coeff: 0.1
-   entropy_coeff: 5
-consistency_kwargs:
-   type: l2norm
+   inveqv: 1
+   mean: 0
+   attention: 0
 
+inveqv_kwargs:
+   type: l2
+
+mean_pixel_kwargs:
+   type: mean
 
 
 head: deeplab

@@ -2,7 +2,7 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
-from os import stat
+import os
 from kornia.geometry import transform
 from numpy import matrix
 import torch
@@ -121,13 +121,15 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             progress.display(i)
             
     save_plot_curve(
+        p=p,
         contrastive_losses=contrastive_losses,
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
         mean_losses=mean_losses,
         attention_losses=attention_losses,
         losses=losses
-    )  
+    )
+    return losses.avg
 
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
@@ -144,29 +146,30 @@ def accuracy(output, target, topk=(1,)):
     
 
 def save_plot_curve(
+    p,
     contrastive_losses, 
     saliency_losses,
     inveqv_losses,
     mean_losses,
     attention_losses,
     losses,
-    path = '/content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/'):
+    ):
 
-    with open(path+'cl.txt', 'a') as f:
+    with open(os.path.join(p['outputdir'], 'cl.txt'), 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
-    with open(path + 'inveqv.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'inveqv.txt'), 'a') as f:
         f.write(str(inveqv_losses.avg))
         f.write("\n")
-    with open(path + 'attention.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'attention.txt'), 'a') as f:
         f.write(str(attention_losses.avg))
         f.write("\n")
-    with open(path+'saliency.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'saliency.txt'), 'a') as f:
         f.write(str(saliency_losses.avg))
         f.write("\n")
-    with open(path+'total.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'total.txt'), 'a') as f:
         f.write(str(losses.avg))
         f.write("\n")
-    with open(path+'mean-contrast.txt', 'a') as f:
+    with open(os.path.join(p['output_dir'], 'mean-contrast.txt'), 'a') as f:
         f.write(str(mean_losses.avg))
         f.write("\n")

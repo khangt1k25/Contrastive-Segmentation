@@ -29,7 +29,7 @@ model_kwargs:
 loss_coeff:
    contrastive: 1
    saliency: 1
-   inveqv: 1
+   inveqv: 0
    mean: 0
    attention: 0
 

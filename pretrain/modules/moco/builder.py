@@ -260,6 +260,7 @@ class ContrastiveModel(nn.Module):
                 q_selected = q.permute((0, 2, 3, 1))
 
                 inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_q)
+                
             elif self.p['inveqv_version'] == 2:
 
                 k_transformed = k_transformed.permute((0, 2, 3, 1))                  

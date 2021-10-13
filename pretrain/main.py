@@ -164,6 +164,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # Main loop
     print(colored('Starting main loop', 'blue'))
     
+    best_train_before = 999999
     for epoch in range(start_epoch, p['epochs']):
         print(colored('Epoch %d/%d' %(epoch+1, p['epochs']), 'yellow'))
         print(colored('-'*10, 'yellow'))
@@ -174,6 +175,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # Train 
         print('Train ...')
+        
         eval_train = train(p, train_dataloader, model, 
                                     optimizer, epoch, amp)
 
@@ -181,11 +183,24 @@ def main_worker(gpu, ngpus_per_node, args):
         if args.rank % ngpus_per_node == 0:
             print('Checkpoint ...')
             if args.nvidia_apex:
+                
+                if eval_train <= best_train_before: # save the best
+                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
+                            'amp': amp.state_dict(), 'epoch': epoch + 1}, 
+                            p['bestcheckpoint'])
+                    best_train_before = eval_train
+
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
                             'amp': amp.state_dict(), 'epoch': epoch + 1}, 
                             p['checkpoint'])
 
             else:
+                if eval_train <= best_train_before: # save the best
+                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
+                            'epoch': epoch + 1}, 
+                            p['bestcheckpoint'])
+                    best_train_before = eval_train
+                 
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
                             'epoch': epoch + 1}, 
                             p['checkpoint'])

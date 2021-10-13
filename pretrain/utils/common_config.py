@@ -137,20 +137,32 @@ def get_inv_transforms(inv_list):
 def get_eqv_transforms(eqv_list):
     aug = []
     if 'hflip' in eqv_list:
-        aug.append(k_aug.RandomHorizontalFlip(p=0.5, return_transform=True))
+        aug.append(
+            k_aug.RandomHorizontalFlip(
+                p=0.5,
+                return_transform=True,
+                same_on_batch=False
+                )
+            )
     if 'vflip' in eqv_list:
-        aug.append(k_aug.RandomVerticalFlip(p=0.5, return_transform=True))
+        aug.append(
+            k_aug.RandomVerticalFlip(
+                p=0.5, 
+                return_transform=True,
+                same_on_batch=False
+                )
+            )
     if 'affine' in eqv_list:
         aug.append(
             k_aug.RandomAffine(
-                degrees=(10, 30),
+                degrees=(-30, 30),
                 translate=(0.15, 0.15),
                 scale=(0.5, 1),
                 return_transform=True,
                 same_on_batch=False,
                 p=0.5
+                )
             )
-        )
     return aug
 
 def get_val_transformations():

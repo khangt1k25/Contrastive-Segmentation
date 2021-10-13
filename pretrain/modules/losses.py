@@ -101,14 +101,9 @@ class AttentionLoss(Module):
 
         mask = mask.reshape(bsz, -1)
         mask = torch.softmax(mask, dim=1)
-        
-        
 
         x_mean = torch.bmm(x, mask.unsqueeze(2)).squeeze()
         x_mean = nn.functional.normalize(x_mean, dim=1)
-        
-        
-       
 
         sal = sal.reshape(bsz, -1)
         sal = 1. - sal

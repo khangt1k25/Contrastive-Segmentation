@@ -20,7 +20,7 @@ def build_memory_bank(p, dataset, loader, model):
     
     for i, batch in enumerate(loader):
         semseg = batch['semseg']
-        output, sal = model(batch['image'].cuda(non_blocking=True))
+        output, sal, y = model(batch['image'].cuda(non_blocking=True))
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape
@@ -71,7 +71,7 @@ def retrieval(p, memory_bank, val_dataset, val_loader, model):
     for i, batch in enumerate(val_loader):
         semseg = batch['semseg'].cuda(non_blocking=True)
         b, h, w = semseg.size()
-        output, sal = model(batch['image'].cuda(non_blocking=True))
+        output, sal, y = model(batch['image'].cuda(non_blocking=True))
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape
@@ -80,15 +80,20 @@ def retrieval(p, memory_bank, val_dataset, val_loader, model):
         prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)
 
-        # find nearest neighbor
+        # find k nearest neighbor
         correlation = torch.matmul(prototypes, memory_prototypes.t())
-        neighbors = torch.argmax(correlation, dim=1)
-        class_pred = torch.index_select(memory_labels, 0, neighbors)
-
+        # neighbors = torch.argmax(correlation, dim=1)
+        # class_pred = torch.index_select(memory_labels, 0, neighbors) 
+        topk = torch.topk(correlation, dim=1, k=p['kneighbor']).indices
+        class_pred = torch.index_select(memory_labels, 0, topk.view(-1))
+        class_pred = class_pred.reshape(b, -1)
+        
         # construct prediction
         pred = torch.LongTensor(b, h, w).zero_().cuda()
         for jj in range(b):
-            pred[jj][sal[jj] > 0.5] = class_pred[jj]
+            counts = torch.bincount(class_pred[jj])
+            y = torch.argmax(counts)
+            pred[jj][sal[jj] > 0.5] = y
 
         # update meter
         meter.update(pred, semseg)

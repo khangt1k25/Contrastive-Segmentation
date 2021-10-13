@@ -39,6 +39,7 @@ def create_config(config_file_env, config_file_exp):
     mkdir_if_missing(output_dir)
     cfg['output_dir'] = output_dir
     cfg['checkpoint'] = os.path.join(cfg['output_dir'], 'checkpoint.pth.tar')
+    cfg['bestcheckpoint'] = os.path.join(cfg['output_dir'], 'bestcheckpoint.pth.tar')
     cfg['best_model'] = os.path.join(cfg['output_dir'], 'best_model.pth.tar')
 
     return cfg 

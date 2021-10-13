@@ -142,7 +142,7 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         ptr += bs
         for name in meta['image']:
             names.append(name)
-
+        
         if ptr % 300 == 0:
             print('Computing prototype {}'.format(ptr))
 
