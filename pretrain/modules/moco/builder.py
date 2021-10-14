@@ -209,29 +209,32 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
-            sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
-            k_transformed = deepcopy(k)
+            
 
-            if self.p['inveqv_version'] == 1:
-                # forward reuse
-                for j in range(len(dataloader.dataset.eqv_list)):
-                    m = [ele[j] for ele in matrix_eqv]
-                    m = torch.stack(m, dim=0).squeeze()
-                    k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
-                    sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0])
 
-            elif self.p['inveqv_version'] == 2:
-                # inverse reuse
-                for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
+            if self.p['loss_coeff']['inveqv'] > 0:
+              sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
+              k_transformed = deepcopy(k)
+              if self.p['inveqv_version'] == 1:
+                  # forward reuse
+                  for j in range(len(dataloader.dataset.eqv_list)):
+                      m = [ele[j] for ele in matrix_eqv]
+                      m = torch.stack(m, dim=0).squeeze()
+                      k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
+                      # sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0])
 
-                    m = [ele[j] for ele in matrix_eqv]
-                    m = torch.stack(m, dim=0).squeeze()
-                    if(j==len(dataloader.dataset.eqv_list)-1):
-                        k_transformed = dataloader.dataset.eqv_list[j].inverse((k_transformed, m),size=size_eqv[0][0])
-                        sal_k_transformed = dataloader.dataset.eqv_list[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
-                    else:
-                        k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
-                        sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
+              elif self.p['inveqv_version'] == 2:
+                  # inverse reuse
+                  for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
+
+                      m = [ele[j] for ele in matrix_eqv]
+                      m = torch.stack(m, dim=0).squeeze()
+                      if(j==len(dataloader.dataset.eqv_list)-1):
+                          k_transformed = dataloader.dataset.eqv_list[j].inverse((k_transformed, m),size=size_eqv[0][0])
+                          sal_k_transformed = dataloader.dataset.eqv_list[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
+                      else:
+                          k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
+                          sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
 
             
             # prototypes k
