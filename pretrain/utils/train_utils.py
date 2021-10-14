@@ -158,17 +158,7 @@ def save_plot_curve(
     with open(os.path.join(p['outputdir'], 'cl.txt'), 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
-<<<<<<< HEAD
-    with open(path + 'inveqv.txt', 'a') as f:
-        f.write(str(attention_losses.avg))
-        f.write("\n")
-    with open(path + 'attention.txt', 'a') as f:
-        f.write(str(attention_losses.avg))
-        f.write("\n")
-    with open(path + 'inveqv.txt', 'a') as f:
-=======
     with open(os.path.join(p['output_dir'], 'inveqv.txt'), 'a') as f:
->>>>>>> 22ea51d0bd46cb32bf64857d48f7a40d31381e85
         f.write(str(inveqv_losses.avg))
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'attention.txt'), 'a') as f:
