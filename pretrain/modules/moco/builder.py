@@ -14,8 +14,10 @@ import torch.nn.functional as F
 import random
 import torchvision
 
-from utils.common_config import get_model, get_next_transformations
+from utils.common_config import get_model
 from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
+import kornia.augmentation as k_aug
+import kornia.geometry.transform as k_trans
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -48,17 +50,15 @@ class ContrastiveModel(nn.Module):
         self.dim = p['model_kwargs']['ndim']
         self.register_buffer("queue", torch.randn(self.dim, self.K))
         self.queue = nn.functional.normalize(self.queue, dim=0)
-    
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
 
-        # kornia prototypes
-        self.kornia_tool = get_next_transformations()
+        
 
         # additional loss
         
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-        self.at = AttentionLoss()
+        self.att = AttentionLoss()
         self.cons = ConsistencyLoss(type=p['inveqv_kwargs']['type'])
 
 
@@ -68,7 +68,7 @@ class ContrastiveModel(nn.Module):
         
 
 
-
+    
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
         """
@@ -143,7 +143,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, state_dict, transform):
+    def forward(self, im_q, im_k, sal_q, sal_k, matrix_eqv, size_eqv, dataloader):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -152,7 +152,9 @@ class ContrastiveModel(nn.Module):
             logits, targets, local_logits, local_targets
         """
         
+
         batch_size, channel, H, W = im_q.size()
+
 
         q, bg_q, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
@@ -168,8 +170,12 @@ class ContrastiveModel(nn.Module):
                 q_mean = nn.functional.normalize(q_mean, dim=1)    
             
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                q_mean, attention_loss = self.at(q, q_mask, sal_q)
+
+                q_mean, attention_loss = self.att(q, q_mask, sal_q)
                 q_mean = nn.functional.normalize(q_mean, dim=1)
+        
+        if self.p['loss_coeff']['attention'] <= 0:
+            attention_loss = 0.
 
         '''
         Compute saliency loss
@@ -203,6 +209,29 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
+            sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
+            k_transformed = deepcopy(k)
+
+            if self.p['inveqv_version'] == 1:
+                # forward reuse
+                for j in range(len(dataloader.dataset.eqv_list)):
+                    m = [ele[j] for ele in matrix_eqv]
+                    m = torch.stack(m, dim=0).squeeze()
+                    k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
+                    sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0])
+
+            elif self.p['inveqv_version'] == 2:
+                # inverse reuse
+                for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
+
+                    m = [ele[j] for ele in matrix_eqv]
+                    m = torch.stack(m, dim=0).squeeze()
+                    if(j==len(dataloader.dataset.eqv_list)-1):
+                        k_transformed = dataloader.dataset.eqv_list[j].inverse((k_transformed, m),size=size_eqv[0][0])
+                        sal_k_transformed = dataloader.dataset.eqv_list[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
+                    else:
+                        k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
+                        sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
 
             
             # prototypes k
@@ -210,10 +239,40 @@ class ContrastiveModel(nn.Module):
                 k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
                 sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
                 prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)   
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+            
             elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                prototypes_foreground, _ = self.at(k, k_mask, sal_k)
+                prototypes_foreground, _ = self.att(k, k_mask, sal_k)
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
+         
+
+
+        
+
+        
+        '''
+        Compute Consistency loss
+        '''
+         
+        if self.p['loss_coeff']['inveqv'] > 0:
+            if self.p['inveqv_version'] == 1:
+                
+                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+            
+                q_selected = q.permute((0, 2, 3, 1))
+
+                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_q)
+                
+            elif self.p['inveqv_version'] == 2:
+
+                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+            
+                q_selected = q.permute((0, 2, 3, 1))
+
+                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_k_transformed)
+        else:
+            inveqv_loss = 0
+
          
 
         '''
@@ -224,46 +283,8 @@ class ContrastiveModel(nn.Module):
             
         
 
-        '''
-        Compute Consistency loss
-        '''
-        
-        if self.p['loss_coeff']['inveqv'] > 0:
-            if self.p['kornia_version'] == 2:
-                fw_q = []
-                fw_sal = []
-                for i in range(len(state_dict)):
-                    sample = {"image":deepcopy(q[i]), "sal":deepcopy(bg_q[i])}
-                    new_sample = self.kornia_tool.forward_with_params(sample, state_dict[i])
-                    fw_q.append(new_sample['image'].squeeze(0))
-                    fw_sal.append(new_sample['sal'].squeeze(0))
-                
-                fw_q = torch.stack(fw_q, dim=0).squeeze(0)
-                fw_q = fw_q.permute((0, 2, 3, 1))
-                fw_sal = torch.stack(fw_sal, dim=0)
-                
-                
-                k_selected = k.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(fw_q, k_selected, mask=sal_k)
-                 
-            elif self.p['kornia_version'] == 1:
-                inverse_k = []
-                inverse_sal = []
-                for i in range(len(transform)):
-                    sample = {"image": deepcopy(k[i]), 'sal': deepcopy(bg_k[i])}
-                    new_sample = self.kornia_tool.inverse(sample, transform[i])
-                    inverse_k.append(new_sample['image'].squeeze(0))
-                    inverse_sal.append(new_sample['sal'].squeeze(0))
 
-                inverse_k = torch.stack(inverse_k, dim=0).squeeze(0)
-                inverse_k = inverse_k.permute((0, 2, 3, 1))                  
-                inverse_sal = torch.stack(inverse_sal, dim=0)
 
-                q_selected = q.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(q_selected, inverse_k, mask=inverse_sal)
-
-        else:
-            inveqv_loss = 0.
 
 
         '''
@@ -297,7 +318,8 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp, sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+
 
         
 # utils
@@ -313,6 +335,3 @@ def concat_all_gather(tensor):
 
     output = torch.cat(tensors_gather, dim=0)
     return output
-
-
-

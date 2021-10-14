@@ -77,8 +77,3 @@ class ContrastiveSegmentationModel(nn.Module):
             return x, mask.squeeze()
         else:
             return x
-
-
-
-
-

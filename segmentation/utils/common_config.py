@@ -29,7 +29,7 @@ def load_pretrained_weights(p, model):
     print('Warning: This piece of code was only tested for linear classification')
     print('Warning: Assertions should probably depend on model type (Segm/ContrastiveSegm)')
     assert(set(msg[0]) == set(['decoder.4.weight', 'decoder.4.bias']))
-    assert(set(msg[1]) == set(['head.weight', 'head.bias', 'classification_head.weight'])) 
+    assert(set(msg[1]) == set(['head.weight', 'head.bias', 'classification_head.weight', 'attention_head.weight'])) 
     
     # Init final conv layer
     if 'deeplab' in p['head']:
@@ -81,9 +81,8 @@ def get_model(p):
         model = ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                     p['model_kwargs']['upsample'], 
                                                     p['model_kwargs']['use_classification_head'],
-                                                    p['model_kwargs']['use_cluster_head'],
-                                                    p['cluster_kwargs']['C'],
-                                                    p['freeze_layer'])
+                                                    p['model_kwargs']['use_attention_head']
+                                                    )
     else:
         from models.models import SimpleSegmentationModel
         model = SimpleSegmentationModel(backbone, head)

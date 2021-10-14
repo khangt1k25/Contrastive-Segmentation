@@ -5,3 +5,4 @@ PASCAL_VOC.tgz
 *__pycache__
 *.jpg
 examples/*
+cifar10/*

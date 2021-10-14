@@ -4,14 +4,13 @@
 
 import math
 import numpy as np
-from numpy.core.fromnumeric import mean
 import torch
 import torchvision
 import data.dataloaders.transforms as transforms
-import data.dataloaders.transforms_v2 as kornia_transforms
 from data.util.mypath import Path
 from utils.collate import collate_custom
-import kornia as K
+import kornia.augmentation as k_aug
+import kornia.geometry.transform as k_trans
 
 
 def load_pretrained_weights(p, model):
@@ -81,8 +80,11 @@ def get_model(p):
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'],
                                                 p['model_kwargs']['use_attention_head'])
+<<<<<<< HEAD
+=======
 
 
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 
 def get_train_dataset(p, transform=None):
@@ -95,6 +97,10 @@ def get_train_dataset(p, transform=None):
     else:    
         raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
 
+<<<<<<< HEAD
+
+=======
+>>>>>>> 8f5e1f06d3fe80e42d9ecdbdd634266e519141c1
 
 def get_train_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
@@ -118,23 +124,54 @@ def get_train_transformations():
     return torchvision.transforms.Compose(augmentation)
 
 
-def get_base_transformations():
+def get_base_transforms():
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.0)),
         transforms.ToTensor(),
-        # transforms.Normalize(mean=[0.485, 0.456, 0.406],
-        #                          std=[0.229, 0.224, 0.225])
     ]
 
     return torchvision.transforms.Compose(augmentation)
 
-def get_normalize_transformations():
-    return transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                                 std=[0.229, 0.224, 0.225])
+def get_inv_transforms(inv_list):
+    aug = []
+    if 'colorjitter' in inv_list:
+        aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
+    if 'gray' in inv_list:
+        aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
+    if 'blur' in inv_list:
+        aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
+    return aug
 
-
-def get_next_transformations():
-    return kornia_transforms.MyAugmentation()
+def get_eqv_transforms(eqv_list):
+    aug = []
+    if 'hflip' in eqv_list:
+        aug.append(
+            k_aug.RandomHorizontalFlip(
+                p=0.5,
+                return_transform=True,
+                same_on_batch=False
+                )
+            )
+    if 'vflip' in eqv_list:
+        aug.append(
+            k_aug.RandomVerticalFlip(
+                p=0.5, 
+                return_transform=True,
+                same_on_batch=False
+                )
+            )
+    if 'affine' in eqv_list:
+        aug.append(
+            k_aug.RandomAffine(
+                degrees=(-30, 30),
+                translate=(0.15, 0.15),
+                scale=(0.5, 1),
+                return_transform=True,
+                same_on_batch=False,
+                p=0.5
+                )
+            )
+    return aug
 
 
 

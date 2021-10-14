@@ -131,26 +131,18 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
 
-        # compute prototypes
-        # bs, dim, _, _ = y.shape
-        # y = torch.softmax(y, dim=1)
-        # y = y.reshape(bs, dim, -1)
-        # sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
-        # prototypes = torch.bmm(y, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
         sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
         prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)        
-        # prototypes = prototypes.t()/prototypes.sum(dim=1)  # norm
-        # prototypes = prototypes.t()
-        # prototypes = torch.nn.functional.normalize(prototypes, dim=1, p=1.0)
+
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
         ptr += bs
         for name in meta['image']:
             names.append(name)
-
+        
         if ptr % 300 == 0:
             print('Computing prototype {}'.format(ptr))
 
@@ -169,7 +161,6 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
     prediction_kmeans = kmeans.fit_predict(all_prototypes)
 
-    # prediction_kmeans = np.argmax(all_prototypes, axis=1)
 
     # # save predictions
     for i, fname, pred in zip(range(len(val_loader.sampler)), names, prediction_kmeans):
