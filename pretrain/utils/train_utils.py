@@ -155,7 +155,7 @@ def save_plot_curve(
     losses,
     ):
 
-    with open(os.path.join(p['outputdir'], 'cl.txt'), 'a') as f:
+    with open(os.path.join(p['output_dir'], 'cl.txt'), 'a') as f:
         f.write(str(contrastive_losses.avg))
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'inveqv.txt'), 'a') as f:
