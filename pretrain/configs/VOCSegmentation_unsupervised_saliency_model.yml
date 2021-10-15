@@ -8,10 +8,6 @@ train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 8
 train_batch_size: 32
-type_dataset: baseline
-
-# 
-inveqv_version:  1
 
 
 # Model
