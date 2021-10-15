@@ -154,12 +154,12 @@ def get_eqv_transforms(eqv_list):
     if 'affine' in eqv_list:
         aug.append(
             k_aug.RandomAffine(
-                degrees=(-30, 30),
-                translate=(0.15, 0.15),
-                scale=(0.5, 1),
+                degrees=(-90, 90),
+                # translate=(0.5, 0.5), # discard translate due to small object/ big bg
+                scale=(0.9, 1.2), 
                 return_transform=True,
                 same_on_batch=False,
-                p=0.5
+                p=0.5,
                 )
             )
     return aug
