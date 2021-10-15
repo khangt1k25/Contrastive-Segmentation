@@ -99,7 +99,7 @@ def get_train_dataloader(p, dataset):
             drop_last=True, shuffle=True)
 
 
-def get_train_transformations():
+def get_train_transformations(): # 2 ảnh tạo ra từ 2 crop, 2sal  
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
         torchvision.transforms.RandomApply([
@@ -143,10 +143,10 @@ def get_eqv_transforms(eqv_list):
                 same_on_batch=False
                 )
             )
-    if 'vflip' in eqv_list:
+    if 'vflip' in eqv_list:  #discard
         aug.append(
             k_aug.RandomVerticalFlip(
-                p=0.5, 
+                p=0, 
                 return_transform=True,
                 same_on_batch=False
                 )
@@ -154,9 +154,9 @@ def get_eqv_transforms(eqv_list):
     if 'affine' in eqv_list:
         aug.append(
             k_aug.RandomAffine(
-                degrees=(-90, 90),
+                degrees=(-20, 20),
                 # translate=(0.5, 0.5), # discard translate due to small object/ big bg
-                scale=(0.9, 1.2), 
+                scale=(1, 1.5), 
                 return_transform=True,
                 same_on_batch=False,
                 p=0.5,

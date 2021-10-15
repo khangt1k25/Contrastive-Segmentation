@@ -170,11 +170,11 @@ class KorniaDataset(data.Dataset):
 
                 key_sample, matrix_eqv, size_eqv = self.eqv_transform(key_sample)
 
-            key_sample['image'] = self.normalize(key_sample['image'])
-            query_sample['image'] = self.normalize(query_sample['image'])
+            # key_sample['image'] = self.normalize(key_sample['image'])
+            # query_sample['image'] = self.normalize(query_sample['image'])
             
-            # key_sample['image'] = key_sample['image']
-            # query_sample['image'] = query_sample['image']    
+            key_sample['image'] = key_sample['image']
+            query_sample['image'] = query_sample['image']    
             
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
