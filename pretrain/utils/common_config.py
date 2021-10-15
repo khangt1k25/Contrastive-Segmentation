@@ -99,7 +99,7 @@ def get_train_dataloader(p, dataset):
             drop_last=True, shuffle=True)
 
 
-def get_train_transformations(): # 2 ảnh tạo ra từ 2 crop, 2sal  
+def get_train_transformations(): # base
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
         torchvision.transforms.RandomApply([
@@ -115,23 +115,20 @@ def get_train_transformations(): # 2 ảnh tạo ra từ 2 crop, 2sal
     return torchvision.transforms.Compose(augmentation)
 
 
+
 def get_base_transforms():
     augmentation = [
-        transforms.RandomResizedCrop(224, scale=(0.2, 1.0)),
+        transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+        torchvision.transforms.RandomApply([
+            transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
+        ], p=0.8),
+        transforms.RandomGrayscale(p=0.2),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
     ]
 
     return torchvision.transforms.Compose(augmentation)
 
-def get_inv_transforms(inv_list):
-    aug = []
-    if 'colorjitter' in inv_list:
-        aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
-    if 'gray' in inv_list:
-        aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
-    if 'blur' in inv_list:
-        aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
-    return aug
 
 def get_eqv_transforms(eqv_list):
     aug = []
@@ -146,7 +143,7 @@ def get_eqv_transforms(eqv_list):
     if 'vflip' in eqv_list:  #discard
         aug.append(
             k_aug.RandomVerticalFlip(
-                p=0, 
+                p=0.5, 
                 return_transform=True,
                 same_on_batch=False
                 )
@@ -162,6 +159,16 @@ def get_eqv_transforms(eqv_list):
                 p=0.5,
                 )
             )
+    return aug
+ 
+def get_inv_transforms(inv_list):
+    aug = []
+    if 'colorjitter' in inv_list:
+        aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
+    if 'gray' in inv_list:
+        aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
+    if 'blur' in inv_list:
+        aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
     return aug
 
 

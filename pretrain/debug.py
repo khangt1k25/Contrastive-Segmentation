@@ -20,7 +20,7 @@ from utils.collate import collate_custom
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
 import numpy as np
-from data.dataloaders.dataset import KorniaDataset
+from data.dataloaders.dataset import KorniaDataset, MyDataset
 
 
 toPIL = ToPILImage()
@@ -30,18 +30,23 @@ p = {'train_db_name':'VOCSegmentation', 'train_db_kwargs': {'saliency':'unsuperv
 base_dataset = get_train_dataset(p, transform=None)
 base_transform = get_base_transforms()
 inv_list = ['colorjitter', 'gray']
-eqv_list = ['hflip', 'vflip', 'affine']
+# inv_list = []
+eqv_list = ['hflip', 'affine']
 inv_transform = get_inv_transforms(inv_list)
 eqv_transform = get_eqv_transforms(eqv_list)
 
-train_dataset = KorniaDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=1)
+train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
 for i, batch in enumerate(train_dataloader):
     im_q = batch['query']['image']
     im_k = batch['key']['image']
+    im_ie = batch['inveqv']['image']
+
     sal_q = batch['query']['sal']
     sal_k = batch['key']['sal']
+    sal_ie = batch['inveqv']['sal']
+
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
     # print(im_q.shape)
@@ -89,10 +94,10 @@ for i, batch in enumerate(train_dataloader):
     # print(k_transformed.shape)
     for i in range(3, 7):
         toPIL(im_q[i]).show()
-        toPIL(im_k[i]).show()
-        # toPIL(k_transformed[i]).show()
-        # toPIL(sal_k_transformed[i].float()).show()
-        # toPIL(sal_k[i].float()).show()
+        # toPIL(sal_q[i].float()).show()
+        # toPIL(im_k[i]).show()
+        toPIL(im_ie[i]).show()
+        # toPIL(sal_ie[i].float()).show()
     break
 # for i in range(3, 6, 1):
 #     sample = train_dataset[i]

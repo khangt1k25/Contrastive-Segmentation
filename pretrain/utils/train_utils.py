@@ -37,14 +37,17 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+        im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
+        sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)
+
         
         matrix_eqv = batch['matrix']
         size_eqv = batch['size']
 
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
-      
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
         p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)

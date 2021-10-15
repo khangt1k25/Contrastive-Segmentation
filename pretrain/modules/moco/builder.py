@@ -143,7 +143,7 @@ class ContrastiveModel(nn.Module):
 
         return x_gather[idx_this]
 
-    def forward(self, im_q, im_k, sal_q, sal_k, matrix_eqv, size_eqv, dataloader):
+    def forward(self, im_q, im_k, sal_q, sal_k, im_ie, sal_ie, matrix_eqv, size_eqv, dataloader):
         """
         Input:
             images: a batch of images (B x 3 x H x W) 
@@ -210,31 +210,31 @@ class ContrastiveModel(nn.Module):
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
             
+            ie, bg_ie, _ = self.model_k(im_ie)
+            ie = nn.functional.normalize(ie, dim=1)   
 
 
             if self.p['loss_coeff']['inveqv'] > 0:
-              sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
-              k_transformed = deepcopy(k)
-              if self.p['inveqv_version'] == 1:
-                  # forward reuse
-                  for j in range(len(dataloader.dataset.eqv_list)):
-                      m = [ele[j] for ele in matrix_eqv]
-                      m = torch.stack(m, dim=0).squeeze()
-                      k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0])
-                      # sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0])
+                if self.p['inveqv_version'] == 1:
+                    # forward reuse
+                    for j in range(len(dataloader.dataset.eqv_list)):
+                        m = [ele[j] for ele in matrix_eqv]
+                        m = torch.stack(m, dim=0).squeeze()
+                        ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
 
-              elif self.p['inveqv_version'] == 2:
-                  # inverse reuse
-                  for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
+                elif self.p['inveqv_version'] == 2: 
+                    # inverse reuse
+                    sal_ie.unsqueeze(1)
+                    for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
 
-                      m = [ele[j] for ele in matrix_eqv]
-                      m = torch.stack(m, dim=0).squeeze()
-                      if(j==len(dataloader.dataset.eqv_list)-1):
-                          k_transformed = dataloader.dataset.eqv_list[j].inverse((k_transformed, m),size=size_eqv[0][0])
-                          sal_k_transformed = dataloader.dataset.eqv_list[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
-                      else:
-                          k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
-                          sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
+                        m = [ele[j] for ele in matrix_eqv]
+                        m = torch.stack(m, dim=0).squeeze()
+                        if(j==len(dataloader.dataset.eqv_list)-1):
+                            ie = dataloader.dataset.eqv_list[j].inverse((ie, m),size=size_eqv[0][0])
+                            sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie, m),size=size_eqv[0][0])
+                        else:
+                            ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
+                            sal_ie = k_trans.warp_perspective(sal_ie, m, size_eqv[0][0]) 
 
             
             # prototypes k
@@ -260,19 +260,19 @@ class ContrastiveModel(nn.Module):
         if self.p['loss_coeff']['inveqv'] > 0:
             if self.p['inveqv_version'] == 1:
                 
-                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+                ie = ie.permute((0, 2, 3, 1))                  
             
                 q_selected = q.permute((0, 2, 3, 1))
 
-                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_q)
+                inveqv_loss = self.cons(ie, q_selected, mask=sal_q)
                 
             elif self.p['inveqv_version'] == 2:
 
-                k_transformed = k_transformed.permute((0, 2, 3, 1))                  
+                ie = ie.permute((0, 2, 3, 1))                  
             
                 q_selected = q.permute((0, 2, 3, 1))
 
-                inveqv_loss = self.cons(k_transformed, q_selected, mask=sal_k_transformed)
+                inveqv_loss = self.cons(ie, q_selected, mask=sal_ie)
         else:
             inveqv_loss = 0
 
