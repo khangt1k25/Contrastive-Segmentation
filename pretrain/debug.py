@@ -32,10 +32,11 @@ base_transform = get_base_transforms()
 inv_list = ['colorjitter', 'gray']
 # inv_list = []
 eqv_list = ['hflip', 'affine']
+# eqv_list = []
 inv_transform = get_inv_transforms(inv_list)
 eqv_transform = get_eqv_transforms(eqv_list)
 
-train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform)
+train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=3)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
 for i, batch in enumerate(train_dataloader):
@@ -76,39 +77,45 @@ for i, batch in enumerate(train_dataloader):
     #             same_on_batch=False,
     #             p=0.5
     #         )
-    # sal_k_transformed  = deepcopy(sal_k).unsqueeze(1)
-    # k_transformed = deepcopy(im_k)
+    
+    # ie = deepcopy(im_ie)
 
     # for j in range(len(eqv_transform)-1, -1, -1):
 
     #     m = [ele[j] for ele in matrix_eqv]
     #     m = torch.stack(m, dim=0).squeeze()
     #     if(j==len(eqv_transform)-1):
-    #         k_transformed = eqv_transform[j].inverse((k_transformed, m),size=size_eqv[0][0])
-    #         sal_k_transformed = eqv_transform[j].inverse((sal_k_transformed, m),size=size_eqv[0][0])
+    #         ie = eqv_transform[j].inverse((ie, m),size=size_eqv[0][0])
     #     else:
-    #         k_transformed = k_trans.warp_perspective(k_transformed, m, size_eqv[0][0]) 
-    #         sal_k_transformed = k_trans.warp_perspective(sal_k_transformed, m, size_eqv[0][0]) 
-        
+    #         ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
+    # im_q.required_grad = True
+    # im_ie.required_grad = False
 
-    # print(k_transformed.shape)
-    for i in range(3, 7):
-        toPIL(im_q[i]).show()
-        # toPIL(sal_q[i].float()).show()
-        # toPIL(im_k[i]).show()
-        toPIL(im_ie[i]).show()
-        # toPIL(sal_ie[i].float()).show()
+    # # tmp = im_q.clone().detach().requires_grad_(True)
+    # tmp = im_q
+    # for j in range(len(eqv_transform)):
+    #     m = [ele[j] for ele in matrix_eqv]
+    #     m = torch.stack(m, dim=0).squeeze()
+    #     # tmp = k_trans.warp_perspective(tmp, m, size_eqv[0][0])
+    #     tmp = tmp + 1
+
+    
+    loss_1 = (im_q - 3).mean()
+
+    print(loss_1)
+    x1_grad = torch.autograd.grad(loss_1, [im_q])
+    print(x1_grad)
+    # x2_grad = torch.autograd.grad(loss_2, [x2])[0]
     break
-# for i in range(3, 6, 1):
-#     sample = train_dataset[i]
-#     key = sample['key']
-#     query = sample['query']
-
-#     print(key['image'].shape)
-
-
-#     # toPIL(key['image']).show()
-#     toPIL(query['image']).show()
-#     # toPIL(key['sal'].float()).show()
+    # print(k_transformed.shape)
+    # for i in range(3, 6):
+    #     # toPIL(im_q[i]).show()
+    #     toPIL(im_ie[i]).show()
+    #     toPIL(tmp[i]).show()
+    #     # toPIL(sal_q[i].float()).show()
+    #     # toPIL(im_k[i]).show()
+    #     # toPIL(im_ie[i]).show()
+    #     # toPIL(sal_ie[i].float()).show()
+    # break
 
 

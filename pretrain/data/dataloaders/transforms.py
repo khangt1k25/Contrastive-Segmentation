@@ -107,6 +107,7 @@ class ToTensor(object):
 class Normalize(object):
     def __init__(self, mean, std):
         self.normalize = torchvision.transforms.Normalize(mean=mean, std=std)
+     
 
     def __call__(self, sample):
         sample['image'] = self.normalize(sample['image'])

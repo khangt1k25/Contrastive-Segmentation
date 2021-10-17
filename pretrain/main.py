@@ -178,7 +178,7 @@ def main_worker(gpu, ngpus_per_node, args):
         
         eval_train = train(p, train_dataloader, model, 
                                     optimizer, epoch, amp)
-
+        
         # Checkpoint
         if args.rank % ngpus_per_node == 0:
             print('Checkpoint ...')

@@ -224,19 +224,29 @@ class ContrastiveModel(nn.Module):
 
                 elif self.p['inveqv_version'] == 2: 
                     # inverse reuse
-                    sal_ie.unsqueeze(1)
+                    # sal_ie.unsqueeze(1) 
                     for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
 
                         m = [ele[j] for ele in matrix_eqv]
                         m = torch.stack(m, dim=0).squeeze()
                         if(j==len(dataloader.dataset.eqv_list)-1):
                             ie = dataloader.dataset.eqv_list[j].inverse((ie, m),size=size_eqv[0][0])
-                            sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie, m),size=size_eqv[0][0])
+                            # sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie, m),size=size_eqv[0][0])
                         else:
                             ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
-                            sal_ie = k_trans.warp_perspective(sal_ie, m, size_eqv[0][0]) 
+                            # sal_ie = k_trans.warp_perspective(sal_ie, m, size_eqv[0][0]) 
+                elif self.p['inveqv_version'] == 3:
+                    
+                    # forward reuse but need differential augment
+                    
+                    tmp = q.clone()
 
-            
+                    for j in range(len(dataloader.dataset.eqv_list)):
+                        m = [ele[j] for ele in matrix_eqv]
+                        m = torch.stack(m, dim=0).squeeze()
+                        tmp = k_trans.warp_perspective(tmp, m, size_eqv[0][0])
+                    
+
             # prototypes k
             if self.p['mean_pixel_kwargs']['type'] == 'mean':
                 k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
@@ -272,7 +282,14 @@ class ContrastiveModel(nn.Module):
             
                 q_selected = q.permute((0, 2, 3, 1))
 
-                inveqv_loss = self.cons(ie, q_selected, mask=sal_ie)
+                inveqv_loss = self.cons(ie, q_selected, mask=sal_q)
+            elif self.p['inveqv_version'] == 3:
+                
+                tmp = tmp.permute((0, 2, 3, 1))
+                
+                ie = ie.permute((0, 2, 3, 1))
+
+                inveqv_loss = self.cons(tmp, ie, mask=sal_ie)
         else:
             inveqv_loss = 0
 
@@ -294,10 +311,10 @@ class ContrastiveModel(nn.Module):
         Compute Object Contrastive loss 
         '''
 
-        q = torch.index_select(flat_q, index=mask_indexes, dim=0)
-        l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
+        anchor = torch.index_select(flat_q, index=mask_indexes, dim=0)
+        l_batch = torch.matmul(anchor, prototypes.t())   # shape: pixels x proto
         negatives = self.queue.clone().detach()          # shape: dim x negatives
-        l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
+        l_mem = torch.matmul(anchor, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
         
         '''

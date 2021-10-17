@@ -226,14 +226,15 @@ class KorniaDataset(data.Dataset):
 
 class MyDataset(data.Dataset):
     def __init__(self, base_dataset, base_transform, inv_list, eqv_list, downsample_sal=False,
-                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99):
+                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99, inveqv_version=1):
         super(MyDataset, self).__init__()
-        self.base_dataset = base_dataset
-        
-        self.base_transform = base_transform
 
+        self.base_dataset = base_dataset
+        self.base_transform = base_transform
         self.inv_list = inv_list
         self.eqv_list = eqv_list
+
+        self.iqveqv_version = inveqv_version
         self.normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         self.downsample_sal = downsample_sal
@@ -266,18 +267,30 @@ class MyDataset(data.Dataset):
             key_sample = self.base_transform(deepcopy(sample_))
          
             query_sample = self.base_transform(deepcopy(sample_))
-            
-            
-            inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
-            inveqv_sample, matrix_eqv, size_eqv = self.eqv_transform(inveqv_sample)
 
-            # key_sample['image'] = self.normalize(key_sample['image'])
-            # query_sample['image'] = self.normalize(query_sample['image'])
-            # inveqv_sample['image'] = self.normalize(inveqv_sample['image'])
+
             
-            key_sample['image'] = key_sample['image']
-            query_sample['image'] = query_sample['image']    
-            inveqv_sample['image'] = inveqv_sample['image']
+            if self.iqveqv_version == 1:   # for reused forward
+                
+                inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
+
+                query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample) 
+                
+            elif self.iqveqv_version in [2, 3] : # for reused inverse
+                
+                inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
+                inveqv_sample, matrix_eqv, size_eqv = self.eqv_transform(inveqv_sample)
+            
+            else:
+                raise ValueError('Not support inveqv verison {}'.format(self.iqveqv_version)) 
+
+            key_sample['image'] = self.normalize(key_sample['image'])
+            query_sample['image'] = self.normalize(query_sample['image'])
+            inveqv_sample['image'] = self.normalize(inveqv_sample['image'])
+            
+            # key_sample['image'] = key_sample['image']
+            # query_sample['image'] = query_sample['image']    
+            # inveqv_sample['image'] = inveqv_sample['image']
 
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
@@ -286,7 +299,7 @@ class MyDataset(data.Dataset):
                                             scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()
                 inveqv_sample['sal'] = interpolate(inveqv_sample['sal'][None,None,:,:].float(),
                                             scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()
-
+            
             key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
             query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
             inveqv_area = inveqv_sample['sal'].float().sum() / inveqv_sample['sal'].numel()

@@ -5,6 +5,7 @@ val_db_kwargs:
   batch_size: 10
 num_workers: 4
 
+inveqv_version: 1
 # Model
 backbone: resnet18
 backbone_kwargs:
