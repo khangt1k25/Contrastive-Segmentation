@@ -156,7 +156,7 @@ class ContrastiveModel(nn.Module):
         batch_size, channel, H, W = im_q.size()
 
 
-        q, bg_q, q_mask = self.model_q(im_q)                      # queries: B x dim x H x W
+        q, bg_q = self.model_q(im_q)                      # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
         flat_q = q.permute((0, 2, 3, 1))                  
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
@@ -196,7 +196,7 @@ class ContrastiveModel(nn.Module):
             # shuffle for making use of BN
             im_k, idx_unshuffle = self._batch_shuffle_ddp(im_k)
 
-            k, bg_k, k_mask = self.model_k(im_k)  # keys: N x C x H x W
+            k, bg_k = self.model_k(im_k)  # keys: N x C x H x W
             k = nn.functional.normalize(k, dim=1)       
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
@@ -210,7 +210,7 @@ class ContrastiveModel(nn.Module):
 
             # apply transform 
             if self.p['loss_coeff']['inveqv'] > 0:
-                ie, bg_ie, _ = self.model_k(im_ie)
+                ie, _ = self.model_k(im_ie)
                 ie = nn.functional.normalize(ie, dim=1)   
                 if self.p['inveqv_version'] == 1:
                     # forward reuse
@@ -232,7 +232,8 @@ class ContrastiveModel(nn.Module):
                         else:
                             ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
                             sal_ie = k_trans.warp_perspective(sal_ie.float(), m, size_eqv[0][0]).long() 
-
+                    
+                    sal_ie = sal_ie.squeeze()
         '''
         Compute Consistency loss
         '''

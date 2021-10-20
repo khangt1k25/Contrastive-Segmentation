@@ -4,7 +4,9 @@ val_db_name: VOCSegmentation
 val_db_kwargs:
   batch_size: 10
 num_workers: 4
-inveqv_version: 1
+
+inveqv_version: 0
+
 # Model
 backbone: resnet18
 backbone_kwargs:
@@ -15,20 +17,6 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_attention_head: True
-
-loss_coeff:
-   contrastive: 1
-   saliency: 1
-   inveqv: 1
-   mean: 0
-   attention: 0
-
-inveqv_kwargs:
-   type: l2
-
-mean_pixel_kwargs:
-   type: mean
 
 head: 'deeplab'
 freeze_layer: 'none'

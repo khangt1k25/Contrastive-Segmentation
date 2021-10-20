@@ -12,12 +12,12 @@ from torch.nn import functional as F
     ContrastiveSegmentationModel
 """
 class ContrastiveSegmentationModel(nn.Module):
-    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, use_attention_head=False):
+    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False):
         super(ContrastiveSegmentationModel, self).__init__()
         self.backbone = backbone
         self.upsample = upsample
         self.use_classification_head = use_classification_head
-        self.use_attention_head = use_attention_head
+
 
 
         if head == 'linear': 
@@ -33,9 +33,6 @@ class ContrastiveSegmentationModel(nn.Module):
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
         
-        if self.use_attention_head:
-            self.attention_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
-        
 
         
 
@@ -50,8 +47,7 @@ class ContrastiveSegmentationModel(nn.Module):
         x = self.head(embedding)
         if self.use_classification_head:
             sal = self.classification_head(embedding)
-        if self.use_attention_head:
-            mask = self.attention_head(embedding)
+
             
         
         
@@ -60,20 +56,12 @@ class ContrastiveSegmentationModel(nn.Module):
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
-            if self.use_attention_head:
-                mask = F.interpolate(mask, size=input_shape, mode='bilinear',  align_corners=False)
+       
 
-        # Post Processing and compute [Mask Attention & X attention]
-
-            
 
         # Return outputs
         
-        if self.use_classification_head and self.use_attention_head:
-            return x, sal.squeeze(), mask.squeeze() 
-        elif self.use_classification_head and not self.use_classification_head:
+        if self.use_classification_head:
             return x, sal.squeeze()
-        elif not self.use_classification_head and self.use_attention_head:
-            return x, mask.squeeze()
         else:
             return x
