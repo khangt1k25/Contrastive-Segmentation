@@ -163,20 +163,12 @@ class ContrastiveModel(nn.Module):
             
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
-            if self.p['mean_pixel_kwargs']['type'] == 'mean':
-                q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-                sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-                q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-                q_mean = nn.functional.normalize(q_mean, dim=1)    
+            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+            q_mean = nn.functional.normalize(q_mean, dim=1) 
             
-            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-
-                q_mean, attention_loss = self.att(q, q_mask, sal_q)
-                q_mean = nn.functional.normalize(q_mean, dim=1)
         
-        if self.p['loss_coeff']['attention'] <= 0:
-            attention_loss = 0.
-
         '''
         Compute saliency loss
         '''
@@ -192,11 +184,11 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
-
+    
 
 
         '''
-        Prepare prototypes in key size
+        Prepare prototypes in key size and apply transform 
         '''
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
@@ -209,103 +201,54 @@ class ContrastiveModel(nn.Module):
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
             
+            # prototypes k
+            k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)   
             
-            ie, bg_ie, _ = self.model_k(im_ie)
-            ie = nn.functional.normalize(ie, dim=1)   
 
-
+            # apply transform 
             if self.p['loss_coeff']['inveqv'] > 0:
+                ie, bg_ie, _ = self.model_k(im_ie)
+                ie = nn.functional.normalize(ie, dim=1)   
                 if self.p['inveqv_version'] == 1:
                     # forward reuse
                     for j in range(len(dataloader.dataset.eqv_list)):
                         m = [ele[j] for ele in matrix_eqv]
                         m = torch.stack(m, dim=0).squeeze()
                         ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
-
+                    
                 elif self.p['inveqv_version'] == 2: 
                     # inverse reuse
-                    # sal_ie.unsqueeze(1) 
+                    sal_ie = sal_ie.unsqueeze(1) 
                     for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
 
                         m = [ele[j] for ele in matrix_eqv]
                         m = torch.stack(m, dim=0).squeeze()
                         if(j==len(dataloader.dataset.eqv_list)-1):
                             ie = dataloader.dataset.eqv_list[j].inverse((ie, m),size=size_eqv[0][0])
-                            # sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie, m),size=size_eqv[0][0])
+                            sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie.float(), m),size=size_eqv[0][0])
                         else:
                             ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
-                            # sal_ie = k_trans.warp_perspective(sal_ie, m, size_eqv[0][0]) 
-                elif self.p['inveqv_version'] == 3:
-                    
-                    # forward reuse but need differential augment
-                    
-                    tmp = q.clone()
+                            sal_ie = k_trans.warp_perspective(sal_ie.float(), m, size_eqv[0][0]).long() 
 
-                    for j in range(len(dataloader.dataset.eqv_list)):
-                        m = [ele[j] for ele in matrix_eqv]
-                        m = torch.stack(m, dim=0).squeeze()
-                        tmp = k_trans.warp_perspective(tmp, m, size_eqv[0][0])
-                    
-
-            # prototypes k
-            if self.p['mean_pixel_kwargs']['type'] == 'mean':
-                k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-                prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
-            
-            elif self.p['mean_pixel_kwargs']['type'] == 'attention':
-                prototypes_foreground, _ = self.att(k, k_mask, sal_k)
-                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)  
-         
-
-
-        
-
-        
         '''
         Compute Consistency loss
         '''
-         
         if self.p['loss_coeff']['inveqv'] > 0:
             if self.p['inveqv_version'] == 1:
-                
                 ie = ie.permute((0, 2, 3, 1))                  
-            
                 q_selected = q.permute((0, 2, 3, 1))
-
                 inveqv_loss = self.cons(ie, q_selected, mask=sal_q)
-                
             elif self.p['inveqv_version'] == 2:
-
                 ie = ie.permute((0, 2, 3, 1))                  
-            
                 q_selected = q.permute((0, 2, 3, 1))
-
-                inveqv_loss = self.cons(ie, q_selected, mask=sal_q)
-            elif self.p['inveqv_version'] == 3:
-                
-                tmp = tmp.permute((0, 2, 3, 1))
-                
-                ie = ie.permute((0, 2, 3, 1))
-
-                inveqv_loss = self.cons(tmp, ie, mask=sal_ie)
+                inveqv_loss = self.cons(ie, q_selected, mask=sal_ie)
         else:
-            inveqv_loss = 0
+            inveqv_loss = 0.
 
-         
-
-        '''
-        Compute attention loss
-        '''
-        if self.p['loss_coeff']['attention'] <= 0:
-            attention_loss = 0
-            
         
-
-
-
-
 
         '''
         Compute Object Contrastive loss 
@@ -318,7 +261,7 @@ class ContrastiveModel(nn.Module):
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
         
         '''
-        Compute Mean Pixel Contrastive loss 
+        Compute superpixel contrastive loss 
         '''
 
         if self.p['loss_coeff']['mean'] > 0:
@@ -338,7 +281,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, attention_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels
 
 
         

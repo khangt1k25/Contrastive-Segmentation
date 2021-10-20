@@ -21,20 +21,16 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-   use_attention_head: True
 
 loss_coeff:
    contrastive: 1
    saliency: 1
    inveqv: 1
    mean: 0
-   attention: 0
 
 inveqv_kwargs:
    type: l2
 
-mean_pixel_kwargs:
-   type: mean
 
 
 head: deeplab

@@ -99,7 +99,7 @@ def get_train_dataloader(p, dataset):
             drop_last=True, shuffle=True)
 
 
-def get_train_transformations(): # base
+def get_train_transformations(): # code from baseline
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
         torchvision.transforms.RandomApply([
@@ -126,11 +126,11 @@ def get_base_transforms():
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
     ]
-
+    
     return torchvision.transforms.Compose(augmentation)
 
 
-def get_eqv_transforms(eqv_list):
+def get_eqv_transforms(eqv_list, ver=2):
     aug = []
     if 'hflip' in eqv_list:
         aug.append(
@@ -149,16 +149,29 @@ def get_eqv_transforms(eqv_list):
                 )
             )
     if 'affine' in eqv_list:
-        aug.append(
-            k_aug.RandomAffine(
-                degrees=(-20, 20),
-                # translate=(0.5, 0.5), # discard translate due to small object/ big bg
-                scale=(1, 1.5), 
-                return_transform=True,
-                same_on_batch=False,
-                p=0.5,
+        if ver == 1:
+            aug.append(
+                k_aug.RandomAffine(
+                    degrees=(-20, 20),
+                    translate=(-0.1, 0.1), 
+                    scale=(1, 1.5),
+                    shear=(-10, 10),
+                    return_transform=True,
+                    same_on_batch=False,
+                    p=1,
+                    )
                 )
-            )
+        elif ver == 2: # ver2 will not use scale property
+            aug.append(
+                k_aug.RandomAffine(
+                    degrees=(-20, 20),
+                    translate=(0.1, 0.1),
+                    shear=(-10, 10),
+                    return_transform=True,
+                    same_on_batch=False,
+                    p=1,
+                    )
+                )
     return aug
  
 def get_inv_transforms(inv_list):

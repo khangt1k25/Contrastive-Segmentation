@@ -276,7 +276,7 @@ class MyDataset(data.Dataset):
 
                 query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample) 
                 
-            elif self.iqveqv_version in [2, 3] : # for reused inverse
+            elif self.iqveqv_version == 2 : # for reused inverse
                 
                 inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
                 inveqv_sample, matrix_eqv, size_eqv = self.eqv_transform(inveqv_sample)
@@ -284,13 +284,13 @@ class MyDataset(data.Dataset):
             else:
                 raise ValueError('Not support inveqv verison {}'.format(self.iqveqv_version)) 
 
-            key_sample['image'] = self.normalize(key_sample['image'])
-            query_sample['image'] = self.normalize(query_sample['image'])
-            inveqv_sample['image'] = self.normalize(inveqv_sample['image'])
+            # key_sample['image'] = self.normalize(key_sample['image'])
+            # query_sample['image'] = self.normalize(query_sample['image'])
+            # inveqv_sample['image'] = self.normalize(inveqv_sample['image'])
             
-            # key_sample['image'] = key_sample['image']
-            # query_sample['image'] = query_sample['image']    
-            # inveqv_sample['image'] = inveqv_sample['image']
+            key_sample['image'] = key_sample['image']
+            query_sample['image'] = query_sample['image']    
+            inveqv_sample['image'] = inveqv_sample['image']
 
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
@@ -306,7 +306,7 @@ class MyDataset(data.Dataset):
             
             if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and inveqv_area < self.max_area and inveqv_area > self.min_area: # Ok. Foreground/Background has proper ratio.
                 return {'key': key_sample, 'query': query_sample, 'inveqv': inveqv_sample, 'matrix': matrix_eqv, 'size': size_eqv}
-
+        
 
             else:
                 count += 1 # Try again. Areas of foreground/background to small.

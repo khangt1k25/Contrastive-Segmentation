@@ -17,7 +17,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     inveqv_losses = AverageMeter('Inveqv', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     mean_losses = AverageMeter('Mean-Contrast', ':.4e')
-    attention_losses = AverageMeter('Attention', ':.4e')
+
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
@@ -46,7 +46,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, attention_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        
+
         
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -72,7 +74,6 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
-                p['loss_coeff']['attention'] * attention_loss+ \
                 p['loss_coeff']['inveqv']* inveqv_loss +\
                 p['loss_coeff']['mean'] * mean_loss
                  
@@ -80,17 +81,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
         contrastive_losses.update(contrastive_loss.item())
 
-        if p['loss_coeff']['attention'] > 0:
-            attention_losses.update(attention_loss.item())
-        else:
-            attention_losses.update(attention_loss)
-
         if p['loss_coeff']['mean'] > 0:
             mean_losses.update(mean_loss.item())
         else:
             mean_losses.update(mean_loss)
-   
-        
+         
         if p['loss_coeff']['inveqv'] > 0:
             inveqv_losses.update(inveqv_loss.item())
         else:
@@ -129,7 +124,6 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
         mean_losses=mean_losses,
-        attention_losses=attention_losses,
         losses=losses
     )
     return losses.avg
@@ -154,7 +148,6 @@ def save_plot_curve(
     saliency_losses,
     inveqv_losses,
     mean_losses,
-    attention_losses,
     losses,
     ):
 
@@ -163,9 +156,6 @@ def save_plot_curve(
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'inveqv.txt'), 'a') as f:
         f.write(str(inveqv_losses.avg))
-        f.write("\n")
-    with open(os.path.join(p['output_dir'], 'attention.txt'), 'a') as f:
-        f.write(str(attention_losses.avg))
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'saliency.txt'), 'a') as f:
         f.write(str(saliency_losses.avg))

@@ -1,59 +1,21 @@
-# Unsupervised Semantic Segmentation by Contrasting Object Mask Proposals
 
-This repo contains the Pytorch implementation of our paper:
-> [**Unsupervised Semantic Segmentation by Contrasting Object Mask Proposals**](https://arxiv.org/pdf/2102.06191.pdf)
->
-> [Wouter Van Gansbeke](https://twitter.com/WGansbeke), [Simon Vandenhende](https://twitter.com/svandenh1), [Stamatios Georgoulis](https://twitter.com/stam_g), and [Luc Van Gool](https://ee.ethz.ch/the-department/faculty/professors/person-detail.OTAyMzM=.TGlzdC80MTEsMTA1ODA0MjU5.html).
 
-🏆 __SOTA for unsupervised semantic segmentation. Check out [Papers With Code](https://paperswithcode.com/paper/unsupervised-semantic-segmentation-by) for the [Unsupervised Semantic Segmentation](https://paperswithcode.com/sota/unsupervised-semantic-segmentation-on-pascal-1?p=unsupervised-semantic-segmentation-by) benchmark and more details.__
-<p align="left">
-    <img src="images/teaser.png" width="600"/>
+## Requirements
+kornia 
 
-[![PWC](https://img.shields.io/endpoint.svg?url=https://paperswithcode.com/badge/unsupervised-semantic-segmentation-by/unsupervised-semantic-segmentation-on-pascal-1)](https://paperswithcode.com/sota/unsupervised-semantic-segmentation-on-pascal-1?p=unsupervised-semantic-segmentation-by) 
+## Setup 
+1. Create folder named USC in drive
+2. Upload notebook 
+3. Change path in pretrain/data/util/mypath.py. The PASCAL VOC dataset will be saved to this path[automatically download]
+4. Specify output dir in configs/env.yml
+## Training
 
-## Contents
-1. [Introduction](#introduction)
-0. [Installation](#installation)
-0. [Training](#training-maskcontrast)
-0. [Evaluation](#evaluation)
-    - [Linear Classifier](#linear-classifier-lc)
-    - [Clustering](#clustering-k-means)
-    - [Semantic Segment Retrieval](#semantic-segment-retrieval)
-0. [Model Zoo](#model-zoo)
-0. [Citation](#citation)
 
-## Introduction
-Being able to learn dense semantic representations of images without supervision is an important problem in computer vision. However, despite its significance, this problem remains rather unexplored, with a few exceptions that considered unsupervised semantic segmentation on small-scale datasets with a narrow visual domain. We make a first attempt to tackle the problem on datasets that have been traditionally utilized for the supervised case (e.g. PASCAL VOC). To achieve this, we introduce a novel two-step framework that adopts a predetermined prior in a contrastive optimization objective to learn pixel embeddings.
-Additionally, we argue about the importance of having a prior that contains information about objects, or their parts, and discuss several possibilities to obtain such a prior in an unsupervised manner. In particular, we adopt a mid-level visual prior to group pixels together and contrast the obtained object mask porposals. For this reason we name the method __MaskContrast__. 
+Read the config in VOCSegmentation_unsupervised_saliency_model.yml 
 
-## Installation
-The Python code runs with recent Pytorch versions, e.g. 1.4. 
-Assuming [Anaconda](https://docs.anaconda.com/anaconda/install/), the most important packages can be installed as:
-```shell
-conda install pytorch=1.4.0 torchvision=0.5.0 cudatoolkit=10.0 -c pytorch
-conda install -c conda-forge opencv           # For image transformations
-conda install matplotlib scipy scikit-learn   # For evaluation
-conda install pyyaml easydict                 # For using config files
-conda install termcolor                       # For colored print statements
-```
-We refer to the `requirements.txt` file for an overview of the packages in the environment we used to produce our results.
-The code was run on 2 Tesla V100 GPUs. 
-
-## Training MaskContrast
-
-### Setup
-The PASCAL VOC [dataset](https://drive.google.com/file/d/1pxhY5vsLwXuz6UHZVUKhtb7EJdCg2kuH/view?usp=sharing) will be downloaded automatically when running the code for the first time. The dataset includes the precomputed supervised and unsupervised saliency masks, following the implementation from the paper. 
-
-The following files (in the `pretrain/` and `segmentation/` directories) need to be adapted in order to run the code on your own machine:
-- Change the file path for the datasets in `data/util/mypath.py`. The PASCAL VOC dataset will be saved to this path.
-- Specify the output directory in `configs/env.yml`. All results will be stored under this directory. 
-
-### Pre-train model
-The training procedure consists of two steps. First, pixels are grouped together based upon a mid-level visual prior (saliency is used). Then, a pre-training strategy is proposed to contrast the pixel-embeddings of the obtained object masks. The code for the pre-training can be found in the `pretrain/` directory and the configuration files are located in the `pretrain/configs/` directory. You can choose to run the model with the masks from the supervised or unsupervised saliency model.
-For example, run the following command to perform the pre-training step on PASCAL VOC with the supervised saliency model:
 ```shell
 cd pretrain
-python main.py --config_env configs/env.yml --config_exp configs/VOCSegmentation_supervised_saliency_model.yml
+python main.py --config_env configs/env.yml --config_exp configs/VOCSegmentation_unsupervised_saliency_model.yml
 ```
 
 ## Evaluation
