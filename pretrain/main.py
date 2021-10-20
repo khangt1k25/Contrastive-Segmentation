@@ -13,7 +13,7 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import KorniaDataset, MyDataset
+from data.dataloaders.dataset import  MyDataset
 
 from modules.moco.builder import ContrastiveModel
 

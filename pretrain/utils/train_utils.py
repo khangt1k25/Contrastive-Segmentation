@@ -22,7 +22,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, attention_losses, top1, top5],
+                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
     

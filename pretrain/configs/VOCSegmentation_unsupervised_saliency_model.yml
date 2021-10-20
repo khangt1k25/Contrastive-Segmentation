@@ -9,6 +9,7 @@ train_db_kwargs:
 num_workers: 8
 train_batch_size: 32
 
+inveqv_version: 2
 
 
 # Model
@@ -25,7 +26,7 @@ model_kwargs:
 loss_coeff:
    contrastive: 1
    saliency: 1
-   inveqv: 1
+   inveqv: 0
    mean: 0
 
 inveqv_kwargs:
