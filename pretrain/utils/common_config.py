@@ -157,7 +157,7 @@ def get_eqv_transforms(eqv_list, ver=2):
             aug.append(
                 k_aug.RandomAffine(
                     degrees=(-20, 20),
-                    translate=(-0.1, 0.1), 
+                    translate=(0.1, 0.1), 
                     scale=(1, 1.5),
                     shear=(-5, 5),
                     return_transform=True,

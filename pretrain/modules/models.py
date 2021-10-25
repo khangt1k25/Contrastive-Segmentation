@@ -64,13 +64,14 @@ class ContrastiveSegmentationModel(nn.Module):
 
 class PredictionHead(nn.Module):
     def __init__(self, dim):
-        self.dim = dim 
+        self.dim = int(dim) 
         super(PredictionHead, self).__init__()
         self.AE = nn.Sequential(
-            nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, stride=1, padding=True),
+            nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, padding='same'),
             nn.ReLU(),
-            nn.Conv2d(in_channels=16, out_channels=dim, kernel_size=3, stride=1, padding=True)
+            nn.Conv2d(in_channels=16, out_channels=dim, kernel_size=3, padding='same')
         )
     def forward(self, x):
-        return self.AE(x)
+        output = self.AE(x)
+        return output
         
