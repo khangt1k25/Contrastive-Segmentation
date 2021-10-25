@@ -160,7 +160,14 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
         flat_q = q.permute((0, 2, 3, 1))                  
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
-            
+
+
+        if self.p['loss_coeff']['spatial'] > 0:
+            vertical = (q[:,:,:-1, :] - q[:,:,1:,:]) * (sal_q[:,:,:-1,:])
+            horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])* (sal_q[:,:,:,:-1])
+            spatial_loss  = vertical.mean() + horizontal.mean()
+
+
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
@@ -183,8 +190,6 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
-    
-
 
         '''
         Prepare prototypes in key size and apply transform 
@@ -251,7 +256,6 @@ class ContrastiveModel(nn.Module):
         else:
             inveqv_loss = 0.
 
-        
 
         '''
         Compute Object Contrastive loss 
@@ -284,7 +288,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, spatial_loss
 
 
         

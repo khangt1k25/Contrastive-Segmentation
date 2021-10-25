@@ -57,12 +57,9 @@ for i, batch in enumerate(train_dataloader):
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
   
-
-    q, _ = model(im_q)
-    pred = prediction_head(q)
-
-    print(q.shape)
-    print(pred.shape)
+    hp1 = im_q[:,:,0:-1, :] - im_q[:,:,1:,:]
+    hp2 = im_q[:,:,0:]
+    print(im_q.shape)
     # affine = k_aug.RandomAffine(
     #             degrees=(10, 30),
     #             translate=(0.15, 0.15),

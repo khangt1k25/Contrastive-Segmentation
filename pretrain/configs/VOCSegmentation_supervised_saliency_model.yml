@@ -27,7 +27,8 @@ loss_coeff:
    saliency: 1
    inveqv: 1
    mean: 0
-
+   spatial: 0
+   
 inveqv_kwargs:
    type: l2
 

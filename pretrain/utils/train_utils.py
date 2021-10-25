@@ -17,12 +17,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     inveqv_losses = AverageMeter('Inveqv', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     mean_losses = AverageMeter('Mean-Contrast', ':.4e')
-
+    spatial_losses = AverageMeter('Spatial', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, top1, top5],
+                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, spatial_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
     
@@ -46,7 +46,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, spatial_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
         
 
         
@@ -75,7 +75,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['inveqv']* inveqv_loss +\
-                p['loss_coeff']['mean'] * mean_loss
+                p['loss_coeff']['mean'] * mean_loss +\
+                p['loss_coeff']['spatial'] * spatial_loss
                  
         
 
@@ -96,6 +97,10 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         else:
             saliency_losses.update(saliency_loss)
         
+        if p['loss_coeff']['spatial'] > 0:
+            spatial_losses.update(spatial_loss.item())
+        else:
+            spatial_losses.update(spatial_loss)
 
         losses.update(loss.item())
         
@@ -124,7 +129,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
         mean_losses=mean_losses,
-        losses=losses
+        losses=losses,
+        spatial_losses=spatial_losses
     )
     return losses.avg
 
@@ -149,6 +155,7 @@ def save_plot_curve(
     inveqv_losses,
     mean_losses,
     losses,
+    spatial_losses
     ):
 
     with open(os.path.join(p['output_dir'], 'cl.txt'), 'a') as f:
@@ -165,4 +172,7 @@ def save_plot_curve(
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'mean-contrast.txt'), 'a') as f:
         f.write(str(mean_losses.avg))
+        f.write("\n")
+    with open(os.path.join(p['output_dir'], 'spatial.txt'), 'a') as f:
+        f.write(str(spatial_losses.avg))
         f.write("\n")
