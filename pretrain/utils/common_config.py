@@ -81,6 +81,11 @@ def get_model(p):
                                                 p['model_kwargs']['use_classification_head'])
 
 
+def get_pHead(p):
+    from modules.models import PredictionHead
+    return PredictionHead(p['model_kwargs']['ndim'])
+    
+
 def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOCSegmentation
@@ -154,7 +159,7 @@ def get_eqv_transforms(eqv_list, ver=2):
                     degrees=(-20, 20),
                     translate=(-0.1, 0.1), 
                     scale=(1, 1.5),
-                    shear=(-10, 10),
+                    shear=(-5, 5),
                     return_transform=True,
                     same_on_batch=False,
                     p=1,
@@ -165,14 +170,14 @@ def get_eqv_transforms(eqv_list, ver=2):
                 k_aug.RandomAffine(
                     degrees=(-20, 20),
                     translate=(0.1, 0.1),
-                    shear=(-10, 10),
+                    shear=(-5, 5),
                     return_transform=True,
                     same_on_batch=False,
                     p=1,
                     )
                 )
     return aug
- 
+    
 def get_inv_transforms(inv_list):
     aug = []
     if 'colorjitter' in inv_list:

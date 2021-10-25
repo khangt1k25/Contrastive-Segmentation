@@ -14,7 +14,7 @@ import torch.nn.functional as F
 import random
 import torchvision
 
-from utils.common_config import get_model
+from utils.common_config import get_model, get_pHead
 from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
@@ -35,7 +35,7 @@ class ContrastiveModel(nn.Module):
         # create the model 
         self.model_q = get_model(p)
         self.model_k = get_model(p)
-
+        self.pHead = get_pHead(p)
 
 
 
@@ -167,8 +167,7 @@ class ContrastiveModel(nn.Module):
             sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
             q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
             q_mean = nn.functional.normalize(q_mean, dim=1) 
-            
-        
+
         '''
         Compute saliency loss
         '''
@@ -239,13 +238,16 @@ class ContrastiveModel(nn.Module):
         '''
         if self.p['loss_coeff']['inveqv'] > 0:
             if self.p['inveqv_version'] == 1:
-                ie = ie.permute((0, 2, 3, 1))                  
-                q_selected = q.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(ie, q_selected, mask=sal_q)
+                pred = self.pHead(q)
+                pred = pred.permute((0, 2, 3, 1))
+                ie = ie.permute((0, 2, 3, 1))
+                inveqv_loss = self.cons(pred, ie, mask=sal_q)
+
             elif self.p['inveqv_version'] == 2:
-                ie = ie.permute((0, 2, 3, 1))                  
-                q_selected = q.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(ie, q_selected, mask=sal_ie)
+                pred = self.pHead(q)
+                pred = pred.permute((0, 2, 3, 1))
+                ie = ie.permute((0, 2, 3, 1))
+                inveqv_loss = self.cons(pred, ie, mask=sal_q)
         else:
             inveqv_loss = 0.
 

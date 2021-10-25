@@ -6,6 +6,7 @@ from numpy.core.fromnumeric import shape
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.modules.activation import ReLU
 
 
 """
@@ -32,10 +33,6 @@ class ContrastiveSegmentationModel(nn.Module):
 
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
-        
-
-        
-
 
     def forward(self, x):
         # Standard model
@@ -56,12 +53,24 @@ class ContrastiveSegmentationModel(nn.Module):
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
-       
-
-
         # Return outputs
         
         if self.use_classification_head:
             return x, sal.squeeze()
         else:
             return x
+
+
+
+class PredictionHead(nn.Module):
+    def __init__(self, dim):
+        self.dim = dim 
+        super(PredictionHead, self).__init__()
+        self.AE = nn.Sequential(
+            nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, stride=1, padding=True),
+            nn.ReLU(),
+            nn.Conv2d(in_channels=16, out_channels=dim, kernel_size=3, stride=1, padding=True)
+        )
+    def forward(self, x):
+        return self.AE(x)
+        

@@ -182,7 +182,7 @@ class MyDataset(data.Dataset):
                 
                 inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
 
-                query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample) 
+                query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
                 
             elif self.iqveqv_version == 2 : # for reused inverse
                 

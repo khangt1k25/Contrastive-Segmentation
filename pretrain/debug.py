@@ -4,7 +4,7 @@
 
 from copy import deepcopy
 import matplotlib.pyplot as plt
-from numpy import matrix
+from numpy import matrix, mod
 from numpy.core.fromnumeric import size
 
 import torch
@@ -20,12 +20,15 @@ from utils.collate import collate_custom
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
 import numpy as np
-from data.dataloaders.dataset import KorniaDataset, MyDataset
-
+from data.dataloaders.dataset import MyDataset
+from modules.models import PredictionHead
 
 toPIL = ToPILImage()
 
-p = {'train_db_name':'VOCSegmentation', 'train_db_kwargs': {'saliency':'unsupervised_model'}}
+p = {'train_db_name':'VOCSegmentation', 'train_db_kwargs': {'saliency':'unsupervised_model'}, 
+'backbone':'resnet18', 'backbone_kwargs': {'dilated':True, 'pretraining':False}, 'model_kwargs': {
+    'ndim': 32, 'head':'linear', 'upsample':True, 'use_classification_head': True}, 'head':'deeplab'
+}
 
 base_dataset = get_train_dataset(p, transform=None)
 base_transform = get_base_transforms()
@@ -39,6 +42,9 @@ eqv_transform = get_eqv_transforms(eqv_list)
 train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=2)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
+
+model = get_model(p)
+prediction_head = PredictionHead(dim=32)
 for i, batch in enumerate(train_dataloader):
     im_q = batch['query']['image']
     im_k = batch['key']['image']
@@ -52,9 +58,11 @@ for i, batch in enumerate(train_dataloader):
     size_eqv = batch['size']
   
 
-    
-    
+    q, _ = model(im_q)
+    pred = prediction_head(q)
 
+    print(q.shape)
+    print(pred.shape)
     # affine = k_aug.RandomAffine(
     #             degrees=(10, 30),
     #             translate=(0.15, 0.15),
@@ -97,10 +105,10 @@ for i, batch in enumerate(train_dataloader):
 
     
     # print(k_transformed.shape)
-    for i in range(3, 6):
-        toPIL(im_q[i]).show()
-        toPIL(im_ie[i]).show()
-        toPIL(ie[i]).show()
+    # for i in range(3, 6):
+    #     toPIL(im_q[i]).show()
+    #     toPIL(im_ie[i]).show()
+    #     toPIL(ie[i]).show()
         # toPIL(sal_ie[i].float()).show()
         # toPIL(sal_q[i].float()).show()
         # toPIL(im_k[i]).show()

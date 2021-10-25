@@ -9,7 +9,7 @@ train_db_kwargs:
 num_workers: 8
 train_batch_size: 32
 
-inveqv_version: 2
+inveqv_version: 1
 
 
 # Model
