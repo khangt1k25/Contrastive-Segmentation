@@ -60,7 +60,7 @@ class ContrastiveModel(nn.Module):
         self.bce = BalancedCrossEntropyLoss(size_average=True)
         self.att = AttentionLoss()
         self.cons = ConsistencyLoss(type=p['inveqv_kwargs']['type'])
-
+        self.l1loss = nn.L1Loss()
 
         
         
@@ -163,9 +163,14 @@ class ContrastiveModel(nn.Module):
 
 
         if self.p['loss_coeff']['spatial'] > 0:
-            vertical = (q[:,:,:-1, :] - q[:,:,1:,:]) * (sal_q[:,:,:-1,:])
-            horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])* (sal_q[:,:,:,:-1])
-            spatial_loss  = vertical.mean() + horizontal.mean()
+            vertical = (q[:,:,:-1, :] - q[:,:,1:,:])
+            horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])
+            # vertical = (q[:,:,:-1, :] - q[:,:,1:,:]) * (sal_q[:,:,:-1,:])
+            # horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])* (sal_q[:,:,:,:-1])
+            ver_target = torch.zeros_like(vertical)
+            hor_target = torch.zeros_like(horizontal)
+            
+            spatial_loss  = self.l1loss(vertical, ver_target) + self.l1loss(horizontal, hor_target)
 
 
         # anchor mean
