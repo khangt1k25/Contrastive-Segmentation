@@ -36,6 +36,7 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
         
+        # prediction head preserves consistency inqeqv: Motivated by BYOL
         if self.p['use_prediction_head']:
             self.pHead = get_pHead(p)
 
@@ -181,8 +182,8 @@ class ContrastiveModel(nn.Module):
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+            bg_q_flat = bg_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            q_mean = torch.bmm(q_mean, bg_q_flat).squeeze() # B x dim
             q_mean = nn.functional.normalize(q_mean, dim=1) 
 
 
@@ -191,7 +192,7 @@ class ContrastiveModel(nn.Module):
         '''
         sal_loss = self.bce(bg_q, sal_q)
       
-       
+
         '''
         Prepare mask_indexes with both query and key size.
         '''
@@ -201,7 +202,7 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
-        
+
         '''
         Prepare prototypes in key size and apply transform 
         '''
@@ -218,11 +219,11 @@ class ContrastiveModel(nn.Module):
             
             # prototypes k
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+            bg_k_flat = bg_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            prototypes_foreground = torch.bmm(k_flat, bg_k_flat).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
-
+            
             # apply transform 
             if self.p['loss_coeff']['inveqv'] > 0:
                 ie, _ = self.model_k(im_ie)
@@ -284,7 +285,7 @@ class ContrastiveModel(nn.Module):
                     inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))        
         else:
             inveqv_loss = 0.
-        
+
 
         '''
         Compute Object Contrastive loss 

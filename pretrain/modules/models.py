@@ -44,7 +44,7 @@ class ContrastiveSegmentationModel(nn.Module):
         x = self.head(embedding)
         if self.use_classification_head:
             sal = self.classification_head(embedding)
-
+            
             
         
         

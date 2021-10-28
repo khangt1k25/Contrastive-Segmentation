@@ -70,7 +70,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             mean_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
         else:
             mean_loss = 0.
-
+        
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \

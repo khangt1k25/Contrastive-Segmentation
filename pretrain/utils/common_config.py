@@ -187,7 +187,7 @@ def get_inv_transforms(inv_list):
     if 'blur' in inv_list:
         aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
     return aug
-
+    
 
 
 

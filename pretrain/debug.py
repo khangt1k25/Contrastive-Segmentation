@@ -57,21 +57,25 @@ for i, batch in enumerate(train_dataloader):
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
   
-    q, _ = model(im_q)
+    q, bg_q = model(im_q)
     q = nn.functional.normalize(q, dim=1)
 
-    ie, _ = model(im_ie)
+    ie, bg_ie = model(im_ie)
     ie = nn.functional.normalize(ie, dim=1)
+
+    print(bg_q)
+    print(bg_ie)
+    
     # print(ie[0,:,0,0])   
     
     # # ie = deepcopy(im_ie)
     # toPIL(q[0,:3,:,:]).show()
     # toPIL(ie[0,:3,:,:]).show()
-    for j in range(len(eqv_list)):
-        m = [ele[j] for ele in matrix_eqv]
-        m = torch.stack(m, dim=0).squeeze()
-    ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
-    toPIL(ie[0,:3,:,:]).show()
+    # for j in range(len(eqv_list)):
+    #     m = [ele[j] for ele in matrix_eqv]
+    #     m = torch.stack(m, dim=0).squeeze()
+    # ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
+    # toPIL(ie[0,:3,:,:]).show()
 
     # # print(k_transformed.shape)
     # for i in range(3, 6):
@@ -84,12 +88,12 @@ for i, batch in enumerate(train_dataloader):
         # toPIL(im_ie[i]).show()
         # toPIL(sal_ie[i].float()).show()
     # toPIL(ie[0]).show()
-    pred = prediction_head(q)
+    # pred = prediction_head(q)
     # print(pred[0,:,0,0])
     
-    toPIL(pred[0,:3,:,:]).show()
-    pred = nn.functional.normalize(pred, dim=1)
-    toPIL(pred[0,:3,:,:]).show()
+    # toPIL(pred[0,:3,:,:]).show()
+    # pred = nn.functional.normalize(pred, dim=1)
+    # toPIL(pred[0,:3,:,:]).show()
     # print(q[0,:,0,0])
     # print(q[0,:,0,0])
     # print(ie[0,:,0,0])
