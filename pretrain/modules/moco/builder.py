@@ -35,7 +35,9 @@ class ContrastiveModel(nn.Module):
         # create the model 
         self.model_q = get_model(p)
         self.model_k = get_model(p)
-        self.pHead = get_pHead(p)
+        
+        if self.p['use_prediction_head']:
+            self.pHead = get_pHead(p)
 
 
 
@@ -59,10 +61,9 @@ class ContrastiveModel(nn.Module):
         
         self.bce = BalancedCrossEntropyLoss(size_average=True)
         self.att = AttentionLoss()
-        self.cons = ConsistencyLoss(type=p['inveqv_kwargs']['type'])
-        self.l1loss = nn.L1Loss()
-
         
+        self.l1loss = nn.L1Loss()
+        self.mse = nn.MSELoss()
         
         
         
@@ -162,23 +163,28 @@ class ContrastiveModel(nn.Module):
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
 
 
+        '''
+        High pass filter
+        '''
         if self.p['loss_coeff']['spatial'] > 0:
-            vertical = (q[:,:,:-1, :] - q[:,:,1:,:])
-            horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])
+            vertical = q[:,:,:-1, :] - q[:,:,1:,:]
+            horizontal = q[:,:,:,:-1] - q[:,:,:,1:]
             # vertical = (q[:,:,:-1, :] - q[:,:,1:,:]) * (sal_q[:,:,:-1,:])
             # horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])* (sal_q[:,:,:,:-1])
             ver_target = torch.zeros_like(vertical)
             hor_target = torch.zeros_like(horizontal)
             
             spatial_loss  = self.l1loss(vertical, ver_target) + self.l1loss(horizontal, hor_target)
-
-
+            
+        
+        
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
             q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
             q_mean = nn.functional.normalize(q_mean, dim=1) 
+
 
         '''
         Compute saliency loss
@@ -195,7 +201,7 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
-
+        
         '''
         Prepare prototypes in key size and apply transform 
         '''
@@ -214,7 +220,7 @@ class ContrastiveModel(nn.Module):
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
             prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)   
+            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
 
             # apply transform 
@@ -247,20 +253,38 @@ class ContrastiveModel(nn.Module):
         Compute Consistency loss
         '''
         if self.p['loss_coeff']['inveqv'] > 0:
-            if self.p['inveqv_version'] == 1:
+            if self.p['use_prediction_head']:
                 pred = self.pHead(q)
+                pred = nn.functional.normalize(pred, dim=1)
                 pred = pred.permute((0, 2, 3, 1))
-                ie = ie.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(pred, ie, mask=sal_q)
 
-            elif self.p['inveqv_version'] == 2:
-                pred = self.pHead(q)
-                pred = pred.permute((0, 2, 3, 1))
-                ie = ie.permute((0, 2, 3, 1))
-                inveqv_loss = self.cons(pred, ie, mask=sal_q)
+                if self.p['inveqv_version'] == 1:  
+                
+                    ie = ie.permute((0, 2, 3, 1))
+                    
+                    inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsquezze(-1))
+
+
+                elif self.p['inveqv_version'] == 2:
+
+                    ie = ie.permute((0, 2, 3, 1))
+
+                    inveqv_loss = self.mse(pred * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))
+            else:
+                if self.p['inveqv_version'] == 1:  
+                    
+                    q_selected = q.permute((0, 2, 3, 1))
+                    ie = ie.permute((0, 2, 3, 1))
+                    inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsquezze(-1))
+
+
+                elif self.p['inveqv_version'] == 2:
+                    q_selected = q.permute((0, 2, 3, 1))
+                    ie = ie.permute((0, 2, 3, 1))
+                    inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))        
         else:
             inveqv_loss = 0.
-
+        
 
         '''
         Compute Object Contrastive loss 

@@ -24,6 +24,7 @@ model_kwargs:
    use_classification_head: True
 
 
+
 loss_coeff:
    contrastive: 1
    saliency: 1
@@ -31,8 +32,7 @@ loss_coeff:
    mean: 0
    spatial: 0
 
-inveqv_kwargs:
-   type: l2
+use_prediction_head: True   
 
 
 head: deeplab

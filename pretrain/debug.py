@@ -39,7 +39,7 @@ eqv_list = ['hflip', 'affine']
 inv_transform = get_inv_transforms(inv_list)
 eqv_transform = get_eqv_transforms(eqv_list)
 
-train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=2)
+train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=1)
 train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
 
@@ -57,9 +57,45 @@ for i, batch in enumerate(train_dataloader):
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
   
-    hp1 = im_q[:,:,0:-1, :] - im_q[:,:,1:,:]
-    hp2 = im_q[:,:,0:]
-    print(im_q.shape)
+    q, _ = model(im_q)
+    q = nn.functional.normalize(q, dim=1)
+
+    ie, _ = model(im_ie)
+    ie = nn.functional.normalize(ie, dim=1)
+    # print(ie[0,:,0,0])   
+    
+    # # ie = deepcopy(im_ie)
+    # toPIL(q[0,:3,:,:]).show()
+    # toPIL(ie[0,:3,:,:]).show()
+    for j in range(len(eqv_list)):
+        m = [ele[j] for ele in matrix_eqv]
+        m = torch.stack(m, dim=0).squeeze()
+    ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
+    toPIL(ie[0,:3,:,:]).show()
+
+    # # print(k_transformed.shape)
+    # for i in range(3, 6):
+    #     toPIL(im_q[i]).show()
+    #     toPIL(ie[i]).show()
+        # toPIL(ie[i]).show()
+        # toPIL(sal_ie[i].float()).show()
+        # toPIL(sal_q[i].float()).show()
+        # toPIL(im_k[i]).show()
+        # toPIL(im_ie[i]).show()
+        # toPIL(sal_ie[i].float()).show()
+    # toPIL(ie[0]).show()
+    pred = prediction_head(q)
+    # print(pred[0,:,0,0])
+    
+    toPIL(pred[0,:3,:,:]).show()
+    pred = nn.functional.normalize(pred, dim=1)
+    toPIL(pred[0,:3,:,:]).show()
+    # print(q[0,:,0,0])
+    # print(q[0,:,0,0])
+    # print(ie[0,:,0,0])
+    # print(pred[0,:,0,0])
+    # print(im_ie[0,:,0,0])    
+    # print(im_q[0,:,0,0])
     # affine = k_aug.RandomAffine(
     #             degrees=(10, 30),
     #             translate=(0.15, 0.15),
@@ -101,16 +137,7 @@ for i, batch in enumerate(train_dataloader):
 
 
     
-    # print(k_transformed.shape)
-    # for i in range(3, 6):
-    #     toPIL(im_q[i]).show()
-    #     toPIL(im_ie[i]).show()
-    #     toPIL(ie[i]).show()
-        # toPIL(sal_ie[i].float()).show()
-        # toPIL(sal_q[i].float()).show()
-        # toPIL(im_k[i]).show()
-        # toPIL(im_ie[i]).show()
-        # toPIL(sal_ie[i].float()).show()
+    
     break
 
 

@@ -95,7 +95,7 @@ def main():
         best_epoch = 0
         best_iou = 0
         model = model.cuda()
-
+    
     # Main loop
     print(colored('Starting main loop', 'blue'))
     
