@@ -176,8 +176,8 @@ class ContrastiveModel(nn.Module):
             hor_target = torch.zeros_like(horizontal)
             
             spatial_loss  = self.l1loss(vertical, ver_target) + self.l1loss(horizontal, hor_target)
-            
-        
+        else:
+            spatial_loss = 0.
         
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
@@ -263,26 +263,26 @@ class ContrastiveModel(nn.Module):
                 
                     ie = ie.permute((0, 2, 3, 1))
                     
-                    inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsquezze(-1))
+                    inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
 
 
                 elif self.p['inveqv_version'] == 2:
 
                     ie = ie.permute((0, 2, 3, 1))
 
-                    inveqv_loss = self.mse(pred * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))
+                    inveqv_loss = self.mse(pred * sal_ie.unsqueeze(-1), ie * sal_ie.unsqueeze(-1))
             else:
                 if self.p['inveqv_version'] == 1:  
                     
                     q_selected = q.permute((0, 2, 3, 1))
                     ie = ie.permute((0, 2, 3, 1))
-                    inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsquezze(-1))
+                    inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
 
 
                 elif self.p['inveqv_version'] == 2:
                     q_selected = q.permute((0, 2, 3, 1))
                     ie = ie.permute((0, 2, 3, 1))
-                    inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))        
+                    inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsqueeze(-1))        
         else:
             inveqv_loss = 0.
         
