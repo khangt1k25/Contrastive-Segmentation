@@ -1,3 +1,34 @@
+Skip to content
+Search or jump to…
+Pull requests
+Issues
+Marketplace
+Explore
+ 
+@khangt1k25 
+khangt1k25
+/
+Contrastive-Segmentation
+Public
+1
+00
+Code
+Issues
+Pull requests
+Actions
+Projects
+Wiki
+Security
+Insights
+Settings
+Contrastive-Segmentation/pretrain/modules/moco/builder.py /
+@khangt1k25
+khangt1k25 fix inveqv normalize
+Latest commit 18d0b5f 3 days ago
+ History
+ 1 contributor
+336 lines (244 sloc)  11.4 KB
+  
 #
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
@@ -36,7 +67,6 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
         
-        # prediction head preserves consistency inqeqv: Motivated by BYOL
         if self.p['use_prediction_head']:
             self.pHead = get_pHead(p)
 
@@ -182,8 +212,8 @@ class ContrastiveModel(nn.Module):
         # anchor mean
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            bg_q_flat = bg_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            q_mean = torch.bmm(q_mean, bg_q_flat).squeeze() # B x dim
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
             q_mean = nn.functional.normalize(q_mean, dim=1) 
 
 
@@ -192,7 +222,7 @@ class ContrastiveModel(nn.Module):
         '''
         sal_loss = self.bce(bg_q, sal_q)
       
-
+       
         '''
         Prepare mask_indexes with both query and key size.
         '''
@@ -202,7 +232,7 @@ class ContrastiveModel(nn.Module):
             tmp = tmp.view(-1)
             mask_indexes = torch.nonzero((tmp)).view(-1).squeeze()
             tmp = torch.index_select(tmp, index=mask_indexes, dim=0) // 2
-
+        
         '''
         Prepare prototypes in key size and apply transform 
         '''
@@ -219,11 +249,11 @@ class ContrastiveModel(nn.Module):
             
             # prototypes k
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            bg_k_flat = bg_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-            prototypes_foreground = torch.bmm(k_flat, bg_k_flat).squeeze() # B x dim
+            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
-            
+
             # apply transform 
             if self.p['loss_coeff']['inveqv'] > 0:
                 ie, _ = self.model_k(im_ie)
@@ -285,7 +315,7 @@ class ContrastiveModel(nn.Module):
                     inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsquezze(-1))        
         else:
             inveqv_loss = 0.
-
+        
 
         '''
         Compute Object Contrastive loss 
@@ -335,3 +365,17 @@ def concat_all_gather(tensor):
 
     output = torch.cat(tensors_gather, dim=0)
     return output
+© 2021 GitHub, Inc.
+Terms
+Privacy
+Security
+Status
+Docs
+Contact GitHub
+Pricing
+API
+Training
+Blog
+About
+Loading complete
+1
