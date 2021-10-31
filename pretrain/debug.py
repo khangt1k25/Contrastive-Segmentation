@@ -63,8 +63,10 @@ for i, batch in enumerate(train_dataloader):
     ie, bg_ie = model(im_ie)
     ie = nn.functional.normalize(ie, dim=1)
 
-    print(bg_q)
-    print(bg_ie)
+    pred = prediction_head(q)
+    print(pred.shape)
+    # print(bg_q)
+    # print(bg_ie)
     
     # print(ie[0,:,0,0])   
     

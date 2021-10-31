@@ -66,15 +66,23 @@ class PredictionHead(nn.Module):
     def __init__(self, dim):
         self.dim = int(dim) 
         super(PredictionHead, self).__init__()
-        self.AE = nn.Sequential(
-            # nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, padding='same'),
-            nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, padding=True),
+
+        self.encoder = nn.Sequential(
+            nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, stride=2, padding=1),
             nn.ReLU(),
-            # nn.Conv2d(in_channels=16, out_channels=dim, kernel_size=3, padding='same'),
-            nn.Conv2d(in_channels=16, out_channels=dim, kernel_size=3, padding=True),
-            # nn.Tanh(),
+            nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=2, padding=1),
+            nn.ReLU(),
+        )
+        self.decoder = nn.Sequential(
+
+            nn.ConvTranspose2d(in_channels=8, out_channels=16, kernel_size=4, stride=2, padding=1),
+            nn.ReLU(),
+            nn.ConvTranspose2d(in_channels=16, out_channels=dim, kernel_size=4, stride=2, padding=1),
         )
     def forward(self, x):
-        output = self.AE(x)
+        output = self.encoder(x)
+
+        output = self.decoder(output)
+        
         return output
         
