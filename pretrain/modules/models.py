@@ -74,7 +74,6 @@ class PredictionHead(nn.Module):
             nn.ReLU(),
         )
         self.decoder = nn.Sequential(
-
             nn.ConvTranspose2d(in_channels=8, out_channels=16, kernel_size=4, stride=2, padding=1),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=16, out_channels=dim, kernel_size=4, stride=2, padding=1),
