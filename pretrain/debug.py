@@ -21,7 +21,7 @@ import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
 import numpy as np
 from data.dataloaders.dataset import MyDataset
-from modules.models import PredictionHead
+from modules.models import Filter, PredictionHead
 
 toPIL = ToPILImage()
 
@@ -46,7 +46,9 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shu
 model = get_model(p)
 prediction_head = PredictionHead(dim=32)
 
-mask_head = nn.AvgPool2d(kernel_size=3, padding=1)
+mask_head = Filter()
+
+# mask_head = nn.LocalResponseNorm()
 
 for i, batch in enumerate(train_dataloader):
     im_q = batch['query']['image']
@@ -61,13 +63,17 @@ for i, batch in enumerate(train_dataloader):
     size_eqv = batch['size']
     
     print(sal_q.shape)
-    print(sal_q[0])
-    after = mask_head(sal_q)
+    # print(sal_q[0])
+    after = mask_head(sal_q.float())
     print(after.shape)
     print(after[0])
     toPIL(sal_q[0].float()).show()
     toPIL(after[0].float()).show()
     # q, bg_q = model(im_q)
+
+    print(after[0])
+    print(torch.unique(sal_q[0]))
+    print(torch.unique(after[0]))
     # q = nn.functional.normalize(q, dim=1)
 
     # ie, bg_ie = model(im_ie)

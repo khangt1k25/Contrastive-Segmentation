@@ -84,7 +84,10 @@ def get_model(p):
 def get_pHead(p):
     from modules.models import PredictionHead
     return PredictionHead(p['model_kwargs']['ndim'])
-    
+
+def get_filter(p):
+    from modules.models import Filter
+    return Filter
 
 def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':

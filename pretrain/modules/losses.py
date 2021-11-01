@@ -43,7 +43,7 @@ class BalancedCrossEntropyLoss(Module):
             loss_neg_pix = torch.mul(w_void, loss_neg_pix)
             num_total = num_total - torch.ge(void_pixels, 0.5).float().sum()
             w = num_labels_neg / num_total
-
+        
         loss_pos = torch.sum(loss_pos_pix)
         loss_neg = torch.sum(loss_neg_pix)
 

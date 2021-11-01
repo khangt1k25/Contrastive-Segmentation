@@ -85,3 +85,15 @@ class PredictionHead(nn.Module):
         
         return output
 
+class Filter(nn.Module):
+    def __init__(self):
+  
+        super(Filter, self).__init__()
+
+        self.filter = nn.Sequential(
+            nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
+        )
+    def forward(self, x):
+        output = self.filter(x)
+        
+        return output

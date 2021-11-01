@@ -15,7 +15,7 @@ import torch.nn.functional as F
 import random
 import torchvision
 
-from utils.common_config import get_model, get_pHead
+from utils.common_config import get_filter, get_model, get_pHead
 from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
@@ -40,6 +40,7 @@ class ContrastiveModel(nn.Module):
         if self.p['use_prediction_head']:
             self.pHead = get_pHead(p)
 
+        self.filter = get_filter(p)
 
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
@@ -296,7 +297,15 @@ class ContrastiveModel(nn.Module):
         negatives = self.queue.clone().detach()          # shape: dim x negatives
         l_mem = torch.matmul(anchor, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
-        weights = torch.index_select(flat_bg_q, index=mask_indexes, dim=0)
+        
+        with torch.no_grad():
+
+            # weights = torch.index_select(flat_bg_q, index=mask_indexes, dim=0) # using predicted
+            # weights = F.sigmoid(weights)
+            weights = self.filter(sal_q)                                         # using sal
+            weights = torch.index_select(weights, index=mask_indexes, dim=0) 
+        
+        
         '''
         Compute superpixel contrastive loss 
         '''

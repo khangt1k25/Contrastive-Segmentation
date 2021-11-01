@@ -37,9 +37,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
-        sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)
-
+        if p['loss_coeff']['inveqv'] > 0:
+            im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
+            sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)
+        else:
+            im_ie = batch['inveqv']['image']
+            sal_ie = batch['inveqv']['sal']
         
         matrix_eqv = batch['matrix']
         size_eqv = batch['size']
@@ -58,8 +61,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         w_class = 1 / torch.log(1.02 + p_class)
         contrastive_loss = cross_entropy(logits, labels, weight=w_class,
                                             reduction='none')
-        contrastive_loss = contrastive_loss * weights
-        contrastive_loss = torch.mean(contrastive_loss)
+        
+        contrastive_loss = contrastive_loss.view(-1, 1) * weights
+        contrastive_loss = torch.sum(contrastive_loss)/torch.sum(weights)
       
         
 
