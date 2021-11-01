@@ -46,7 +46,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, spatial_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        logits, labels, weights, saliency_loss, inveqv_loss, m_logits, m_labels, spatial_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
         
 
         
@@ -57,7 +57,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         p_class[uniq] = p_class_non_zero_classes
         w_class = 1 / torch.log(1.02 + p_class)
         contrastive_loss = cross_entropy(logits, labels, weight=w_class,
-                                            reduction='mean')
+                                            reduction='none')
+        contrastive_loss = contrastive_loss * weights
+        contrastive_loss = torch.mean(contrastive_loss)
       
         
 

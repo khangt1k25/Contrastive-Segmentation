@@ -84,4 +84,4 @@ class PredictionHead(nn.Module):
         output = self.decoder(output)
         
         return output
-        
+

@@ -45,6 +45,9 @@ train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shu
 
 model = get_model(p)
 prediction_head = PredictionHead(dim=32)
+
+mask_head = nn.AvgPool2d(kernel_size=3, padding=1)
+
 for i, batch in enumerate(train_dataloader):
     im_q = batch['query']['image']
     im_k = batch['key']['image']
@@ -56,15 +59,22 @@ for i, batch in enumerate(train_dataloader):
 
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
-  
-    q, bg_q = model(im_q)
-    q = nn.functional.normalize(q, dim=1)
+    
+    print(sal_q.shape)
+    print(sal_q[0])
+    after = mask_head(sal_q)
+    print(after.shape)
+    print(after[0])
+    toPIL(sal_q[0].float()).show()
+    toPIL(after[0].float()).show()
+    # q, bg_q = model(im_q)
+    # q = nn.functional.normalize(q, dim=1)
 
-    ie, bg_ie = model(im_ie)
-    ie = nn.functional.normalize(ie, dim=1)
+    # ie, bg_ie = model(im_ie)
+    # ie = nn.functional.normalize(ie, dim=1)
 
-    pred = prediction_head(q)
-    print(pred.shape)
+    # pred = prediction_head(q)
+    # print(pred.shape)
     # print(bg_q)
     # print(bg_ie)
     
