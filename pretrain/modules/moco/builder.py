@@ -181,13 +181,29 @@ class ContrastiveModel(nn.Module):
             spatial_loss = 0.
         
         # anchor mean
+        # if self.p['loss_coeff']['mean'] > 0:
+        #     q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+        #     sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+        #     q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+        #     q_mean = nn.functional.normalize(q_mean, dim=1) 
+
+        # anchor mean = weights by avgpooling2d
         if self.p['loss_coeff']['mean'] > 0:
-            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-            q_mean = nn.functional.normalize(q_mean, dim=1) 
+            q_mean = q.reshape(batch_size, self.dim, -1)
+            sal_q_weights = self.filter(sal_q)
+            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.type)
+            q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+            q_mean = nn.functional.normalize(q_mean, dim=1)
 
-
+        # anchor mean = weights by predicted sal
+        if self.p['loss_coeff']['mean'] > 0:
+            q_mean = q.reshape(batch_size, self.dim, -1)
+            sal_q_weights = bg_q * sal_q
+            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.type)
+            q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+            q_mean = nn.functional.normalize(q_mean, dim=1)
+        
+            
         '''
         Compute saliency loss
         '''
@@ -298,12 +314,19 @@ class ContrastiveModel(nn.Module):
         l_mem = torch.matmul(anchor, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
         
-        with torch.no_grad():
 
-            # weights = torch.index_select(flat_bg_q, index=mask_indexes, dim=0) # using predicted
+        '''
+        Use weights for Contrastive loss 
+        '''
+        # with torch.no_grad():
+            ## using predicted
+            
+            # weights = torch.index_select(flat_bg_q, index=mask_indexes, dim=0)
             # weights = F.sigmoid(weights)
-            weights = self.filter(sal_q)                                         # using sal
-            weights = torch.index_select(weights, index=mask_indexes, dim=0) 
+            
+            ## using sal
+            # weights = self.filter(sal_q)                                         
+            # weights = torch.index_select(weights, index=mask_indexes, dim=0) 
         
         
         '''
@@ -327,7 +350,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp.long(), weights, sal_loss, inveqv_loss,  mean_logits, mean_labels, spatial_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, spatial_loss
 
 
         

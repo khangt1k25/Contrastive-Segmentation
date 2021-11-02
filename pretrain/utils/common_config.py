@@ -87,7 +87,7 @@ def get_pHead(p):
 
 def get_filter(p):
     from modules.models import Filter
-    return Filter
+    return Filter()
 
 def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':

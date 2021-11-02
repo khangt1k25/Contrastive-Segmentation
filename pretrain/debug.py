@@ -48,7 +48,6 @@ prediction_head = PredictionHead(dim=32)
 
 mask_head = Filter()
 
-# mask_head = nn.LocalResponseNorm()
 
 for i, batch in enumerate(train_dataloader):
     im_q = batch['query']['image']
