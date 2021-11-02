@@ -94,6 +94,6 @@ class Filter(nn.Module):
             nn.AvgPool2d(kernel_size=3, stride=1, padding=1)
         )
     def forward(self, x):
-        output = self.filter(x)
+        output = self.filter(x.float())
         
         return output

@@ -191,7 +191,8 @@ class ContrastiveModel(nn.Module):
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1)
             sal_q_weights = self.filter(sal_q)
-            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.type)
+            sal_q_weights = sal_q_weights * sal_q
+            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
             q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
             q_mean = nn.functional.normalize(q_mean, dim=1)
 
@@ -199,10 +200,10 @@ class ContrastiveModel(nn.Module):
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1)
             sal_q_weights = bg_q * sal_q
-            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.type)
+            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
             q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
             q_mean = nn.functional.normalize(q_mean, dim=1)
-        
+
             
         '''
         Compute saliency loss
