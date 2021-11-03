@@ -61,28 +61,19 @@ for i, batch in enumerate(train_dataloader):
     matrix_eqv = batch['matrix']
     size_eqv = batch['size']
     
-    print(sal_q.shape)
-    # print(sal_q[0])
-    after = mask_head(sal_q.float())
-    print(after.shape)
-    print(after[0])
-    toPIL(sal_q[0].float()).show()
-    toPIL(after[0].float()).show()
-    # q, bg_q = model(im_q)
 
-    print(after[0])
-    print(torch.unique(sal_q[0]))
-    print(torch.unique(after[0]))
-    # q = nn.functional.normalize(q, dim=1)
+    q, bg_q = model(im_q)
+    q = nn.functional.normalize(q, dim=1)
 
-    # ie, bg_ie = model(im_ie)
-    # ie = nn.functional.normalize(ie, dim=1)
+    ie, bg_ie = model(im_ie)
+    ie = nn.functional.normalize(ie, dim=1)
 
-    # pred = prediction_head(q)
-    # print(pred.shape)
-    # print(bg_q)
-    # print(bg_ie)
-    
+    pred = prediction_head(q)
+    print(pred[0,:,0,0])
+    pred = nn.functional.normalize(pred, dim=1)
+    print(q.shape)
+    print(pred.shape)
+    print(pred[0,:,0,0])
     # print(ie[0,:,0,0])   
     
     # # ie = deepcopy(im_ie)

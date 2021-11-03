@@ -37,6 +37,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+        
         if p['loss_coeff']['inveqv'] > 0:
             im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
             sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)

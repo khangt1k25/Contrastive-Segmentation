@@ -181,28 +181,28 @@ class ContrastiveModel(nn.Module):
             spatial_loss = 0.
         
         # anchor mean
-        # if self.p['loss_coeff']['mean'] > 0:
-        #     q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-        #     sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-        #     q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-        #     q_mean = nn.functional.normalize(q_mean, dim=1) 
+        if self.p['loss_coeff']['mean'] > 0:
+            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+            q_mean = nn.functional.normalize(q_mean, dim=1) 
 
         # anchor mean = weights by avgpooling2d
-        if self.p['loss_coeff']['mean'] > 0:
-            q_mean = q.reshape(batch_size, self.dim, -1)
-            sal_q_weights = self.filter(sal_q)
-            sal_q_weights = sal_q_weights * sal_q
-            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-            q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
-            q_mean = nn.functional.normalize(q_mean, dim=1)
-
+        # if self.p['loss_coeff']['mean'] > 0:
+        #     q_mean = q.reshape(batch_size, self.dim, -1)
+        #     sal_q_weights = self.filter(sal_q)
+        #     sal_q_weights = sal_q_weights * sal_q
+        #     sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+        #     q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+        #     q_mean = nn.functional.normalize(q_mean, dim=1)
+        
         # anchor mean = weights by predicted sal
-        if self.p['loss_coeff']['mean'] > 0:
-            q_mean = q.reshape(batch_size, self.dim, -1)
-            sal_q_weights = bg_q * sal_q
-            sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-            q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
-            q_mean = nn.functional.normalize(q_mean, dim=1)
+        # if self.p['loss_coeff']['mean'] > 0:
+        #     q_mean = q.reshape(batch_size, self.dim, -1)
+        #     sal_q_weights = bg_q * sal_q
+        #     sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+        #     q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+        #     q_mean = nn.functional.normalize(q_mean, dim=1)
 
             
         '''

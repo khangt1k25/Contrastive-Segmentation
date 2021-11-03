@@ -61,7 +61,7 @@ class ContrastiveSegmentationModel(nn.Module):
             return x
 
 
-
+## verNorm: add batchnorm and tanh
 class PredictionHead(nn.Module):
     def __init__(self, dim):
         self.dim = int(dim) 
@@ -69,14 +69,18 @@ class PredictionHead(nn.Module):
 
         self.encoder = nn.Sequential(
             nn.Conv2d(in_channels=dim, out_channels=16, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.Conv2d(in_channels=16, out_channels=8, kernel_size=3, stride=2, padding=1),
+            nn.BatchNorm2d(8),
             nn.ReLU(),
         )
         self.decoder = nn.Sequential(
             nn.ConvTranspose2d(in_channels=8, out_channels=16, kernel_size=4, stride=2, padding=1),
+            nn.BatchNorm2d(16),
             nn.ReLU(),
             nn.ConvTranspose2d(in_channels=16, out_channels=dim, kernel_size=4, stride=2, padding=1),
+            nn.Tanh(),
         )
     def forward(self, x):
         output = self.encoder(x)
