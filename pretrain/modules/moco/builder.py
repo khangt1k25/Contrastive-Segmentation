@@ -234,13 +234,27 @@ class ContrastiveModel(nn.Module):
             k = nn.functional.normalize(k, dim=1)       
             # undo shuffle
             k = self._batch_unshuffle_ddp(k, idx_unshuffle)
-            
-            # prototypes k
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            
+            
+            # prototypes k: mean
             sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
             prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
+
+            # prototypes k: avgpooling
+            # sal_k_weights = self.filter(sal_k)
+            # sal_k_weights = sal_k_weights * sal_k
+            # sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
+            # prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+            # prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
+
+            # prototypes k: predicted
+            # sal_k_weights = bg_k * sal_k
+            # sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
+            # prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+            # prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
 
             # apply transform 
             if self.p['loss_coeff']['inveqv'] > 0:
