@@ -180,14 +180,14 @@ class ContrastiveModel(nn.Module):
         else:
             spatial_loss = 0.
         
-        # anchor mean
+        # anchor mean = mean
         if self.p['loss_coeff']['mean'] > 0:
             q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
             q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
             q_mean = nn.functional.normalize(q_mean, dim=1) 
 
-        # anchor mean = weights by avgpooling2d
+        # anchor mean = weights by filter
         # if self.p['loss_coeff']['mean'] > 0:
         #     q_mean = q.reshape(batch_size, self.dim, -1)
         #     sal_q_weights = self.filter(sal_q)
@@ -243,7 +243,7 @@ class ContrastiveModel(nn.Module):
             prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
 
-            # prototypes k: avgpooling
+            # prototypes k: filter
             # sal_k_weights = self.filter(sal_k)
             # sal_k_weights = sal_k_weights * sal_k
             # sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
