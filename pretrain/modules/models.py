@@ -61,7 +61,6 @@ class ContrastiveSegmentationModel(nn.Module):
             return x
 
 
-## verNorm: add batchnorm and tanh
 class PredictionHead(nn.Module):
     def __init__(self, dim):
         self.dim = int(dim) 

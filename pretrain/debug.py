@@ -48,32 +48,42 @@ prediction_head = PredictionHead(dim=32)
 
 mask_head = Filter()
 
+salmap = torch.Tensor([[0, 1, 1], [0, 1, 1], [0, 0, 1]])
+salmap = salmap.unsqueeze(0)
 
-for i, batch in enumerate(train_dataloader):
-    im_q = batch['query']['image']
-    im_k = batch['key']['image']
-    im_ie = batch['inveqv']['image']
+after = mask_head(salmap)
+print(salmap.shape)
 
-    sal_q = batch['query']['sal']
-    sal_k = batch['key']['sal']
-    sal_ie = batch['inveqv']['sal']
+print(after.shape)
+print(salmap)
+print(after)
+print(after * salmap)
 
-    matrix_eqv = batch['matrix']
-    size_eqv = batch['size']
+# for i, batch in enumerate(train_dataloader):
+#     im_q = batch['query']['image']
+#     im_k = batch['key']['image']
+#     im_ie = batch['inveqv']['image']
+
+#     sal_q = batch['query']['sal']
+#     sal_k = batch['key']['sal']
+#     sal_ie = batch['inveqv']['sal']
+
+#     matrix_eqv = batch['matrix']
+#     size_eqv = batch['size']
     
 
-    q, bg_q = model(im_q)
-    q = nn.functional.normalize(q, dim=1)
+#     q, bg_q = model(im_q)
+#     q = nn.functional.normalize(q, dim=1)
 
-    ie, bg_ie = model(im_ie)
-    ie = nn.functional.normalize(ie, dim=1)
+#     ie, bg_ie = model(im_ie)
+#     ie = nn.functional.normalize(ie, dim=1)
 
-    pred = prediction_head(q)
-    print(pred[0,:,0,0])
-    pred = nn.functional.normalize(pred, dim=1)
-    print(q.shape)
-    print(pred.shape)
-    print(pred[0,:,0,0])
+#     pred = prediction_head(q)
+#     print(pred[0,:,0,0])
+#     pred = nn.functional.normalize(pred, dim=1)
+#     print(q.shape)
+#     print(pred.shape)
+#     print(pred[0,:,0,0])
     # print(ie[0,:,0,0])   
     
     # # ie = deepcopy(im_ie)
@@ -150,6 +160,6 @@ for i, batch in enumerate(train_dataloader):
 
     
     
-    break
+    # break
 
 

@@ -7,13 +7,12 @@ train_db_name: VOCSegmentation
 train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 8
-train_batch_size: 32
+train_batch_size: 64
 
-inveqv_version: 1
 
 
 # Model
-backbone: resnet18
+backbone: resnet50
 backbone_kwargs:
    dilated: True
    pretraining: imagenet_classification 
@@ -32,14 +31,14 @@ loss_coeff:
    mean: 0
    spatial: 0
 
-use_prediction_head: True   
+use_prediction_head: False 
 
 
 head: deeplab
 # Freeze block 1 and 2 in backbone (~1% miou improvement)
 freeze_layers: True 
 # Optimizer
-epochs: 45
+epochs: 60
 optimizer: sgd
 optimizer_kwargs:
    lr: 0.004

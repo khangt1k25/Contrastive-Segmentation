@@ -16,13 +16,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     inveqv_losses = AverageMeter('Inveqv', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
-    mean_losses = AverageMeter('Mean-Contrast', ':.4e')
-    spatial_losses = AverageMeter('Spatial', ':.4e')
+    superpixel_losses = AverageMeter('Mean-Contrast', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, inveqv_losses, saliency_losses, mean_losses, spatial_losses, top1, top5],
+                        [losses, contrastive_losses, inveqv_losses, saliency_losses, superpixel_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
     
@@ -50,7 +49,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
             
         
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, spatial_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
         
 
         
@@ -66,31 +65,29 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
         
 
-        if p['loss_coeff']['mean'] > 0:
+        if p['loss_coeff']['superpixel'] > 0:
             uniq_mean, freq_mean = torch.unique(m_labels, return_counts=True)
             p_class_mean = torch.zeros(m_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
             p_class_non_zero_classes_mean = freq_mean.float() / m_labels.numel()
             p_class_mean[uniq_mean] = p_class_non_zero_classes_mean
             w_class_mean = 1 / torch.log(1.02 + p_class_mean)
-            mean_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
+            superpixel_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
         else:
-            mean_loss = 0.
+            superpixel_loss = 0.
         
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['inveqv']* inveqv_loss +\
-                p['loss_coeff']['mean'] * mean_loss +\
-                p['loss_coeff']['spatial'] * spatial_loss
-                 
+                p['loss_coeff']['superpixel'] * superpixel_loss
         
 
         contrastive_losses.update(contrastive_loss.item())
 
         if p['loss_coeff']['mean'] > 0:
-            mean_losses.update(mean_loss.item())
+            superpixel_losses.update(superpixel_loss.item())
         else:
-            mean_losses.update(mean_loss)
+            superpixel_losses.update(superpixel_loss)
          
         if p['loss_coeff']['inveqv'] > 0:
             inveqv_losses.update(inveqv_loss.item())
@@ -101,11 +98,6 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             saliency_losses.update(saliency_loss.item())
         else:
             saliency_losses.update(saliency_loss)
-        
-        if p['loss_coeff']['spatial'] > 0:
-            spatial_losses.update(spatial_loss.item())
-        else:
-            spatial_losses.update(spatial_loss)
 
         losses.update(loss.item())
         
@@ -133,9 +125,8 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         contrastive_losses=contrastive_losses,
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
-        mean_losses=mean_losses,
-        losses=losses,
-        spatial_losses=spatial_losses
+        superpixel_losses=superpixel_losses,
+        losses=losses
     )
     return losses.avg
 
@@ -158,9 +149,8 @@ def save_plot_curve(
     contrastive_losses, 
     saliency_losses,
     inveqv_losses,
-    mean_losses,
-    losses,
-    spatial_losses
+    superpixel_losses,
+    losses
     ):
 
     with open(os.path.join(p['output_dir'], 'cl.txt'), 'a') as f:
@@ -175,9 +165,6 @@ def save_plot_curve(
     with open(os.path.join(p['output_dir'], 'total.txt'), 'a') as f:
         f.write(str(losses.avg))
         f.write("\n")
-    with open(os.path.join(p['output_dir'], 'mean-contrast.txt'), 'a') as f:
-        f.write(str(mean_losses.avg))
-        f.write("\n")
-    with open(os.path.join(p['output_dir'], 'spatial.txt'), 'a') as f:
-        f.write(str(spatial_losses.avg))
+    with open(os.path.join(p['output_dir'], 'superpixel-contrast.txt'), 'a') as f:
+        f.write(str(superpixel_losses.avg))
         f.write("\n")

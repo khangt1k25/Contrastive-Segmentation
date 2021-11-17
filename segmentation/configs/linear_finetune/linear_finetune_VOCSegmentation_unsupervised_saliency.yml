@@ -18,7 +18,7 @@ model_kwargs:
    upsample: True
    use_classification_head: True
 head: 'deeplab'
-pretraining: /path/to/checkpoint.pth.tar # Change this.
+pretraining: /path/to/checkpoint.pth.tar # Change this path
 
 # Optimizer
 epochs: 60

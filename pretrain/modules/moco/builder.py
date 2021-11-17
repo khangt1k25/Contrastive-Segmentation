@@ -1,5 +1,4 @@
 
-
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 #
@@ -16,7 +15,7 @@ import random
 import torchvision
 
 from utils.common_config import get_filter, get_model, get_pHead
-from modules.losses import BalancedCrossEntropyLoss, ConsistencyLoss, AttentionLoss
+from modules.losses import BalancedCrossEntropyLoss
 import kornia.augmentation as k_aug
 import kornia.geometry.transform as k_trans
 
@@ -62,7 +61,7 @@ class ContrastiveModel(nn.Module):
         # additional loss
         
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-        self.att = AttentionLoss()
+
         
         self.l1loss = nn.L1Loss()
         self.mse = nn.MSELoss()
@@ -165,45 +164,32 @@ class ContrastiveModel(nn.Module):
         flat_q = torch.reshape(flat_q, [-1, self.dim])    # queries: pixels x dim
         flat_bg_q = torch.reshape(bg_q, [-1, 1])
 
-        '''
-        High pass filter
-        '''
-        if self.p['loss_coeff']['spatial'] > 0:
-            vertical = q[:,:,:-1, :] - q[:,:,1:,:]
-            horizontal = q[:,:,:,:-1] - q[:,:,:,1:]
-            # vertical = (q[:,:,:-1, :] - q[:,:,1:,:]) * (sal_q[:,:,:-1,:])
-            # horizontal = (q[:,:,:,:-1] - q[:,:,:,1:])* (sal_q[:,:,:,:-1])
-            ver_target = torch.zeros_like(vertical)
-            hor_target = torch.zeros_like(horizontal)
-            
-            spatial_loss  = self.l1loss(vertical, ver_target) + self.l1loss(horizontal, hor_target)
-        else:
-            spatial_loss = 0.
-        
-        # anchor mean = mean
-        if self.p['loss_coeff']['mean'] > 0:
-            q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
-            q_mean = nn.functional.normalize(q_mean, dim=1) 
 
-        # anchor mean = weights by filter
-        # if self.p['loss_coeff']['mean'] > 0:
-        #     q_mean = q.reshape(batch_size, self.dim, -1)
-        #     sal_q_weights = self.filter(sal_q)
-        #     sal_q_weights = sal_q_weights * sal_q
-        #     sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-        #     q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
-        #     q_mean = nn.functional.normalize(q_mean, dim=1)
         
-        # anchor mean = weights by predicted sal
-        # if self.p['loss_coeff']['mean'] > 0:
-        #     q_mean = q.reshape(batch_size, self.dim, -1)
-        #     sal_q_weights = bg_q * sal_q
-        #     sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-        #     q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
-        #     q_mean = nn.functional.normalize(q_mean, dim=1)
-
+        if self.p['loss_coeff']['superpixel'] > 0:
+            # anchor superpixel = mean
+            if self.p['superpixel_kwargs']['type'] == 'mean':
+                q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+                q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+                q_mean = nn.functional.normalize(q_mean, dim=1)
+            # anchor superpixel = filter 
+            elif self.p['superpixel_kwargs']['type'] == 'filter':
+                q_mean = q.reshape(batch_size, self.dim, -1)
+                sal_q_weights = self.filter(sal_q)
+                sal_q_weights = sal_q_weights * sal_q
+                sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+                q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+                q_mean = nn.functional.normalize(q_mean, dim=1)
+            # anchor superpixel = predicted sal 
+            elif self.p['superpixel_kwargs']['type'] == 'predicted':                
+                q_mean = q.reshape(batch_size, self.dim, -1)
+                sal_q_weights = bg_q * sal_q
+                sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+                q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+                q_mean = nn.functional.normalize(q_mean, dim=1)
+            else:
+                raise ValueError('Only support mean, filter, predicted type')
             
         '''
         Compute saliency loss
@@ -237,51 +223,37 @@ class ContrastiveModel(nn.Module):
             k_flat = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
             
-            # prototypes k: mean
-            sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
-            prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
-            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             
 
+            
+            # prototypes k: mean
+            if self.p['superpixel_kwargs']['type'] == 'mean':
+                sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+                prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             # prototypes k: filter
-            # sal_k_weights = self.filter(sal_k)
-            # sal_k_weights = sal_k_weights * sal_k
-            # sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
-            # prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
-            # prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
-
+            elif self.p['superpixel_kwargs']['type'] == 'filter':
+                sal_k_weights = self.filter(sal_k)
+                sal_k_weights = sal_k_weights * sal_k
+                sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
+                prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
             # prototypes k: predicted
-            # sal_k_weights = bg_k * sal_k
-            # sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
-            # prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
-            # prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
+            elif self.p['superpixel_kwargs']['type'] == 'predicted':       
+                sal_k_weights = bg_k * sal_k
+                sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
+                prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+                prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
 
-            # apply transform 
+            # apply transform for inveqv
             if self.p['loss_coeff']['inveqv'] > 0:
                 ie, _ = self.model_k(im_ie)
                 ie = nn.functional.normalize(ie, dim=1)   
-                if self.p['inveqv_version'] == 1:
-                    # forward reuse
-                    for j in range(len(dataloader.dataset.eqv_list)):
-                        m = [ele[j] for ele in matrix_eqv]
-                        m = torch.stack(m, dim=0).squeeze()
-                        ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
+                for j in range(len(dataloader.dataset.eqv_list)):
+                    m = [ele[j] for ele in matrix_eqv]
+                    m = torch.stack(m, dim=0).squeeze()
+                    ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
                     
-                elif self.p['inveqv_version'] == 2: 
-                    # inverse reuse
-                    sal_ie = sal_ie.unsqueeze(1) 
-                    for j in range(len(dataloader.dataset.eqv_list)-1, -1, -1):
-
-                        m = [ele[j] for ele in matrix_eqv]
-                        m = torch.stack(m, dim=0).squeeze()
-                        if(j==len(dataloader.dataset.eqv_list)-1):
-                            ie = dataloader.dataset.eqv_list[j].inverse((ie, m),size=size_eqv[0][0])
-                            sal_ie = dataloader.dataset.eqv_list[j].inverse((sal_ie.float(), m),size=size_eqv[0][0])
-                        else:
-                            ie = k_trans.warp_perspective(ie, m, size_eqv[0][0]) 
-                            sal_ie = k_trans.warp_perspective(sal_ie.float(), m, size_eqv[0][0]).long() 
-                    
-                    sal_ie = sal_ie.squeeze()
         '''
         Compute Consistency loss
         '''
@@ -290,31 +262,12 @@ class ContrastiveModel(nn.Module):
                 pred = self.pHead(q)
                 pred = nn.functional.normalize(pred, dim=1)
                 pred = pred.permute((0, 2, 3, 1))
-
-                if self.p['inveqv_version'] == 1:  
-                
-                    ie = ie.permute((0, 2, 3, 1))
-                    
-                    inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
-
-
-                elif self.p['inveqv_version'] == 2:
-
-                    ie = ie.permute((0, 2, 3, 1))
-
-                    inveqv_loss = self.mse(pred * sal_ie.unsqueeze(-1), ie * sal_ie.unsqueeze(-1))
+                ie = ie.permute((0, 2, 3, 1))
+                inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
             else:
-                if self.p['inveqv_version'] == 1:  
-                    
-                    q_selected = q.permute((0, 2, 3, 1))
-                    ie = ie.permute((0, 2, 3, 1))
-                    inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
-
-
-                elif self.p['inveqv_version'] == 2:
-                    q_selected = q.permute((0, 2, 3, 1))
-                    ie = ie.permute((0, 2, 3, 1))
-                    inveqv_loss = self.mse(q_selected * sal_ie.unsqueeze(-1), ie * sal_ie.unsqueeze(-1))        
+                q_selected = q.permute((0, 2, 3, 1))
+                ie = ie.permute((0, 2, 3, 1))
+                inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
         else:
             inveqv_loss = 0.
         
@@ -330,25 +283,12 @@ class ContrastiveModel(nn.Module):
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
         
 
-        '''
-        Use weights for Contrastive loss 
-        '''
-        # with torch.no_grad():
-            ## using predicted
-            
-            # weights = torch.index_select(flat_bg_q, index=mask_indexes, dim=0)
-            # weights = F.sigmoid(weights)
-            
-            ## using sal
-            # weights = self.filter(sal_q)                                         
-            # weights = torch.index_select(weights, index=mask_indexes, dim=0) 
-        
         
         '''
         Compute superpixel contrastive loss 
         '''
 
-        if self.p['loss_coeff']['mean'] > 0:
+        if self.p['loss_coeff']['superpixel'] > 0:
             l_positive = torch.matmul(q_mean, prototypes.t())
             l_negative = torch.matmul(q_mean, negatives)
             mean_logits = torch.cat([l_positive, l_negative], dim=1)
@@ -365,7 +305,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, spatial_loss
+        return logits, tmp.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels
 
 
         

@@ -134,7 +134,7 @@ def main_worker(gpu, ngpus_per_node, args):
     inv_list = ['colorjitter', 'gray']
     eqv_list = ['hflip', 'affine']
     inv_transform = get_inv_transforms(inv_list)
-    eqv_transform = get_eqv_transforms(eqv_list, ver=p['inveqv_version'])
+    eqv_transform = get_eqv_transforms(eqv_list)
     
     train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform)
     

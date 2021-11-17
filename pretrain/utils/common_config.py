@@ -137,7 +137,7 @@ def get_base_transforms():
     return torchvision.transforms.Compose(augmentation)
 
 
-def get_eqv_transforms(eqv_list, ver=1):
+def get_eqv_transforms(eqv_list):
     aug = []
     if 'hflip' in eqv_list:
         aug.append(
@@ -156,29 +156,18 @@ def get_eqv_transforms(eqv_list, ver=1):
                 )
             )
     if 'affine' in eqv_list:
-        if ver == 1:
-            aug.append(
-                k_aug.RandomAffine(
-                    degrees=(-20, 20),
-                    translate=(0.1, 0.1), 
-                    scale=(1, 1.5),
-                    shear=(-5, 5),
-                    return_transform=True,
-                    same_on_batch=False,
-                    p=0.5,
-                    )
+        aug.append(
+            k_aug.RandomAffine(
+                degrees=(-20, 20),
+                translate=(0.1, 0.1), 
+                scale=(1, 1.5),
+                shear=(-5, 5),
+                return_transform=True,
+                same_on_batch=False,
+                p=0.5,
                 )
-        elif ver == 2: # ver2 will not use scale property & p=1.
-            aug.append(
-                k_aug.RandomAffine(
-                    degrees=(-20, 20),
-                    translate=(0.1, 0.1),
-                    shear=(-5, 5),
-                    return_transform=True,
-                    same_on_batch=False,
-                    p=1,
-                    )
-                )
+            )
+       
     return aug
     
 def get_inv_transforms(inv_list):

@@ -132,9 +132,11 @@ class DatasetKeyQuery(data.Dataset):
         return sample, matrix_eqv, size_eqv
 
 
+
+## Our custom dataset
 class MyDataset(data.Dataset):
     def __init__(self, base_dataset, base_transform, inv_list, eqv_list, downsample_sal=False,
-                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99, inveqv_version=1):
+                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99):
         super(MyDataset, self).__init__()
 
         self.base_dataset = base_dataset
@@ -142,7 +144,7 @@ class MyDataset(data.Dataset):
         self.inv_list = inv_list
         self.eqv_list = eqv_list
 
-        self.iqveqv_version = inveqv_version
+
         self.normalize = torchvision.transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
         self.downsample_sal = downsample_sal
@@ -178,27 +180,16 @@ class MyDataset(data.Dataset):
 
 
             
-            if self.iqveqv_version == 1:   # for reused forward
-                
-                inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
-
-                query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
-                
-            elif self.iqveqv_version == 2 : # for reused inverse
-                
-                inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
-                inveqv_sample, matrix_eqv, size_eqv = self.eqv_transform(inveqv_sample)
             
-            else:
-                raise ValueError('Not support inveqv verison {}'.format(self.iqveqv_version)) 
+                
+            inveqv_sample, _, _ = self.inv_transform(deepcopy(query_sample))
+
+            query_sample, matrix_eqv, size_eqv = self.eqv_transform(query_sample)
+    
 
             key_sample['image'] = self.normalize(key_sample['image'])
             query_sample['image'] = self.normalize(query_sample['image'])
             inveqv_sample['image'] = self.normalize(inveqv_sample['image'])
-            
-            # key_sample['image'] = key_sample['image']
-            # query_sample['image'] = query_sample['image']    
-            # inveqv_sample['image'] = inveqv_sample['image']
 
             if self.downsample_sal: # Downsample
                 key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
@@ -240,7 +231,7 @@ class MyDataset(data.Dataset):
         matrix_eqv = []
         size_eqv = []
         for eqv in self.eqv_list:
-            # print(img.shape)
+    
             img, m = eqv(img)
             s = tuple(img.shape[-2:])
             params = eqv._params
@@ -252,25 +243,3 @@ class MyDataset(data.Dataset):
         sample['sal'] = sal.squeeze().long()
         return sample, matrix_eqv, size_eqv   
 
-if __name__=='__main__':
-    import numpy as np
-    from matplotlib import pyplot as plt
-    from utils.common_config import get_train_dataset, get_train_transformations
-    p = {'train_db_name': 'VOCSegmentation', 'overfit': False}
-    transform = get_train_transformations('strong')
-    base_dataset = get_train_dataset(p, transform=None) 
-    dataset = DatasetKeyQuery(base_dataset, transform, downsample_sal=False)
-
-    for i, sample in enumerate(dataset):
-        fig, axes = plt.subplots(4)
-        key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
-        key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
-        query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
-        query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
-        sal_query = sample['query']['sal']
-        sal_key = sample['key']['sal']
-        axes[0].imshow(key.astype(np.uint8))
-        axes[1].imshow(query.astype(np.uint8))
-        axes[2].imshow(sal_key)
-        axes[3].imshow(sal_query)
-        plt.show()
