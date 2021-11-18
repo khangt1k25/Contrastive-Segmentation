@@ -24,7 +24,7 @@ cd pretrain
 python main.py --config_env configs/env.yml --config_exp configs/VOCSegmentation_unsupervised_saliency_model.yml 
 ```
 ## Evaluate
-Change segmentation result path at configs/env.yml [The same path as step 3]
+Change segmentation result path at configs/env.yml [The same path as step 3] and data path [The same as step 1]
 
 ### Linear Finetune
   

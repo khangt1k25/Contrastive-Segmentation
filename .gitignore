@@ -7,3 +7,4 @@ PASCAL_VOC.tgz
 examples/*
 cifar10/*
 draft.py
+*.tar

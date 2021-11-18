@@ -37,8 +37,9 @@ def load_pretrained_weights(p, model):
                 new_dict[k.rsplit('module.encoder_q.')[1]] = v
         msg = model.load_state_dict(new_dict, strict=False)   
         assert(all(['fc' in k for k in msg[0]])) 
-        assert(all(['fc' in k for k in msg[1]])) 
-
+        assert(all(['fc' in k for k in msg[1]]))
+        print(msg) 
+        
     else:
         raise ValueError('Invalid value {}'.format(p['backbone_kwargs']['pretraining']))
  
