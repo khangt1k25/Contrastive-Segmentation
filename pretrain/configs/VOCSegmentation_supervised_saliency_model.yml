@@ -30,7 +30,7 @@ loss_coeff:
    inveqv: 0
    superpixel: 0
 
-superpixel_type: filter
+superpixel_type: filter #baseline: set this to 'mean'
 use_prediction_head: False 
 
 
