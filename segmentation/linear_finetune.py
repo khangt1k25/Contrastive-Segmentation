@@ -115,6 +115,7 @@ def main():
         # Evaluate online -> This will use batched eval where every image is resized to the same resolution.
         print('Evaluate ...')
         eval_val = eval_segmentation_supervised_online(p, val_dataloader, model)
+        
         if eval_val['mIoU'] > best_iou:
             print('Found new best model: %.2f -> %.2f (mIoU)' %(100*best_iou, 100*eval_val['mIoU']))
             best_iou = eval_val['mIoU']
@@ -136,6 +137,6 @@ def main():
     model.load_state_dict(torch.load(p['best_model']))
     save_results_to_disk(p, val_dataloader, model, crf_postprocess=args.crf_postprocess)
     eval_stats = eval_segmentation_supervised_offline(p, true_val_dataset, verbose=True)
-
+        
 if __name__ == "__main__":
     main()

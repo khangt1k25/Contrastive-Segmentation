@@ -11,7 +11,8 @@ num_workers: 4
 # Model
 backbone: 'resnet50'
 backbone_kwargs:
-   dilated: True
+   ndim: 32
+
 head: 'deeplab'
 pretraining: /path/to/checkpoint.pth.tar # Change this.
 

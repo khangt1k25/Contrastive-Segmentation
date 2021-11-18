@@ -5,10 +5,9 @@ val_db_kwargs:
   batch_size: 10
 num_workers: 4
 
-inveqv_version: 0
 
 # Model
-backbone: resnet18
+backbone: resnet50
 backbone_kwargs:
    dilated: True
    pretrained: True 

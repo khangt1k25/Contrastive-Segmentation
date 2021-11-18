@@ -61,7 +61,7 @@ cd segmentation
 python retrieval.py --config_env configs/env.yml --config_exp configs/retrieval/retrieval_VOCSegmentation_unsupervised_saliency.yml
 ```
 
-### 4. Visualize
+### 4. Visualize [Updating ...]
 
 ```shell
 cd segmentation

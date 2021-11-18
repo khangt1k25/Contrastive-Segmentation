@@ -10,7 +10,7 @@ import data.dataloaders.transforms as transforms
 from data.util.mypath import Path
 from utils.collate import collate_custom
 import kornia.augmentation as k_aug
-import kornia.geometry.transform as k_trans
+
 
 
 def load_pretrained_weights(p, model):
@@ -80,7 +80,6 @@ def get_model(p):
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'])
 
-
 def get_pHead(p):
     from modules.models import PredictionHead
     return PredictionHead(p['model_kwargs']['ndim'])
@@ -120,7 +119,6 @@ def get_train_transformations(): # code from baseline
     ]
 
     return torchvision.transforms.Compose(augmentation)
-
 
 
 def get_base_transforms():
@@ -181,9 +179,6 @@ def get_inv_transforms(inv_list):
     return aug
     
 
-
-
-
 def get_val_transformations():
     augmentation = [
         transforms.Resize(224),
@@ -193,10 +188,6 @@ def get_val_transformations():
     ]
         
     return torchvision.transforms.Compose(augmentation)
-
-
-
-
 
 
 def get_optimizer(p, parameters):

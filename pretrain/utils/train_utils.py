@@ -1,14 +1,11 @@
 #
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
-
 import os
-from kornia.geometry import transform
-from numpy import matrix
 import torch
 from torch.nn.functional import cross_entropy
-from torchvision import transforms
 from utils.utils import AverageMeter, ProgressMeter, freeze_layers
+from torch.utils.tensorboard import SummaryWriter, writer 
 
 
 def train(p, train_loader, model, optimizer, epoch, amp):
@@ -37,6 +34,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         
+
         if p['loss_coeff']['inveqv'] > 0:
             im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
             sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)
@@ -73,8 +71,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             w_class_mean = 1 / torch.log(1.02 + p_class_mean)
             superpixel_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
         else:
-            superpixel_loss = 0.
+            superpixel_loss = torch.zeros([])
         
+
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
@@ -82,23 +81,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
                 p['loss_coeff']['superpixel'] * superpixel_loss
         
 
+        # Update loss step
         contrastive_losses.update(contrastive_loss.item())
-
-        if p['loss_coeff']['mean'] > 0:
-            superpixel_losses.update(superpixel_loss.item())
-        else:
-            superpixel_losses.update(superpixel_loss)
-         
-        if p['loss_coeff']['inveqv'] > 0:
-            inveqv_losses.update(inveqv_loss.item())
-        else:
-            inveqv_losses.update(inveqv_loss)
-
-        if p['loss_coeff']['saliency'] > 0:
-            saliency_losses.update(saliency_loss.item())
-        else:
-            saliency_losses.update(saliency_loss)
-
+        superpixel_losses.update(superpixel_loss.item())
+        inveqv_losses.update(inveqv_loss.item())
+        saliency_losses.update(saliency_loss.item())
         losses.update(loss.item())
         
 
@@ -119,7 +106,18 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-            
+
+    # Save to tensorboard
+    writer_path = os.path.join(p['output_dir'], "runs")
+    writer = SummaryWriter(log_dir=writer_path)
+    writer.add_scalar('total loss', losses.avg, epoch)
+    writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
+    writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
+    writer.add_scalar('inveqv loss', inveqv_losses.avg, epoch)
+    writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
+    writer.close()
+    
+    ## Save to txt 
     save_plot_curve(
         p=p,
         contrastive_losses=contrastive_losses,
@@ -128,6 +126,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         superpixel_losses=superpixel_losses,
         losses=losses
     )
+    
     return losses.avg
 
 @torch.no_grad()
