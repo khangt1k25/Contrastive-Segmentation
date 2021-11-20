@@ -7,6 +7,8 @@ requirements.txt
 git clone -b akien https://github.com/khangt1k25/Contrastive-Segmentation.git
 
 cd Contrastive-Segmentation/
+
+download pretrained MOCOv2 800 step from https://github.com/facebookresearch/moco
 ```
 ## Training
 

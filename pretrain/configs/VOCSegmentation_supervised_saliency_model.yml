@@ -29,8 +29,11 @@ loss_coeff:
    saliency: 1
    inveqv: 0
    superpixel: 0
+   
+#baseline: set this to 'mean' both 'side'
+superpixel_query_type: filter 
+superpixel_key_type: mean
 
-superpixel_type: filter #baseline: set this to 'mean'
 use_prediction_head: False 
 
 
