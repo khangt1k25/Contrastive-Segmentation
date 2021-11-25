@@ -81,7 +81,8 @@ def main():
     train_dataloader = get_train_dataloader(p, train_dataset)
     val_dataloader = get_val_dataloader(p, val_dataset)
     print(colored('Train samples %d - Val samples %d' %(len(train_dataset), len(val_dataset)), 'yellow'))
-
+    
+    
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
         print(colored('Restart from checkpoint {}'.format(p['checkpoint']), 'blue'))
@@ -114,7 +115,7 @@ def main():
         print('Train ...')
         eval_train = train_segmentation_vanilla(p, train_dataloader, model, criterion, optimizer, epoch,
                                                     freeze_batchnorm=p['freeze_batchnorm'])
-        
+
         # Evaluate online -> This will use batched eval where every image is resized to the same resolution.
         print('Evaluate ...')
         eval_val = eval_segmentation_supervised_online(p, val_dataloader, model)
@@ -135,11 +136,11 @@ def main():
                     'epoch': epoch + 1, 'best_epoch': best_epoch, 'best_iou': best_iou}, 
                     p['checkpoint'])
 
-    # # Evaluate best model at the end -> This will evaluate the predictions on the original resolution.
-    # print(colored('Evaluating best model at the end', 'blue'))
-    # model.load_state_dict(torch.load(p['best_model']))
-    # save_results_to_disk(p, val_dataloader, model, crf_postprocess=args.crf_postprocess)
-    # eval_stats = eval_segmentation_supervised_offline(p, true_val_dataset, verbose=True)
+    # Evaluate best model at the end -> This will evaluate the predictions on the original resolution.
+    print(colored('Evaluating best model at the end', 'blue'))
+    model.load_state_dict(torch.load(p['best_model']))
+    save_results_to_disk(p, val_dataloader, model, crf_postprocess=args.crf_postprocess)
+    eval_stats = eval_segmentation_supervised_offline(p, true_val_dataset, verbose=True)
         
 if __name__ == "__main__":
     main()

@@ -1,7 +1,10 @@
 # Dataset
 train_db_name: MSRCv2
 val_db_name: MSRCv2
-batch_size: 16
+train_db_kwargs:
+   batch_size: 16
+val_db_kwargs:
+   batch_size: 16
 num_workers: 2
 
 # Model
@@ -12,7 +15,7 @@ model_kwargs:
    ndim: 32
 
 head: 'deeplab'
-pretraining: /path/to/checkpoint.pth.tar # Change this path
+pretraining: /content/drive/MyDrive/UCS_local/oursupin/VOCSegmentation_supervised_saliency_model/bestcheckpoint.pth.tar # Change this path
 
 
 # Optimizer

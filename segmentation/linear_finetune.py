@@ -106,7 +106,7 @@ def main():
         # Adjust lr
         lr = adjust_learning_rate(p, optimizer, epoch)
         print('Adjusted learning rate to {:.5f}'.format(lr))
-
+        
         # Train 
         print('Train ...')
         eval_train = train_segmentation_vanilla(p, train_dataloader, model, criterion, optimizer, epoch,
