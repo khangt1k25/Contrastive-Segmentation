@@ -29,7 +29,7 @@ def train_segmentation_vanilla(p, train_loader, model, criterion, optimizer, epo
     elif freeze_batchnorm == 'all': # Put complete model to eval
         print('Freeze BatchNorm - model put to eval mode.')
         model.eval()
-
+    
     else:
         raise ValueError('Invalid value freeze batchnorm {}'.format(freeze_batchnorm))
 

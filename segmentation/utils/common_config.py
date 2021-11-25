@@ -95,18 +95,23 @@ def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOC12
         dataset = VOC12(split=p['train_db_kwargs']['split'], transform=transform)
-    
+    elif p['train_db_name'] == 'MSRCv2':
+        from data.dataloaders.msrcv2 import MSRC
+        dataset = MSRC(transform=None, split='train')
     else:
         raise ValueError('Invalid train dataset {}'.format(p['train_db_name']))
     
     return dataset
 
 
+
 def get_val_dataset(p, transform=None):
     if p['val_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOC12
         dataset = VOC12(split='val', transform=transform)        
-    
+    elif p['train_db_name'] == 'MSRCv2':
+        from data.dataloaders.msrcv2 import MSRC
+        dataset = MSRC(transform=None, split='val')
     else:
         raise ValueError('Invalid validation dataset {}'.format(p['val_db_name']))
     
@@ -123,7 +128,7 @@ def get_val_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'],
             batch_size=p['val_db_kwargs']['batch_size'], pin_memory=True, 
             collate_fn=collate_custom, drop_last=False, shuffle=False)
-
+    
 
 def get_train_transformations(augmentation_strategy='pascal'):
     return transforms.Compose([custom_tr.RandomHorizontalFlip(),

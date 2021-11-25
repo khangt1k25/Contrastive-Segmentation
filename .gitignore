@@ -1,6 +1,7 @@
 .vscode/*
 test.py
 PASCAL_VOC/*
+BSDS500/*
 PASCAL_VOC.tgz
 *__pycache__
 *.jpg
@@ -8,3 +9,6 @@ examples/*
 cifar10/*
 draft.py
 *.tar
+*.zip
+*.xz
+MSRCv2/

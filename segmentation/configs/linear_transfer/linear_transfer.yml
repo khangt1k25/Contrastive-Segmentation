@@ -1,0 +1,31 @@
+# Dataset
+train_db_name: MSRCv2
+val_db_name: MSRCv2
+batch_size: 16
+num_workers: 2
+
+# Model
+backbone: 'resnet50'
+backbone_kwargs:
+   dilated: True
+model_kwargs:
+   ndim: 32
+
+head: 'deeplab'
+pretraining: /path/to/checkpoint.pth.tar # Change this path
+
+
+# Optimizer
+epochs: 60
+scheduler: step
+scheduler_kwargs:
+   lr_decay_rate: 0.1
+   lr_decay_epochs: [25]
+
+optimizer: sgd 
+optimizer_kwargs:
+   lr: 0.1
+   weight_decay: 0.0001
+   momentum: 0.9
+   nesterov: False
+freeze_batchnorm: 'all'

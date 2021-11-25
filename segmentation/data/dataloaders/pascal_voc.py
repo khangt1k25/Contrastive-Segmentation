@@ -45,9 +45,9 @@ class VOC12(data.Dataset):
         else:
             _semseg_dir = os.path.join(self.root, 'SegmentationClass')
 
-        _image_dir = os.path.join(self.root, 'images')
+        _image_dir = os.path.join(self.root, 'images')        
 
-
+        
         # Download
         if download:
             self._download()
