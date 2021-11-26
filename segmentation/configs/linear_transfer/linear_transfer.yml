@@ -15,7 +15,7 @@ model_kwargs:
    ndim: 32
 
 head: 'deeplab'
-pretraining: /content/drive/MyDrive/UCS_local/oursupin/VOCSegmentation_supervised_saliency_model/bestcheckpoint.pth.tar # Change this path
+pretraining: False
 
 
 # Optimizer

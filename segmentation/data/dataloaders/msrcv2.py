@@ -21,46 +21,75 @@ class MSRC(data.Dataset):
     GOOGLE_DRIVE_ID = '1VnOq18ae8jYd71lyXCgRF6GyaZ3vTqpn'
 
     FILE = 'MSRCv2.zip'
-
+    # SEG_LABELS_LIST = [
+    # {"id": 0, "name": "void",       "rgb_values": [0,   0,    0]},
+    # {"id": 0,  "name": "building",   "rgb_values": [128, 0,    0]},
+    # {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
+    # {"id": 2,  "name": "tree",       "rgb_values": [128, 128,  0]},
+    # {"id": 3,  "name": "cow",        "rgb_values": [0,   0,    128]},
+    # {"id": 4,  "name": "horse",      "rgb_values": [128, 0,    128]},
+    # {"id": 5,  "name": "sheep",      "rgb_values": [0,   128,  128]},
+    # {"id": 6,  "name": "sky",        "rgb_values": [128, 128,  128]},
+    # {"id": 7,  "name": "mountain",   "rgb_values": [64,  0,    0]},
+    # {"id": 8,  "name": "airplane",   "rgb_values": [192, 0,    0]},
+    # {"id": 9,  "name": "water",      "rgb_values": [64,  128,  0]},
+    # {"id": 10, "name": "face",       "rgb_values": [192, 128,  0]},
+    # {"id": 11, "name": "car",        "rgb_values": [64,  0,    128]},
+    # {"id": 12, "name": "bicycle",    "rgb_values": [192, 0,    128]},
+    # {"id": 13, "name": "flower",     "rgb_values": [64,  128,  128]},
+    # {"id": 14, "name": "sign",       "rgb_values": [192, 128,  128]},
+    # {"id": 15, "name": "bird",       "rgb_values": [0,   64,   0]},
+    # {"id": 16, "name": "book",       "rgb_values": [128, 64,   0]},
+    # {"id": 17, "name": "chair",      "rgb_values": [0,   192,  0]},
+    # {"id": 18, "name": "road",       "rgb_values": [128, 64,   128]},
+    # {"id": 19, "name": "cat",        "rgb_values": [0,   192,  128]},
+    # {"id": 20, "name": "dog",        "rgb_values": [128, 192,  128]},
+    # {"id": 21, "name": "body",       "rgb_values": [64,  64,   0]},
+    # {"id": 22, "name": "boat",       "rgb_values": [192, 64,   0]}]
     SEG_LABELS_LIST = [
     {"id": 0,  "name": "background", "rgb_values": [0,   0,  0]},
     {"id": 0,  "name": "background", "rgb_values": [128, 128, 128]},
     {"id": 0,  "name": "background", "rgb_values": [0, 128, 0]},
     {"id": 0,  "name": "background", "rgb_values": [64, 128, 0]},
     {"id": 0,  "name": "background", "rgb_values": [128, 64, 128]},
+    {"id": 0,  "name": "background", "rgb_values": [64,  0,  0]},
+    
     {"id": 1, "name": "person",       "rgb_values": [64, 64,  0]},
     {"id": 1, "name": "person",       "rgb_values": [192, 128,  0]},
     
     {"id": 2,  "name": "building",   "rgb_values": [128, 0,    0]},
     # {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
     {"id": 3,  "name": "tree",       "rgb_values": [128, 128,  0]},
-    {"id": 4,  "name": "cow",        "rgb_values": [0,   0,    128]},
-    {"id": 5,  "name": "horse",      "rgb_values": [128, 0,    128]},
-    {"id": 6,  "name": "sheep",      "rgb_values": [0,   128,  128]},
+    {"id": 4,  "name": "cow/horse",        "rgb_values": [0,   0,    128]},
+    {"id": 4,  "name": "cow/horse",      "rgb_values": [128, 0,    128]},
+    {"id": 5,  "name": "sheep",      "rgb_values": [0,   128,  128]},
     # {"id": 6,  "name": "sky",        "rgb_values": [128, 128,  128]},
-    {"id": 7,  "name": "mountain",   "rgb_values": [64,  0,    0]},
-    {"id": 8,  "name": "airplane",   "rgb_values": [192, 0,    0]},
+    # {"id": 7,  "name": "mountain",   "rgb_values": [64,  0,    0]},
+    {"id": 6,  "name": "airplane",   "rgb_values": [192, 0,    0]},
     # {"id": 9,  "name": "water",      "rgb_values": [64,  128,  0]},
     # {"id": 10, "name": "face",       "rgb_values": [192, 128,  0]},
-    {"id": 9, "name": "car",        "rgb_values": [64,  0,    128]},
-    {"id": 10, "name": "bicycle",    "rgb_values": [192, 0,    128]},
-    {"id": 11, "name": "flower",     "rgb_values": [64,  128,  128]},
-    {"id": 12, "name": "sign",       "rgb_values": [192, 128,  128]},
-    {"id": 13, "name": "bird",       "rgb_values": [0,   64,   0]},
-    {"id": 14, "name": "book",       "rgb_values": [128, 64,   0]},
-    {"id": 15, "name": "chair",      "rgb_values": [0,   192,  0]},
+    {"id": 7, "name": "car",        "rgb_values": [64,  0,    128]},
+    {"id": 8, "name": "bicycle",    "rgb_values": [192, 0,    128]},
+    {"id": 9, "name": "flower",     "rgb_values": [64,  128,  128]},
+    {"id": 10, "name": "sign",       "rgb_values": [192, 128,  128]},
+    {"id": 11, "name": "bird",       "rgb_values": [0,   64,   0]},
+    {"id": 12, "name": "book",       "rgb_values": [128, 64,   0]},
+    {"id": 13, "name": "chair",      "rgb_values": [0,   192,  0]},
     # {"id": 18, "name": "road",       "rgb_values": [128, 64,   128]},
-    {"id": 16, "name": "cat",        "rgb_values": [0,   192,  128]},
-    {"id": 17, "name": "dog",        "rgb_values": [128, 192,  128]},
+    {"id": 14, "name": "cat",        "rgb_values": [0,   192,  128]},
+    {"id": 15, "name": "dog",        "rgb_values": [128, 192,  128]},
     # {"id": 21, "name": "body",       "rgb_values": [64,  64,   0]},
-    {"id": 18, "name": "boat",       "rgb_values": [192, 64,   0]}]
+    {"id": 16, "name": "boat",       "rgb_values": [192, 64,   0]}]
     
     def __init__(self, root=Path.db_root_dir('MSRCv2'),
                  transform=None, overfit=False, split='train', download=False):
         super(MSRC, self).__init__()
 
-        self.CATEGORY_NAMES = list(set([ele['name'] for ele in self.SEG_LABELS_LIST]))
-
+        self.CATEGORY_NAMES = ['background', 'person', 'building', 'tree', 'cow/horse', 
+        'sheep', 'airplane', 'car', 'bicylce', 'flower', 'sign', 'bird', 'book', 
+        'chair', 'cat', 'dog', 'boat'
+        ] 
+        
         self.root = root
         self.transform = transform
         self.split = split
@@ -123,6 +152,7 @@ class MSRC(data.Dataset):
 
         _semseg_label = _semseg[..., 0]
         for label in self.SEG_LABELS_LIST:
+
             mask = np.all(_semseg == label['rgb_values'], axis=2)
             _semseg_label[mask] = label['id']
 
