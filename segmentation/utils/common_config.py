@@ -85,9 +85,9 @@ def get_model(p):
     else:
         from models.models import SimpleSegmentationModel
         model = SimpleSegmentationModel(backbone, head)
-    
+        if p['pretraining']:
         # Load pretrained weights
-        load_pretrained_weights(p, model)
+            load_pretrained_weights(p, model)
     return model
 
 

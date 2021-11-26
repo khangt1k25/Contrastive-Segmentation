@@ -38,7 +38,7 @@ def main():
     sys.stdout = Logger(p['log_file'])
     print('Python script is {}'.format(os.path.abspath(__file__)))
     print(colored(p, 'red'))
-
+    
     # Get model
     print(colored('Retrieve model', 'blue'))
     model = get_model(p)
