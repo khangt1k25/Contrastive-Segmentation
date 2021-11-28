@@ -104,11 +104,11 @@ class MSRC(data.Dataset):
         
 
         with open(self.names_dir, 'r') as f:
-            names = f.read().splitlines()
+            self.names = f.read().splitlines()
 
-        random.shuffle(names)
+        random.shuffle(self.names)
 
-        for f in names:
+        for f in self.names:
             _image = os.path.join(self.images_dir, f + '.bmp')
             _label = os.path.join(self.labels_dir, f + '_GT.bmp')
             self.images_path.append(_image)
@@ -130,8 +130,8 @@ class MSRC(data.Dataset):
             sample = self.transform(sample)
 
         sample['meta'] = {'im_size': (sample['image'].shape[0], sample['image'].shape[1]),
-                          'image_file': self.images_path[index],
-                          'image': os.path.basename(self.images_path[index]).split('.')[0]}
+                          'image_file': self.names[index],
+                          'image':self.names[index]}
         
         return sample
 

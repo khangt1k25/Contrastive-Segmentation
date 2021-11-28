@@ -131,22 +131,40 @@ def get_val_dataloader(p, dataset):
     
 
 def get_train_transformations(augmentation_strategy='pascal'):
-    return transforms.Compose([custom_tr.RandomHorizontalFlip(),
-                                   custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
-                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
-                                   custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 'semseg': tuple((224,224))},
-                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
-                                   custom_tr.ToTensor(),
+    if augmentation_strategy='pascal':
+        return transforms.Compose([custom_tr.RandomHorizontalFlip(),
+                                    custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512))},
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.ToTensor(),
+                                        custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    elif augmentation_strategy=='msrc':
+        return transforms.Compose([custom_tr.RandomHorizontalFlip(),
+                                    custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 'semseg': tuple((224,224))},
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.ToTensor(),
+                                        custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    else:
+        raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
+        
+def get_val_transformations(augmentation_strategy='pascal'):
+    if augmentation_strategy == 'pascal':
+        return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
+                                                            'semseg': tuple((512,512))},
+                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
+                                    custom_tr.ToTensor(),
                                     custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
-
-    
-def get_val_transformations():
-    return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 
-                                                        'semseg': tuple((224,224))},
-                                            flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
-                                custom_tr.ToTensor(),
-                                custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
-
+    elif augmentation_strategy == 'msrc':
+        return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 
+                                                            'semseg': tuple((224,224))},
+                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
+                                    custom_tr.ToTensor(),
+                                    custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    else:
+        raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
 
 def get_optimizer(p, parameters):
     if p['optimizer'] == 'sgd':

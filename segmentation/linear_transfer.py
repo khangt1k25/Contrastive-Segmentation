@@ -69,11 +69,10 @@ def main():
 
     # Dataset
     print(colored('Retrieve dataset', 'blue'))
-    train_transforms = get_train_transformations()
-    val_transforms = get_val_transformations()
+    train_transforms = get_train_transformations(augmentation_strategy='msrc')
+    val_transforms = get_val_transformations(augmentation_strategy='msrc')
     
     train_dataset = get_train_dataset(p, train_transforms) 
-    
     val_dataset = get_val_dataset(p, val_transforms)
 
     true_val_dataset = get_val_dataset(p, None) # True validation dataset without reshape - For validation. 
@@ -125,7 +124,6 @@ def main():
             best_iou = eval_val['mIoU']
             best_epoch = epoch
             torch.save(model.state_dict(), p['best_model'])
-        
         else:
             print('No new best model: %.2f -> %.2f (mIoU)' %(100*best_iou, 100*eval_val['mIoU']))
             print('Last best model was found in epoch %d' %(best_epoch))

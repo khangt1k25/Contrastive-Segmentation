@@ -61,7 +61,7 @@ def eval_segmentation_supervised_offline(p, val_dataset, verbose=True):
 
         gt = sample['semseg']
         valid = (gt != 255)
-
+        
         if mask.shape != gt.shape:
             warning.warn('Prediction and ground truth have different size. Resizing Prediction ..')
             mask = cv2.resize(mask, gt.shape[::-1], interpolation=cv2.INTER_NEAREST)
@@ -97,7 +97,6 @@ def eval_segmentation_supervised_offline(p, val_dataset, verbose=True):
 def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
     print('Save results to disk ...')
     model.eval()
-
     # CRF
     if crf_postprocess:
         from utils.crf import dense_crf
@@ -108,7 +107,7 @@ def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
         meta = batch['meta']
         for jj in range(output.shape[0]):
             counter += 1
-            image_file = meta['image_file'][jj]
+            
 
             # CRF post-process
             if crf_postprocess:
@@ -122,6 +121,6 @@ def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
             result = cv2.resize(pred, dsize=(meta['im_size'][1][jj], meta['im_size'][0][jj]), 
                                         interpolation=cv2.INTER_NEAREST)
             imageio.imwrite(os.path.join(p['save_dir'], meta['image'][jj] + '.png'), result)
-   
+
         if counter % 250 == 0:
             print('Saving results: {} of {} objects'.format(counter, len(val_loader.dataset)))

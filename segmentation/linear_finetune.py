@@ -78,9 +78,6 @@ def main():
     val_dataloader = get_val_dataloader(p, val_dataset)
     print(colored('Train samples %d - Val samples %d' %(len(train_dataset), len(val_dataset)), 'yellow'))
     
-    
-    
-
 
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
