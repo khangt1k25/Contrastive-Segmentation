@@ -8,7 +8,6 @@ import torch
 import torchvision
 import data.dataloaders.transforms as transforms
 from data.util.mypath import Path
-from utils.collate import collate_custom
 import kornia.augmentation as k_aug
 
 
@@ -100,10 +99,10 @@ def get_train_dataset(p, transform=None):
         raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
 
 
-def get_train_dataloader(p, dataset):
-    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
-            batch_size=p['train_batch_size'], pin_memory=True, collate_fn=collate_custom,
-            drop_last=True, shuffle=True)
+# def get_train_dataloader(p, dataset):
+#     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
+#             batch_size=p['train_batch_size'], pin_memory=True, collate_fn=collate_custom,
+#             drop_last=True, shuffle=True)
 
 
 def get_train_transformations(): # code from baseline

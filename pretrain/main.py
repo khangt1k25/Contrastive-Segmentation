@@ -19,7 +19,7 @@ from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
 from utils.common_config import get_crop_inv_transforms, get_train_dataset,\
-                                get_train_dataloader, get_optimizer, adjust_learning_rate,\
+                                get_optimizer, adjust_learning_rate,\
                                 get_eqv_transforms, get_train_transformations
 
 from utils.train_utils import train
