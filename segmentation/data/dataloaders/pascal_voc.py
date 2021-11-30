@@ -45,9 +45,9 @@ class VOC12(data.Dataset):
         else:
             _semseg_dir = os.path.join(self.root, 'SegmentationClass')
 
-        _image_dir = os.path.join(self.root, 'images')
+        _image_dir = os.path.join(self.root, 'images')        
 
-
+        
         # Download
         if download:
             self._download()
@@ -119,7 +119,7 @@ class VOC12(data.Dataset):
         for ignore_class in self.ignore_classes:
             _semseg[_semseg == ignore_class] = 255
         return _semseg
-
+        
     def get_img_size(self, idx=0):
         img = Image.open(os.path.join(self.root, 'JPEGImages', self.images[idx] + '.jpg'))
         return list(reversed(img.size))

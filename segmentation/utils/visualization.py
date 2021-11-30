@@ -143,7 +143,7 @@ def visualize_sample_with_prediction(image, gt, prediction, filename=None):
     else:
         plt.show()
 
- 
+    
 
 def color_map(N=256, normalized=False):
     def bitget(byteval, idx):

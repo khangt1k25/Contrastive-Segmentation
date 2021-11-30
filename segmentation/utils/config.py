@@ -38,10 +38,12 @@ def create_config(config_file_env, config_file_exp, run_idx=None):
     if cfg['train_db_name'] == 'VOCSegmentation':
         cfg['num_classes'] = 20
         cfg['has_bg'] = True
-    
+    elif cfg['train_db_name'] == 'MSRCv2':
+        cfg['num_classes'] = 21
+        cfg['has_bg'] = False
     else:
         raise ValueError('Invalid train db name {}'.format(cfg['train_db_name']))
-  
+    
     # Paths 
     output_dir = os.path.join(root_dir, os.path.basename(config_file_exp).split('.')[0])
     mkdir_if_missing(output_dir)

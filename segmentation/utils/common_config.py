@@ -29,7 +29,7 @@ def load_pretrained_weights(p, model):
     print('Warning: This piece of code was only tested for linear classification')
     print('Warning: Assertions should probably depend on model type (Segm/ContrastiveSegm)')
     assert(set(msg[0]) == set(['decoder.4.weight', 'decoder.4.bias']))
-    assert(set(msg[1]) == set(['head.weight', 'head.bias', 'classification_head.weight', 'attention_head.weight'])) 
+    assert(set(msg[1]) == set(['head.weight', 'head.bias', 'classification_head.weight'])) 
     
     # Init final conv layer
     if 'deeplab' in p['head']:
@@ -80,15 +80,14 @@ def get_model(p):
         import torch.nn as nn
         model = ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                     p['model_kwargs']['upsample'], 
-                                                    p['model_kwargs']['use_classification_head'],
-                                                    p['model_kwargs']['use_attention_head']
+                                                    p['model_kwargs']['use_classification_head']
                                                     )
     else:
         from models.models import SimpleSegmentationModel
         model = SimpleSegmentationModel(backbone, head)
-    
+        if p['pretraining']:
         # Load pretrained weights
-        load_pretrained_weights(p, model)
+            load_pretrained_weights(p, model)
     return model
 
 
@@ -96,18 +95,23 @@ def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOC12
         dataset = VOC12(split=p['train_db_kwargs']['split'], transform=transform)
-    
+    elif p['train_db_name'] == 'MSRCv2':
+        from data.dataloaders.msrcv2 import MSRC
+        dataset = MSRC(split='train', transform=transform)
     else:
         raise ValueError('Invalid train dataset {}'.format(p['train_db_name']))
     
     return dataset
 
 
+
 def get_val_dataset(p, transform=None):
     if p['val_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOC12
         dataset = VOC12(split='val', transform=transform)        
-    
+    elif p['train_db_name'] == 'MSRCv2':
+        from data.dataloaders.msrcv2 import MSRC
+        dataset = MSRC(split='val', transform=transform)
     else:
         raise ValueError('Invalid validation dataset {}'.format(p['val_db_name']))
     
@@ -124,25 +128,43 @@ def get_val_dataloader(p, dataset):
     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'],
             batch_size=p['val_db_kwargs']['batch_size'], pin_memory=True, 
             collate_fn=collate_custom, drop_last=False, shuffle=False)
-
+    
 
 def get_train_transformations(augmentation_strategy='pascal'):
-    return transforms.Compose([custom_tr.RandomHorizontalFlip(),
-                                   custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
-                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
-                                   custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512))},
-                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
-                                   custom_tr.ToTensor(),
+    if augmentation_strategy='pascal':
+        return transforms.Compose([custom_tr.RandomHorizontalFlip(),
+                                    custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512))},
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.ToTensor(),
+                                        custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    elif augmentation_strategy=='msrc':
+        return transforms.Compose([custom_tr.RandomHorizontalFlip(),
+                                    custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 'semseg': tuple((224,224))},
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.ToTensor(),
+                                        custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    else:
+        raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
+        
+def get_val_transformations(augmentation_strategy='pascal'):
+    if augmentation_strategy == 'pascal':
+        return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
+                                                            'semseg': tuple((512,512))},
+                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
+                                    custom_tr.ToTensor(),
                                     custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
-
-    
-def get_val_transformations():
-    return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
-                                                        'semseg': tuple((512,512))},
-                                            flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
-                                custom_tr.ToTensor(),
-                                custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
-
+    elif augmentation_strategy == 'msrc':
+        return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((224,224)), 
+                                                            'semseg': tuple((224,224))},
+                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
+                                    custom_tr.ToTensor(),
+                                    custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+    else:
+        raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
 
 def get_optimizer(p, parameters):
     if p['optimizer'] == 'sgd':

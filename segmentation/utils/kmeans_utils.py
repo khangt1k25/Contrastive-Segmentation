@@ -118,7 +118,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
 
 
 @torch.no_grad()
-def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
+def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
     import torch.nn as nn
     print('Save embeddings to disk ...')
     model.eval()
@@ -130,7 +130,6 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     for i, batch in enumerate(val_loader):
         output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
-
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
         sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1

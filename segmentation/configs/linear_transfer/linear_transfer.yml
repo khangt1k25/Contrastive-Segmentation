@@ -1,20 +1,22 @@
 # Dataset
-train_db_name: VOCSegmentation
+train_db_name: MSRCv2
+val_db_name: MSRCv2
 train_db_kwargs:
-   split: trainaug
    batch_size: 16
-val_db_name: VOCSegmentation
 val_db_kwargs:
    batch_size: 16
-num_workers: 4
+num_workers: 2
 
 # Model
 backbone: 'resnet50'
 backbone_kwargs:
+   dilated: True
+model_kwargs:
    ndim: 32
 
 head: 'deeplab'
-pretraining: /path/to/checkpoint.pth.tar # Change this.
+pretraining: False
+
 
 # Optimizer
 epochs: 60

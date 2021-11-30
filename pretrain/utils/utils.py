@@ -53,7 +53,7 @@ class ProgressMeter(object):
         num_digits = len(str(num_batches // 1))
         fmt = '{:' + str(num_digits) + 'd}'
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
-
+        
 
 def freeze_layers(model):
     # Freeze block 1+2 layers in the backbone

@@ -6,45 +6,41 @@
 train_db_name: VOCSegmentation
 train_db_kwargs:
    saliency: unsupervised_model
-num_workers: 8
-train_batch_size: 32
-type_dataset: baseline
-
-# 
-inveqv_version:  1
-
+num_workers: 2
+train_batch_size: 64
 
 # Model
-backbone: resnet18
+backbone: resnet50
 backbone_kwargs:
    dilated: True
-   pretraining: imagenet_classification 
+   pretraining: imagenet_classification  ## or imagenet_moco
+   moco_state_dict: /path/to/mocov2-imagenet-pretrain
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
-   use_attention_head: True
 
 loss_coeff:
    contrastive: 1
    saliency: 1
    inveqv: 0
-   mean: 0
-   attention: 0
+   superpixel: 0
 
-inveqv_kwargs:
-   type: l2
 
-mean_pixel_kwargs:
-   type: mean
+
+#baseline: set this to 'mean' both 'side'
+superpixel_query_type: filter 
+superpixel_key_type: mean
+
+use_prediction_head: False 
 
 
 head: deeplab
 # Freeze block 1 and 2 in backbone (~1% miou improvement)
 freeze_layers: True 
 # Optimizer
-epochs: 45
+epochs: 60
 optimizer: sgd
 optimizer_kwargs:
    lr: 0.004

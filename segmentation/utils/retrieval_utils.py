@@ -20,7 +20,7 @@ def build_memory_bank(p, dataset, loader, model):
     
     for i, batch in enumerate(loader):
         semseg = batch['semseg']
-        output, sal, y = model(batch['image'].cuda(non_blocking=True))
+        output, sal = model(batch['image'].cuda(non_blocking=True))
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape
@@ -71,7 +71,7 @@ def retrieval(p, memory_bank, val_dataset, val_loader, model):
     for i, batch in enumerate(val_loader):
         semseg = batch['semseg'].cuda(non_blocking=True)
         b, h, w = semseg.size()
-        output, sal, y = model(batch['image'].cuda(non_blocking=True))
+        output, sal = model(batch['image'].cuda(non_blocking=True))
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape

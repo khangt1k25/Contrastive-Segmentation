@@ -31,7 +31,7 @@ def collate_custom(batch):
     elif isinstance(batch[0], collections.Mapping):
         batch_modified = {key: collate_custom([d[key] for d in batch]) for key in batch[0] if key.find('idx') < 0}
         return batch_modified
-
+    
     elif isinstance(batch[0], collections.Sequence):
         transposed = zip(*batch)
         return [collate_custom(samples) for samples in transposed]

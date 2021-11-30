@@ -11,14 +11,16 @@ class Path(object):
     """
     @staticmethod
     def db_root_dir(database=''):
-        db_root = '/content/drive/MyDrive/UCS_local/PASCAL_VOC' # VOC will be automatically downloaded
-        db_names = ['VOCSegmentation']
+        db_root = '/home/khangt1k25/Code/Contrastive Segmentation/' # VOC will be automatically downloaded
+        # db_root_other = '/content/drive/MyDrive/UCS_local/'
+        db_names = ['VOCSegmentation', 'MSRCv2']
 
         if database == '':
             return db_root
 
-        if database in db_names:
+        if database == db_names[0]:
+            return os.path.join(db_root,'PASCAL_VOC', database)
+        elif database == db_names[1]:
             return os.path.join(db_root, database)
-
         else:
             raise ValueError('Invalid database {}'.format(database))

@@ -75,7 +75,7 @@ def main():
     n_clusters = 21
     results_miou = []
     for i in range(args.num_seeds):
-        save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)
+        save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=2021 + i)
         eval_stats = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
         results_miou.append(eval_stats['mIoU'])
     print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)*100), 'green'))
