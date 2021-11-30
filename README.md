@@ -4,7 +4,7 @@
 requirements.txt
 ## Setup
 ```
-git clone -b akien https://github.com/khangt1k25/Contrastive-Segmentation.git
+git clone https://github.com/khangt1k25/Contrastive-Segmentation.git
 
 cd Contrastive-Segmentation/
 
