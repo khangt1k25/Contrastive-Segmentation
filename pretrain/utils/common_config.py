@@ -122,18 +122,42 @@ def get_train_transformations(): # code from baseline
     return torchvision.transforms.Compose(augmentation)
 
 
-def get_base_transforms():
+# def get_base_transforms():
+#     augmentation = [
+#         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+#         torchvision.transforms.RandomApply([
+#             transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
+#         ], p=0.8),
+#         transforms.RandomGrayscale(p=0.2),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.ToTensor(),
+#     ]
+    
+#     return torchvision.transforms.Compose(augmentation)
+
+# def get_key_transforms():
+#     augmentation = [
+#         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
+#         torchvision.transforms.RandomApply([
+#             transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
+#         ], p=0.8),
+#         transforms.RandomGrayscale(p=0.2),
+#         transforms.RandomHorizontalFlip(),
+#         transforms.ToTensor(),
+#     ]
+#     return torchvision.transforms.Compose(augmentation)
+
+def get_crop_inv_transforms():
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
         torchvision.transforms.RandomApply([
             transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
         ], p=0.8),
         transforms.RandomGrayscale(p=0.2),
-        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
     ]
-    
     return torchvision.transforms.Compose(augmentation)
+
 
 
 def get_eqv_transforms(eqv_list):
@@ -169,15 +193,15 @@ def get_eqv_transforms(eqv_list):
        
     return aug
     
-def get_inv_transforms(inv_list):
-    aug = []
-    if 'colorjitter' in inv_list:
-        aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
-    if 'gray' in inv_list:
-        aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
-    if 'blur' in inv_list:
-        aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
-    return aug
+# def get_inv_transforms(inv_list):
+#     aug = []
+#     if 'colorjitter' in inv_list:
+#         aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
+#     if 'gray' in inv_list:
+#         aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
+#     if 'blur' in inv_list:
+#         aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
+#     return aug
     
 
 def get_val_transformations():

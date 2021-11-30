@@ -38,18 +38,15 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         if p['loss_coeff']['inveqv'] > 0:
             im_ie = batch['inveqv']['image'].cuda(p['gpu'], non_blocking=True)
             sal_ie = batch['inveqv']['sal'].cuda(p['gpu'], non_blocking=True)
+            matrix_eqv = batch['matrix']
+            size_eqv = batch['size']
         else:
-            im_ie = batch['inveqv']['image']
-            sal_ie = batch['inveqv']['sal']
-        
-        matrix_eqv = batch['matrix']
-        size_eqv = batch['size']
+            im_ie = None
+            sal_ie = None
+            matrix_eqv = None
+            size_eqv = None 
 
-            
-        
         logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
-        
-
         
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)

@@ -226,7 +226,7 @@ class ContrastiveModel(nn.Module):
             if self.p['loss_coeff']['inveqv'] > 0:
                 ie, _ = self.model_k(im_ie)
                 ie = nn.functional.normalize(ie, dim=1)   
-                for j in range(len(dataloader.dataset.eqv_list)):
+                for j in range(len(dataloader.dataset.eqv_list_query)):
                     m = [ele[j] for ele in matrix_eqv]
                     m = torch.stack(m, dim=0).squeeze()
                     ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])

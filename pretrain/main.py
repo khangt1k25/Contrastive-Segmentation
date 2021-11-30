@@ -13,18 +13,18 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import  MyDataset
+from data.dataloaders.dataset import  DatasetKeyQueryInvEqv, DatasetKeyQuery
 
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
-from utils.common_config import get_train_dataset,\
+from utils.common_config import get_crop_inv_transforms, get_train_dataset,\
                                 get_train_dataloader, get_optimizer, adjust_learning_rate,\
-                                get_base_transforms, get_inv_transforms, get_eqv_transforms
+                                get_eqv_transforms, get_train_transformations
 
 from utils.train_utils import train
 from utils.logger import Logger
-from utils.collate import collate_custom
+from utils.collate import collate_custom_forkeyquery, collate_custom_forkeyqueryinveqv
 
 
 # Parser
@@ -128,15 +128,18 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    
-    base_dataset = get_train_dataset(p, transform=None)
-    base_transform = get_base_transforms()
-    inv_list = ['colorjitter', 'gray']
-    eqv_list = ['hflip', 'affine']
-    inv_transform = get_inv_transforms(inv_list)
-    eqv_transform = get_eqv_transforms(eqv_list)
-    
-    train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform)
+    if p['loss_coeff']['inveqv'] > 0:
+        base_dataset = get_train_dataset(p, transform=None)
+        crop_inv_transfrom = get_crop_inv_transforms()
+        eqv_list_key = ['hflip']
+        eqv_list_query = ['hflip', 'affine']    
+        train_dataset = DatasetKeyQueryInvEqv(base_dataset, crop_inv_transfrom, get_eqv_transforms(eqv_list_key), get_eqv_transforms(eqv_list_query))
+        collate_custom = collate_custom_forkeyqueryinveqv
+    else:
+        train_transform = get_train_transformations()
+        train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
+                                    downsample_sal=not p['model_kwargs']['upsample'])
+        collate_custom = collate_custom_forkeyquery
     
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),

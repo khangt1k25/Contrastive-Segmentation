@@ -93,6 +93,7 @@ def eval_segmentation_supervised_offline(p, val_dataset, verbose=True):
     return eval_result
 
 
+
 @torch.no_grad()
 def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
     print('Save results to disk ...')
@@ -107,7 +108,7 @@ def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
         meta = batch['meta']
         for jj in range(output.shape[0]):
             counter += 1
-            
+            image_file = meta['image_file'][jj]
 
             # CRF post-process
             if crf_postprocess:
@@ -117,7 +118,7 @@ def save_results_to_disk(p, val_loader, model, crf_postprocess=False):
             # Regular
             else:
                 pred = torch.argmax(output[jj], dim=0).cpu().numpy().astype(np.uint8)
-
+                
             result = cv2.resize(pred, dsize=(meta['im_size'][1][jj], meta['im_size'][0][jj]), 
                                         interpolation=cv2.INTER_NEAREST)
             imageio.imwrite(os.path.join(p['save_dir'], meta['image'][jj] + '.png'), result)

@@ -39,8 +39,8 @@ def create_config(config_file_env, config_file_exp, run_idx=None):
         cfg['num_classes'] = 20
         cfg['has_bg'] = True
     elif cfg['train_db_name'] == 'MSRCv2':
-        cfg['num_classes'] = 16
-        cfg['has_bg'] = True
+        cfg['num_classes'] = 21
+        cfg['has_bg'] = False
     else:
         raise ValueError('Invalid train db name {}'.format(cfg['train_db_name']))
     

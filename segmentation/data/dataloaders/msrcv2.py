@@ -21,74 +21,42 @@ class MSRC(data.Dataset):
     GOOGLE_DRIVE_ID = '1VnOq18ae8jYd71lyXCgRF6GyaZ3vTqpn'
 
     FILE = 'MSRCv2.zip'
-    # SEG_LABELS_LIST = [
-    # {"id": 0, "name": "void",       "rgb_values": [0,   0,    0]},
-    # {"id": 0,  "name": "building",   "rgb_values": [128, 0,    0]},
-    # {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
-    # {"id": 2,  "name": "tree",       "rgb_values": [128, 128,  0]},
-    # {"id": 3,  "name": "cow",        "rgb_values": [0,   0,    128]},
-    # {"id": 4,  "name": "horse",      "rgb_values": [128, 0,    128]},
-    # {"id": 5,  "name": "sheep",      "rgb_values": [0,   128,  128]},
-    # {"id": 6,  "name": "sky",        "rgb_values": [128, 128,  128]},
-    # {"id": 7,  "name": "mountain",   "rgb_values": [64,  0,    0]},
-    # {"id": 8,  "name": "airplane",   "rgb_values": [192, 0,    0]},
-    # {"id": 9,  "name": "water",      "rgb_values": [64,  128,  0]},
-    # {"id": 10, "name": "face",       "rgb_values": [192, 128,  0]},
-    # {"id": 11, "name": "car",        "rgb_values": [64,  0,    128]},
-    # {"id": 12, "name": "bicycle",    "rgb_values": [192, 0,    128]},
-    # {"id": 13, "name": "flower",     "rgb_values": [64,  128,  128]},
-    # {"id": 14, "name": "sign",       "rgb_values": [192, 128,  128]},
-    # {"id": 15, "name": "bird",       "rgb_values": [0,   64,   0]},
-    # {"id": 16, "name": "book",       "rgb_values": [128, 64,   0]},
-    # {"id": 17, "name": "chair",      "rgb_values": [0,   192,  0]},
-    # {"id": 18, "name": "road",       "rgb_values": [128, 64,   128]},
-    # {"id": 19, "name": "cat",        "rgb_values": [0,   192,  128]},
-    # {"id": 20, "name": "dog",        "rgb_values": [128, 192,  128]},
-    # {"id": 21, "name": "body",       "rgb_values": [64,  64,   0]},
-    # {"id": 22, "name": "boat",       "rgb_values": [192, 64,   0]}]
     SEG_LABELS_LIST = [
-    {"id": 0,  "name": "background", "rgb_values": [0,   0,  0]},
-    {"id": 0,  "name": "background", "rgb_values": [128, 128, 128]},
-    {"id": 0,  "name": "background", "rgb_values": [0, 128, 0]},
-    {"id": 0,  "name": "background", "rgb_values": [64, 128, 0]},
-    {"id": 0,  "name": "background", "rgb_values": [128, 64, 128]},
-    {"id": 0,  "name": "background", "rgb_values": [64,  0,  0]},
-    
-    {"id": 1, "name": "person",       "rgb_values": [64, 64,  0]},
-    {"id": 1, "name": "person",       "rgb_values": [192, 128,  0]},
-    
-    {"id": 2,  "name": "building",   "rgb_values": [128, 0,    0]},
-    # {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
-    {"id": 3,  "name": "tree",       "rgb_values": [128, 128,  0]},
-    {"id": 4,  "name": "cow/horse",        "rgb_values": [0,   0,    128]},
-    {"id": 4,  "name": "cow/horse",      "rgb_values": [128, 0,    128]},
-    {"id": 5,  "name": "sheep",      "rgb_values": [0,   128,  128]},
-    # {"id": 6,  "name": "sky",        "rgb_values": [128, 128,  128]},
+    {"id": -1, "name": "void",       "rgb_values": [0,   0,    0]},
+    {"id": -1,  "name": "horse",      "rgb_values": [128, 0,    128]},
+    {"id": -1,  "name": "mountain",   "rgb_values": [64,  0,    0]},
+    {"id": 0,  "name": "building",   "rgb_values": [128, 0,    0]},
+    {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
+    {"id": 2,  "name": "tree",       "rgb_values": [128, 128,  0]},
+    # {"id": 4,  "name": "horse",      "rgb_values": [128, 0,    128]},
+    {"id": 4,  "name": "sheep",      "rgb_values": [0,   128,  128]},
+    {"id": 5,  "name": "sky",        "rgb_values": [128, 128,  128]},
     # {"id": 7,  "name": "mountain",   "rgb_values": [64,  0,    0]},
     {"id": 6,  "name": "airplane",   "rgb_values": [192, 0,    0]},
-    # {"id": 9,  "name": "water",      "rgb_values": [64,  128,  0]},
-    # {"id": 10, "name": "face",       "rgb_values": [192, 128,  0]},
-    {"id": 7, "name": "car",        "rgb_values": [64,  0,    128]},
-    {"id": 8, "name": "bicycle",    "rgb_values": [192, 0,    128]},
-    {"id": 9, "name": "flower",     "rgb_values": [64,  128,  128]},
-    {"id": 10, "name": "sign",       "rgb_values": [192, 128,  128]},
-    {"id": 11, "name": "bird",       "rgb_values": [0,   64,   0]},
-    {"id": 12, "name": "book",       "rgb_values": [128, 64,   0]},
-    {"id": 13, "name": "chair",      "rgb_values": [0,   192,  0]},
-    # {"id": 18, "name": "road",       "rgb_values": [128, 64,   128]},
-    {"id": 14, "name": "cat",        "rgb_values": [0,   192,  128]},
-    {"id": 15, "name": "dog",        "rgb_values": [128, 192,  128]},
-    # {"id": 21, "name": "body",       "rgb_values": [64,  64,   0]},
-    {"id": 16, "name": "boat",       "rgb_values": [192, 64,   0]}]
+    {"id": 7,  "name": "water",      "rgb_values": [64,  128,  0]},
+    {"id": 8, "name": "face",       "rgb_values": [192, 128,  0]},
+    {"id": 9, "name": "car",        "rgb_values": [64,  0,    128]},
+    {"id": 10, "name": "bicycle",    "rgb_values": [192, 0,    128]},
+    {"id": 11, "name": "flower",     "rgb_values": [64,  128,  128]},
+    {"id": 12, "name": "sign",       "rgb_values": [192, 128,  128]},
+    {"id": 13, "name": "bird",       "rgb_values": [0,   64,   0]},
+    {"id": 14, "name": "book",       "rgb_values": [128, 64,   0]},
+    {"id": 15, "name": "chair",      "rgb_values": [0,   192,  0]},
+    {"id": 16, "name": "road",       "rgb_values": [128, 64,   128]},
+    {"id": 17, "name": "cat",        "rgb_values": [0,   192,  128]},
+    {"id": 18, "name": "dog",        "rgb_values": [128, 192,  128]},
+    {"id": 19, "name": "body",       "rgb_values": [64,  64,   0]},
+    {"id": 20, "name": "boat",       "rgb_values": [192, 64,   0]}]
+    
     
     def __init__(self, root=Path.db_root_dir('MSRCv2'),
                  transform=None, overfit=False, split='train', download=False):
         super(MSRC, self).__init__()
 
-        self.CATEGORY_NAMES = ['background', 'person', 'building', 'tree', 'cow/horse', 
-        'sheep', 'airplane', 'car', 'bicylce', 'flower', 'sign', 'bird', 'book', 
-        'chair', 'cat', 'dog', 'boat'
-        ] 
+        self.CATEGORY_NAMES = ['building', 'grass', 'tree', 'cow', 'sheep', 'sky',
+        'airplane', 'water', 'face', 'car', 'bicycle', 'flower', 'sign', 'bird', 'book', 'chair', 'road', 
+        'cat', 'dog', 'body', 'boat']
+        
         
         self.root = root
         self.transform = transform
@@ -104,11 +72,11 @@ class MSRC(data.Dataset):
         
 
         with open(self.names_dir, 'r') as f:
-            self.names = f.read().splitlines()
+            names = f.read().splitlines()
 
-        random.shuffle(self.names)
+        random.shuffle(names)
 
-        for f in self.names:
+        for f in names:
             _image = os.path.join(self.images_dir, f + '.bmp')
             _label = os.path.join(self.labels_dir, f + '_GT.bmp')
             self.images_path.append(_image)
@@ -116,7 +84,8 @@ class MSRC(data.Dataset):
 
         assert(len(self.images_path) == len(self.labels_path))
      
-
+        self.ignore_classes = [-1]
+        
         # Display stats
         print('Number of images: {:d}'.format(len(self.images_path)))
         
@@ -130,8 +99,8 @@ class MSRC(data.Dataset):
             sample = self.transform(sample)
 
         sample['meta'] = {'im_size': (sample['image'].shape[0], sample['image'].shape[1]),
-                          'image_file': self.names[index],
-                          'image':self.names[index]}
+                          'image_file': self.images_path[index],
+                          'image': os.path.basename(self.images_path[index]).split('.')[0]}
         
         return sample
 
@@ -148,7 +117,8 @@ class MSRC(data.Dataset):
     def _load_label(self, index):
         
         _semseg = np.array(Image.open(self.labels_path[index]).convert('RGB'))
-
+        
+        
 
         _semseg_label = _semseg[..., 0]
         for label in self.SEG_LABELS_LIST:
@@ -156,6 +126,9 @@ class MSRC(data.Dataset):
             mask = np.all(_semseg == label['rgb_values'], axis=2)
             _semseg_label[mask] = label['id']
 
+        for ignore_class in self.ignore_classes:
+            _semseg_label[_semseg_label == ignore_class] = 255
+        
         return _semseg_label
 
     def __str__(self):
@@ -186,27 +159,10 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     bsd = MSRC(split='train')
     xo = bsd[16]
-    # for xo in bsd:
-        # yo = xo['semseg']
-        # print(type(yo))
-        # print(np.unique(yo))
     print(xo['image'].size)
     fig, axes = plt.subplots(2)
     print(np.unique(xo['semseg']))
     axes[0].imshow(xo['image'])
     axes[1].imshow(xo['semseg'])
-    # print(xo['semseg'])
     plt.show()
     
-    
-    # xo['image'].show()
-    # yo = xo['semseg']
-    # print(yo)
-    # print(yo.keys())
-    # print(xo['image'].size)
-    # print(yo['groundTruth'][0][2][0][0][0])
-    # print(len(yo['groundTruth'][0]))
-    # print(len(yo['groundTruth'][0][0]))
-    # print(yo['groundTruth'][0][0][0][0][0])
-
-    # print(yo['groundTruth'][0][0][0][0][1])
