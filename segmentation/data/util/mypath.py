@@ -11,7 +11,7 @@ class Path(object):
     """
     @staticmethod
     def db_root_dir(database=''):
-        db_root = '/home/khangt1k25/Code/Contrastive Segmentation/' # VOC will be automatically downloaded
+        db_root = '/content/drive/MyDrive/UCS_local/PASCAL_VOC' # VOC will be automatically downloaded
         # db_root_other = '/content/drive/MyDrive/UCS_local/'
         db_names = ['VOCSegmentation', 'MSRCv2']
 

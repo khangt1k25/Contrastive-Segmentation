@@ -131,7 +131,7 @@ def get_val_dataloader(p, dataset):
     
 
 def get_train_transformations(augmentation_strategy='pascal'):
-    if augmentation_strategy='pascal':
+    if augmentation_strategy=='pascal':
         return transforms.Compose([custom_tr.RandomHorizontalFlip(),
                                     custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
                                         flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
