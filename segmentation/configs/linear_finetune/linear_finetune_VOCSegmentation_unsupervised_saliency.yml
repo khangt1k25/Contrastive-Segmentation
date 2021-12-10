@@ -6,7 +6,7 @@ train_db_kwargs:
 val_db_name: VOCSegmentation
 val_db_kwargs:
    batch_size: 16
-num_workers: 4
+num_workers: 2
 
 # Model
 backbone: 'resnet50'

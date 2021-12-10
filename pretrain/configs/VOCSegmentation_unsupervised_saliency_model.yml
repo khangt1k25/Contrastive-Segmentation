@@ -7,14 +7,14 @@ train_db_name: VOCSegmentation
 train_db_kwargs:
    saliency: unsupervised_model
 num_workers: 2
-train_batch_size: 64
+train_batch_size: 32
 
 # Model
 backbone: resnet50
 backbone_kwargs:
    dilated: True
-   pretraining: imagenet_classification  ## or imagenet_moco
-   moco_state_dict: /path/to/mocov2-imagenet-pretrain
+   pretraining: imagenet_moco  ## or imagenet_moco
+   moco_state_dict: /content/drive/MyDrive/UCS_local/moco_v2_800ep_pretrain.pth.tar
 model_kwargs:
    ndim: 32
    head: linear
@@ -30,7 +30,7 @@ loss_coeff:
 
 
 #baseline: set this to 'mean' both 'side'
-superpixel_query_type: filter 
+superpixel_query_type: mean 
 superpixel_key_type: mean
 
 use_prediction_head: False 

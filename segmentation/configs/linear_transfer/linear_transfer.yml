@@ -15,7 +15,7 @@ model_kwargs:
    ndim: 32
 
 head: 'deeplab'
-pretraining: False
+pretraining: /path/to/checkpoint.pth.tar # Change this path
 
 
 # Optimizer

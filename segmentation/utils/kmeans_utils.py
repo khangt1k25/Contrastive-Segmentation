@@ -9,6 +9,7 @@ import torch
 from PIL import Image
 from utils.utils import SemsegMeter
 from sklearn.cluster import MiniBatchKMeans
+from sklearn.cluster import KMeans
 from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import PCA
 from termcolor import colored
@@ -18,7 +19,7 @@ from sklearn import metrics
 N_JOBS = 1 # set to number of threads
 
 
-def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=True):
+def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=True):
     n_classes = p['num_classes'] + int(p['has_bg'])
 
     # Iterate
@@ -70,7 +71,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
     else:
         print('Using majority voting for matching')
         match = _majority_vote(all_pixels, all_gt, preds_k=n_clusters, targets_k=n_classes)
-
+    
     # Remap predictions
     reordered_preds = np.zeros(num_elems, dtype=all_pixels.dtype)
     for pred_i, target_i in match:
@@ -79,8 +80,10 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
     if compute_metrics:
         print('Computing acc, nmi, ari ...')
         acc = int((reordered_preds == all_gt).sum()) / float(num_elems)
-        nmi = metrics.normalized_mutual_info_score(all_gt, reordered_preds)
-        ari = metrics.adjusted_rand_score(all_gt, reordered_preds)
+        nmi = None 
+        ari = None
+        # nmi = metrics.normalized_mutual_info_score(all_gt, reordered_preds)
+        # ari = metrics.adjusted_rand_score(all_gt, reordered_preds)
     else: 
         acc, nmi, ari = None, None, None
 
@@ -113,7 +116,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
             print('IoU class %s is %.2f' %(class_names[i_part], 100*jac[i_part]))
 
     print(eval_result)
-
+    
     return eval_result
 
 
@@ -157,7 +160,9 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
 
     pca = PCA(n_components = 32, whiten = True)
     all_prototypes = pca.fit_transform(all_prototypes)
-    kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
+    # kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
+    kmeans = KMeans(n_clusters=n_clusters, random_state=seed)
+
     prediction_kmeans = kmeans.fit_predict(all_prototypes)
 
 

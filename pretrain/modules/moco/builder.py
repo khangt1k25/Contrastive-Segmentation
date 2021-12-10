@@ -6,7 +6,6 @@
 # 
 # Pixel-wise contrastive loss based upon our paper
 
-
 from copy import deepcopy
 import torch
 import torch.nn as nn
@@ -31,6 +30,7 @@ class ContrastiveModel(nn.Module):
         # create the model 
         self.model_q = get_model(p)
         self.model_k = get_model(p)
+        
         if self.p['use_prediction_head']:
             self.pHead = get_pHead(p)
         self.filter = get_filter(p)
@@ -56,11 +56,7 @@ class ContrastiveModel(nn.Module):
         self.l1loss = nn.L1Loss()
         self.mse = nn.MSELoss()
         
-        
-        
 
-
-    
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
         """
@@ -146,7 +142,7 @@ class ContrastiveModel(nn.Module):
         """
         
 
-        batch_size, channel, H, W = im_q.size()
+        batch_size, _, _, _ = im_q.size()
 
 
         q, bg_q = self.model_q(im_q)                      # queries: B x dim x H x W
@@ -267,7 +263,7 @@ class ContrastiveModel(nn.Module):
             mean_logits = torch.zeros([])
             mean_labels = torch.zeros([])
         
-
+        
         # Apply temperature
         logits /= self.T
         mean_logits /= self.T

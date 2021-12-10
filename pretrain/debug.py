@@ -1,9 +1,9 @@
 import torch
-
-a = torch.zeros([])
-
-
-print(a.long())
+from PIL import Image
+import os
+for x in os.listdir('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Images'):
+    a = Image.open(os.path.join('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Images', x)).convert('RGB')
+    print(a.size)
 # from copy import deepcopy
 # import matplotlib.pyplot as plt
 # from numpy import matrix, mod

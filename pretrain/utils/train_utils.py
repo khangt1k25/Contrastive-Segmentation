@@ -103,7 +103,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # Display progress
         if i % 25 == 0:
             progress.display(i)
-
+    
     # Save to tensorboard
     writer_path = os.path.join(p['output_dir'], "runs")
     writer = SummaryWriter(log_dir=writer_path)

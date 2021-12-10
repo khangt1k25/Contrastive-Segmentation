@@ -131,8 +131,8 @@ def main_worker(gpu, ngpus_per_node, args):
     if p['loss_coeff']['inveqv'] > 0:
         base_dataset = get_train_dataset(p, transform=None)
         crop_inv_transfrom = get_crop_inv_transforms()
-        eqv_list_key = ['hflip']
-        eqv_list_query = ['hflip', 'affine']    
+        eqv_list_key = ['hflip'] ## vflip, affine
+        eqv_list_query = ['hflip']    
         train_dataset = DatasetKeyQueryInvEqv(base_dataset, crop_inv_transfrom, get_eqv_transforms(eqv_list_key), get_eqv_transforms(eqv_list_query))
         collate_custom = collate_custom_forkeyqueryinveqv
     else:
