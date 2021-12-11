@@ -49,7 +49,7 @@ class VOC12(data.Dataset):
 
         _image_dir = os.path.join(self.root, 'images')
 
-        _sal_dir = os.path.join(self.root, 'saliency_', self.saliency_name, '_model')
+        _sal_dir = os.path.join(self.root, 'saliency_'+ self.saliency_name +'_model')
         
         # Download
         if download:
@@ -73,7 +73,7 @@ class VOC12(data.Dataset):
             # Images
             _image = os.path.join(_image_dir, line + ".jpg")
             _semseg = os.path.join(_semseg_dir, line + '.png')
-            _sal = os.path.join(_sal_dir, line, '.png')
+            _sal = os.path.join(_sal_dir, line + '.png')
             if os.path.isfile(_image) and os.path.isfile(_semseg) and os.path.isfile(_sal):
                 self.images.append(_image)
                 self.semsegs.append(_semseg)
