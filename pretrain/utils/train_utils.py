@@ -129,6 +129,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         saliency_losses=saliency_losses,
         inveqv_losses=inveqv_losses,
         superpixel_losses=superpixel_losses,
+        bg_losses=bg_losses,
         losses=losses
     )
     

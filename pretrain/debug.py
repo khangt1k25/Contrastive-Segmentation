@@ -1,9 +1,25 @@
 import torch
 from PIL import Image
 import os
-for x in os.listdir('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Images'):
-    a = Image.open(os.path.join('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Images', x)).convert('RGB')
-    print(a.size)
+
+
+sal = torch.rand((64, 224, 224))
+
+
+sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
+
+sal = sal.unsqueeze(0)
+
+from modules.models import GaussianSmoothing, Filter
+
+filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)
+
+out = filter(sal)
+
+print(out.shape)
+print(out)
+
+
 # from copy import deepcopy
 # import matplotlib.pyplot as plt
 # from numpy import matrix, mod
@@ -42,7 +58,7 @@ for x in os.listdir('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Image
 # eqv_transform = get_eqv_transforms(eqv_list)
 
 # train_dataset = MyDataset(base_dataset, base_transform, inv_transform, eqv_transform, inveqv_version=1)
-# train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=10, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
+# train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=11, shuffle=False, pin_memory=True, drop_last=True, collate_fn=collate_custom)
 
 
 # model = get_model(p)
@@ -50,8 +66,8 @@ for x in os.listdir('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Image
 
 # mask_head = Filter()
 
-# salmap = torch.Tensor([[0, 1, 1], [0, 1, 1], [0, 0, 1]])
-# salmap = salmap.unsqueeze(0)
+# salmap = torch.Tensor([[1, 1, 1], [1, 1, 1], [1, 1, 1]])
+# salmap = salmap.unsqueeze(1)
 
 # after = mask_head(salmap)
 # print(salmap.shape)
@@ -81,7 +97,7 @@ for x in os.listdir('/home/khangt1k25/Code/Contrastive Segmentation/MSRCv2/Image
 # #     ie = nn.functional.normalize(ie, dim=1)
 
 # #     pred = prediction_head(q)
-# #     print(pred[0,:,0,0])
+# #     print(pred[1,:,1,0])
 # #     pred = nn.functional.normalize(pred, dim=1)
 # #     print(q.shape)
 # #     print(pred.shape)
