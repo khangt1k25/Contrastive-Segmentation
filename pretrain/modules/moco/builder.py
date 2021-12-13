@@ -157,28 +157,49 @@ class ContrastiveModel(nn.Module):
         if self.p['loss_coeff']['superpixel'] > 0:
             # anchor superpixel = mean
             if self.p['superpixel_query_type'] == 'mean':
-                q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+                q_res = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
                 sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-                q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+
+                bg_q_mean = torch.bmm(q_res, 1.-sal_q_flat).squeeze()
+                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+
+                q_mean = torch.bmm(q_res, sal_q_flat).squeeze() # B x dim
                 q_mean = nn.functional.normalize(q_mean, dim=1)
+                
+                
+
             # anchor superpixel = filter 
             elif self.p['superpixel_query_type'] == 'filter':
-                q_mean = q.reshape(batch_size, self.dim, -1)
+                q_res = q.reshape(batch_size, self.dim, -1)
                 sal_q_weights = self.filter(sal_q)
                 sal_q_weights = sal_q_weights * sal_q
                 sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-                q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+                
+                bg_q_mean = torch.bmm(q_res, 1.-sal_q_weights).squeeze()
+                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+
+                q_mean = torch.bmm(q_res, sal_q_weights).squeeze()
                 q_mean = nn.functional.normalize(q_mean, dim=1)
+
+
+
             # anchor superpixel = predicted sal 
             elif self.p['superpixel_query_type'] == 'predicted':                
-                q_mean = q.reshape(batch_size, self.dim, -1)
+                q_res = q.reshape(batch_size, self.dim, -1)
                 sal_q_weights = bg_q * sal_q
                 sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
-                q_mean = torch.bmm(q_mean, sal_q_weights).squeeze()
+                
+                bg_q_mean = torch.bmm(q_res, 1.-sal_q_weights).squeeze()
+                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+
+                q_mean = torch.bmm(q_res, sal_q_weights).squeeze()
                 q_mean = nn.functional.normalize(q_mean, dim=1)
             else:
                 raise ValueError('Only support mean, filter, predicted types for superpixel')
-            
+        
+   
+
+
         # Compute the targets
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
@@ -203,6 +224,10 @@ class ContrastiveModel(nn.Module):
                 sal_k_flat = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
                 prototypes_foreground = torch.bmm(k_flat, sal_k_flat).squeeze() # B x dim
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
+
+                backgrounds = torch.bmm(k_flat, 1.-sal_k_flat).squeeze() # B x dim
+                backgrounds = nn.functional.normalize(backgrounds, dim=1)
+
             # prototypes k: filter
             elif self.p['superpixel_key_type'] == 'filter':
                 sal_k_weights = self.filter(sal_k)
@@ -210,14 +235,21 @@ class ContrastiveModel(nn.Module):
                 sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
                 prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
+
+                backgrounds = torch.bmm(k_flat, 1.-sal_k_weights).squeeze() # B x dim
+                backgrounds = nn.functional.normalize(backgrounds, dim=1)
+
             # prototypes k: predicted
             elif self.p['superpixel_key_type'] == 'predicted':       
                 sal_k_weights = bg_k * sal_k
                 sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
                 prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
-            
+
+                backgrounds = torch.bmm(k_flat, 1.-sal_k_weights).squeeze() # B x dim
+                backgrounds = nn.functional.normalize(backgrounds, dim=1)
                 
+
             # transform eqv for repr
             if self.p['loss_coeff']['inveqv'] > 0:
                 ie, _ = self.model_k(im_ie)
@@ -227,6 +259,9 @@ class ContrastiveModel(nn.Module):
                     m = torch.stack(m, dim=0).squeeze()
                     ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
             
+            
+            
+        
         ## Compute inveqv loss
         if self.p['loss_coeff']['inveqv'] > 0:
             if self.p['use_prediction_head']:
@@ -251,6 +286,16 @@ class ContrastiveModel(nn.Module):
         l_mem = torch.matmul(anchor, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1)      # pixels x (proto + negatives)
         
+        
+
+        ## Compute background contrast loss 
+        if self.p['loss_coeff']['background'] > 0:
+            bg_logits = torch.matmul(bg_q_mean, backgrounds.t())
+            bg_labels = torch.arange(bg_logits.shape[0]).to(q.device)
+
+        else:
+            bg_logits = torch.zeros([])
+            bg_labels = torch.zeros([]) 
 
         
         ## Compute superpixel contrastive loss
@@ -271,7 +316,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
-        return logits, targets.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels
+        return logits, targets.long(), sal_loss, inveqv_loss,  mean_logits, mean_labels, bg_logits, bg_labels
 
 
         

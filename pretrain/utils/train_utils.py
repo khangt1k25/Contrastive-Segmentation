@@ -14,11 +14,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     inveqv_losses = AverageMeter('Inveqv', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     superpixel_losses = AverageMeter('Mean-Contrast', ':.4e')
+    bg_losses = AverageMeter('BG-Contrast', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, inveqv_losses, saliency_losses, superpixel_losses, top1, top5],
+                        [losses, contrastive_losses, inveqv_losses, saliency_losses, superpixel_losses, bg_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
     
@@ -46,7 +47,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
             matrix_eqv = None
             size_eqv = None 
 
-        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
+        logits, labels, saliency_loss, inveqv_loss, m_logits, m_labels, bg_logits, bg_labels = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k, im_ie=im_ie, sal_ie=sal_ie, matrix_eqv=matrix_eqv, size_eqv=size_eqv, dataloader=train_loader)
         
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -70,12 +71,17 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         else:
             superpixel_loss = torch.zeros([])
         
+        if p['loss_coeff']['background'] > 0:
+            bg_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
+        else:
+            bg_loss = torch.zeros([])
 
         # Calculate total loss and update meters
         loss = p['loss_coeff']['contrastive'] * contrastive_loss +\
                 p['loss_coeff']['saliency'] * saliency_loss + \
                 p['loss_coeff']['inveqv']* inveqv_loss +\
-                p['loss_coeff']['superpixel'] * superpixel_loss
+                p['loss_coeff']['superpixel'] * superpixel_loss +\
+                p['loss_coeff']['background'] * bg_loss
         
 
         # Update loss step
@@ -83,9 +89,10 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         superpixel_losses.update(superpixel_loss.item())
         inveqv_losses.update(inveqv_loss.item())
         saliency_losses.update(saliency_loss.item())
+        bg_losses.update(bg_loss.item())
         losses.update(loss.item())
         
-
+        
         acc1, acc5 = accuracy(logits, labels, topk=(1, 5))
         top1.update(acc1[0], im_q.size(0))
         top5.update(acc5[0], im_q.size(0))
@@ -112,6 +119,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
     writer.add_scalar('inveqv loss', inveqv_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
+    writer.add_scalar('background loss', bg_losses.avg, epoch)
     writer.close()
     
     ## Save to txt 
@@ -146,6 +154,7 @@ def save_plot_curve(
     saliency_losses,
     inveqv_losses,
     superpixel_losses,
+    bg_losses,
     losses
     ):
 
@@ -163,4 +172,7 @@ def save_plot_curve(
         f.write("\n")
     with open(os.path.join(p['output_dir'], 'superpixel-contrast.txt'), 'a') as f:
         f.write(str(superpixel_losses.avg))
+        f.write("\n")
+    with open(os.path.join(p['output_dir'], 'bg-contrast.txt'), 'a') as f:
+        f.write(str(bg_losses.avg))
         f.write("\n")
