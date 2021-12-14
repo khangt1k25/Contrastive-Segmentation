@@ -290,8 +290,10 @@ class ContrastiveModel(nn.Module):
 
         ## Compute background contrast loss 
         if self.p['loss_coeff']['background'] > 0:
-            bg_logits = torch.matmul(bg_q_mean, backgrounds.t())
-            bg_labels = torch.arange(bg_logits.shape[0]).to(q.device)
+            bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
+            bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+            bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+            bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
 
         else:
             bg_logits = torch.zeros([])

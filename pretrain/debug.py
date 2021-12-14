@@ -3,23 +3,36 @@ from PIL import Image
 import os
 
 
-sal = torch.rand((64, 224, 224))
+# sal = torch.rand((64, 224, 224))
 
 
-sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
+# sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
 
-sal = sal.unsqueeze(0)
+# sal = sal.unsqueeze(0)
 
-from modules.models import GaussianSmoothing, Filter
+# from modules.models import GaussianSmoothing, Filter
 
-filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)
+# filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)
 
-out = filter(sal)
+# out = filter(sal)
 
-print(out.shape)
-print(out)
+# print(out.shape)
+# print(out)
 
+bg_q_mean = torch.randn((64, 32))
+backgrounds = torch.randn((64,32))
+prototypes = torch.randn((64,32))
+# bg_positives = torch.matmul(bg_q_mean, backgrounds.t())
+print(torch.matmul(bg_q_mean, backgrounds.t())[1][1])
+bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
 
+print(bg_positives.shape)            
+print(bg_positives[1])
+bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+print(bg_negatives.shape)
+
+bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+print(bg_logits.shape)
 # from copy import deepcopy
 # import matplotlib.pyplot as plt
 # from numpy import matrix, mod
