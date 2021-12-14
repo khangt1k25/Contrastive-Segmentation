@@ -26,6 +26,7 @@ loss_coeff:
    saliency: 1
    inveqv: 0
    superpixel: 0
+   background: 0 
 
 
 
