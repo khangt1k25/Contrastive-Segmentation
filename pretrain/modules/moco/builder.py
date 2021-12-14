@@ -172,13 +172,17 @@ class ContrastiveModel(nn.Module):
             elif self.p['superpixel_query_type'] == 'filter':
                 q_res = q.reshape(batch_size, self.dim, -1)
                 sal_q_weights = self.filter(sal_q)
-                sal_q_weights = sal_q_weights * sal_q
-                sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+
+                sal_q_weights_bg = (1.-sal_q_weights)*(1.-sal_q)
+                sal_q_weights_fg = sal_q_weights * sal_q
                 
-                bg_q_mean = torch.bmm(q_res, 1.-sal_q_weights).squeeze()
+                sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
+                sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
+                
+                bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
                 bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
 
-                q_mean = torch.bmm(q_res, sal_q_weights).squeeze()
+                q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
                 q_mean = nn.functional.normalize(q_mean, dim=1)
 
 
@@ -186,13 +190,17 @@ class ContrastiveModel(nn.Module):
             # anchor superpixel = predicted sal 
             elif self.p['superpixel_query_type'] == 'predicted':                
                 q_res = q.reshape(batch_size, self.dim, -1)
-                sal_q_weights = bg_q * sal_q
-                sal_q_weights = sal_q_weights.reshape(batch_size, -1, 1).type(q.dtype)
+
                 
-                bg_q_mean = torch.bmm(q_res, 1.-sal_q_weights).squeeze()
+                sal_q_weights_fg = bg_q * sal_q
+                sal_q_weights_bg = (1.-bg_q) * (1.-sal_q)
+                sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
+                sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
+
+                bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
                 bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
 
-                q_mean = torch.bmm(q_res, sal_q_weights).squeeze()
+                q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
                 q_mean = nn.functional.normalize(q_mean, dim=1)
             else:
                 raise ValueError('Only support mean, filter, predicted types for superpixel')
@@ -231,22 +239,31 @@ class ContrastiveModel(nn.Module):
             # prototypes k: filter
             elif self.p['superpixel_key_type'] == 'filter':
                 sal_k_weights = self.filter(sal_k)
-                sal_k_weights = sal_k_weights * sal_k
-                sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
-                prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+
+                sal_k_weights_bg = (1-sal_k_weights)*(1-sal_k)
+                sal_k_weights_fg = sal_k_weights * sal_k
+                
+                sal_k_weights_bg = sal_k_weights_bg.reshape(batch_size, -1, 1).type(k.dtype)
+                sal_k_weights_fg = sal_k_weights_fg.reshape(batch_size, -1, 1).type(k.dtype)
+
+                prototypes_foreground = torch.bmm(k_flat, sal_k_weights_fg).squeeze()
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
 
-                backgrounds = torch.bmm(k_flat, 1.-sal_k_weights).squeeze() # B x dim
+                backgrounds = torch.bmm(k_flat, sal_k_weights_bg).squeeze() # B x dim
                 backgrounds = nn.functional.normalize(backgrounds, dim=1)
 
             # prototypes k: predicted
             elif self.p['superpixel_key_type'] == 'predicted':       
-                sal_k_weights = bg_k * sal_k
-                sal_k_weights = sal_k_weights.reshape(batch_size, -1, 1).type(k.dtype)
-                prototypes_foreground = torch.bmm(k_flat, sal_k_weights).squeeze()
+                sal_k_weights_fg = bg_k * sal_k
+                sal_k_weights_bg = (1-bg_k)*(1-sal_k)
+
+                sal_k_weights_fg = sal_k_weights_fg.reshape(batch_size, -1, 1).type(k.dtype)
+                sal_k_weights_bg = sal_k_weights_bg.reshape(batch_size, -1, 1).type(k.dtype)
+
+                prototypes_foreground = torch.bmm(k_flat, sal_k_weights_fg).squeeze()
                 prototypes = nn.functional.normalize(prototypes_foreground, dim=1)
 
-                backgrounds = torch.bmm(k_flat, 1.-sal_k_weights).squeeze() # B x dim
+                backgrounds = torch.bmm(k_flat, sal_k_weights_bg).squeeze() # B x dim
                 backgrounds = nn.functional.normalize(backgrounds, dim=1)
                 
 
