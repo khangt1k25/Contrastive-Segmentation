@@ -74,3 +74,17 @@ class ContrastiveSegmentationModel(nn.Module):
         else:
             return x
 
+
+
+class Filter(nn.Module):
+    def __init__(self):
+  
+        super(Filter, self).__init__()
+
+        self.filter = nn.Sequential(
+            nn.AvgPool2d(kernel_size=3, stride=1, padding=1) ## change filter here
+        )
+    def forward(self, x):
+        output = self.filter(x.float())
+        
+        return output

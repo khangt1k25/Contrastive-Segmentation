@@ -15,8 +15,11 @@ from sklearn.decomposition import PCA
 from termcolor import colored
 from joblib import Parallel, delayed
 from sklearn import metrics
+from common_config import get_filter
 
 N_JOBS = 1 # set to number of threads
+myfilter = get_filter()
+myfilter = myfilter.cuda()
 
 
 def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=True):
@@ -133,12 +136,19 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
     for i, batch in enumerate(val_loader):
         output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
+
+        sal_proto = myfilter(sal)*(sal>0.5)
+        # sal_proto = sal*(sal>0.5)
+
+        
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
-        sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        sal_proto = sal_proto.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
         prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)        
+        
 
+        sal = sal.reshape(bs, -1, 1).type(output.dtype)
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
         ptr += bs

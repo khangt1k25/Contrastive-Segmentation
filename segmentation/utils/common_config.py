@@ -198,3 +198,7 @@ def adjust_learning_rate(p, optimizer, epoch):
         param_group['lr'] = lr
 
     return lr
+
+def get_filter():
+    from models.models import Filter
+    return Filter()
