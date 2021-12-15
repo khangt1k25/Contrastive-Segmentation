@@ -134,9 +134,9 @@ def get_train_transformations(augmentation_strategy='pascal'):
     if augmentation_strategy=='pascal':
         return transforms.Compose([custom_tr.RandomHorizontalFlip(),
                                     custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
-                                        flagvals={'semseg': cv2.INTER_NEAREST, 'sal':cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
-                                    custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512)), 'sal': tuple((512, 512))},
-                                        flagvals={'semseg': cv2.INTER_NEAREST, 'sal':cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                    custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512))},
+                                        flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
                                     custom_tr.ToTensor(),
                                         custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
     elif augmentation_strategy=='msrc':
@@ -153,8 +153,8 @@ def get_train_transformations(augmentation_strategy='pascal'):
 def get_val_transformations(augmentation_strategy='pascal'):
     if augmentation_strategy == 'pascal':
         return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
-                                                            'semseg': tuple((512,512)), 'sal': tuple((512,512))},
-                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST, 'sal':cv2.INTER_NEAREST}),
+                                                            'semseg': tuple((512,512))},
+                                                flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
                                     custom_tr.ToTensor(),
                                     custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
     elif augmentation_strategy == 'msrc':

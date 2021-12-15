@@ -235,7 +235,7 @@ class ToTensor(object):
             elif elem == 'image':
                 sample[elem] = self.to_tensor(sample[elem]) # Regular ToTensor operation 
             
-            elif elem in ['semseg', 'sal']:
+            elif elem in ['semseg']:
                 sample[elem] = torch.from_numpy(sample[elem]).long() # Torch Long
 
             else:
