@@ -194,6 +194,7 @@ class ContrastiveModel(nn.Module):
                 
                 sal_q_weights_fg = bg_q * sal_q
                 sal_q_weights_bg = (1.-bg_q) * (1.-sal_q)
+                
                 sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
                 sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
 
