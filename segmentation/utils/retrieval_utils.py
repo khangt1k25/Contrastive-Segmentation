@@ -37,7 +37,7 @@ def build_memory_bank(p, dataset, loader, model):
         prototypes = nn.functional.normalize(prototypes, dim=1)
 
         # compute majority vote per salient object
-        sal = sal.reshape(bs, -1, 1).type(output.dtype)
+
         sal = (sal > 0.5).cpu()
         for jj in range(bs):
             sal_jj, semseg_jj = sal[jj], semseg[jj]
@@ -93,8 +93,6 @@ def retrieval(p, memory_bank, val_dataset, val_loader, model):
 
         # find k nearest neighbor
         correlation = torch.matmul(prototypes, memory_prototypes.t())
-        # neighbors = torch.argmax(correlation, dim=1)
-        # class_pred = torch.index_select(memory_labels, 0, neighbors) 
         topk = torch.topk(correlation, dim=1, k=p['kneighbor']).indices
         class_pred = torch.index_select(memory_labels, 0, topk.view(-1))
         class_pred = class_pred.reshape(b, -1)

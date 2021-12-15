@@ -148,7 +148,7 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
         prototypes = nn.functional.normalize(prototypes, dim=1)        
         
 
-        sal = sal.reshape(bs, -1, 1).type(output.dtype)
+
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
         ptr += bs
