@@ -28,6 +28,7 @@ class MSRC(data.Dataset):
     {"id": 0,  "name": "building",   "rgb_values": [128, 0,    0]},
     {"id": 1,  "name": "grass",      "rgb_values": [0,   128,  0]},
     {"id": 2,  "name": "tree",       "rgb_values": [128, 128,  0]},
+    {"id": 3,  "name": "cow",        "rgb_values": [0,   0,    128]},
     # {"id": 4,  "name": "horse",      "rgb_values": [128, 0,    128]},
     {"id": 4,  "name": "sheep",      "rgb_values": [0,   128,  128]},
     {"id": 5,  "name": "sky",        "rgb_values": [128, 128,  128]},

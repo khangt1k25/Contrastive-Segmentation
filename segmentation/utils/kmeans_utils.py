@@ -15,7 +15,7 @@ from sklearn.decomposition import PCA
 from termcolor import colored
 from joblib import Parallel, delayed
 from sklearn import metrics
-from common_config import get_filter
+from utils.common_config import get_filter
 
 N_JOBS = 1 # set to number of threads
 myfilter = get_filter()
