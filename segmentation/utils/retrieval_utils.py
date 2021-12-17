@@ -7,6 +7,10 @@ import torch
 import torch.nn as nn
 
 from utils.utils import SemsegMeter
+from utils.common_config import get_filter
+
+myfilter = get_filter()
+myfilter = myfilter.cuda()
 
 @torch.no_grad()
 def build_memory_bank(p, dataset, loader, model):
@@ -21,15 +25,19 @@ def build_memory_bank(p, dataset, loader, model):
     for i, batch in enumerate(loader):
         semseg = batch['semseg']
         output, sal = model(batch['image'].cuda(non_blocking=True))
+        
+        sal_proto = myfilter(sal)*(sal>0.5)
+        # sal_proto = sal*(sal>0.5)
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
-        sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
-        prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
+        sal_proto = sal_proto.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        prototypes = torch.bmm(output, sal_proto).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)
 
         # compute majority vote per salient object
+
         sal = (sal > 0.5).cpu()
         for jj in range(bs):
             sal_jj, semseg_jj = sal[jj], semseg[jj]
@@ -72,18 +80,19 @@ def retrieval(p, memory_bank, val_dataset, val_loader, model):
         semseg = batch['semseg'].cuda(non_blocking=True)
         b, h, w = semseg.size()
         output, sal = model(batch['image'].cuda(non_blocking=True))
+        
+        sal_proto = myfilter(sal)*(sal>0.5)
+        # sal_proto = sal*(sal>0.5)
 
         # compute prototype per salient object
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
-        sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
-        prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
+        sal_proto = sal_proto.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        prototypes = torch.bmm(output, sal_proto.float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)
 
         # find k nearest neighbor
         correlation = torch.matmul(prototypes, memory_prototypes.t())
-        # neighbors = torch.argmax(correlation, dim=1)
-        # class_pred = torch.index_select(memory_labels, 0, neighbors) 
         topk = torch.topk(correlation, dim=1, k=p['kneighbor']).indices
         class_pred = torch.index_select(memory_labels, 0, topk.view(-1))
         class_pred = class_pred.reshape(b, -1)
