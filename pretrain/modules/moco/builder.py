@@ -154,59 +154,58 @@ class ContrastiveModel(nn.Module):
         sal_loss = self.bce(bg_q, sal_q)
 
         # Compute the anchor superpixel
-        if self.p['loss_coeff']['superpixel'] > 0:
-            # anchor superpixel = mean
-            if self.p['superpixel_query_type'] == 'mean':
-                q_res = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
-                sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+        # if self.p['loss_coeff']['superpixel'] > 0:
+        # anchor superpixel = mean
+        if self.p['superpixel_query_type'] == 'mean':
+            q_res = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
 
-                bg_q_mean = torch.bmm(q_res, 1.-sal_q_flat).squeeze()
-                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+            bg_q_mean = torch.bmm(q_res, 1.-sal_q_flat).squeeze()
+            bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
 
-                q_mean = torch.bmm(q_res, sal_q_flat).squeeze() # B x dim
-                q_mean = nn.functional.normalize(q_mean, dim=1)
-                
-                
+            q_mean = torch.bmm(q_res, sal_q_flat).squeeze() # B x dim
+            q_mean = nn.functional.normalize(q_mean, dim=1)
+            
 
-            # anchor superpixel = filter 
-            elif self.p['superpixel_query_type'] == 'filter':
-                q_res = q.reshape(batch_size, self.dim, -1)
-                sal_q_weights = self.filter(sal_q)
+        # anchor superpixel = filter 
+        elif self.p['superpixel_query_type'] == 'filter':
+            q_res = q.reshape(batch_size, self.dim, -1)
+            sal_q_weights = self.filter(sal_q)
 
-                sal_q_weights_bg = (1.-sal_q_weights)*(1.-sal_q)
-                sal_q_weights_fg = sal_q_weights * sal_q
-                
-                sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
-                sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
-                
-                bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
-                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+            sal_q_weights_bg = (1.-sal_q_weights)*(1.-sal_q)
+            sal_q_weights_fg = sal_q_weights * sal_q
+            
+            sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
+            sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
+            
+            bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
+            bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
 
-                q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
-                q_mean = nn.functional.normalize(q_mean, dim=1)
-
+            q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
+            q_mean = nn.functional.normalize(q_mean, dim=1)
 
 
-            # anchor superpixel = predicted sal 
-            elif self.p['superpixel_query_type'] == 'predicted':                
-                q_res = q.reshape(batch_size, self.dim, -1)
+        # anchor superpixel = predicted sal 
+        elif self.p['superpixel_query_type'] == 'predicted':                
+            q_res = q.reshape(batch_size, self.dim, -1)
 
-                
-                sal_q_weights_fg = bg_q * sal_q
-                sal_q_weights_bg = (1.-bg_q) * (1.-sal_q)
-                
-                sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
-                sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
+            
+            sal_q_weights_fg = bg_q * sal_q
+            sal_q_weights_bg = (1.-bg_q) * (1.-sal_q)
+            
+            sal_q_weights_fg = sal_q_weights_fg.reshape(batch_size, -1, 1).type(q.dtype)
+            sal_q_weights_bg = sal_q_weights_bg.reshape(batch_size, -1, 1).type(q.dtype)
 
-                bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
-                bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
+            bg_q_mean = torch.bmm(q_res, sal_q_weights_bg).squeeze()
+            bg_q_mean = nn.functional.normalize(bg_q_mean, dim=1)
 
-                q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
-                q_mean = nn.functional.normalize(q_mean, dim=1)
-            else:
-                raise ValueError('Only support mean, filter, predicted types for superpixel')
+            q_mean = torch.bmm(q_res, sal_q_weights_fg).squeeze()
+            q_mean = nn.functional.normalize(q_mean, dim=1)
+        else:
+            raise ValueError('Only support mean, filter, predicted types for superpixel')
         
-   
+
+        
 
 
         # Compute the targets
@@ -308,10 +307,44 @@ class ContrastiveModel(nn.Module):
 
         ## Compute background contrast loss 
         if self.p['loss_coeff']['background'] > 0:
-            bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
-            bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
-            bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
-            bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+            if self.p['background']['type'] == 1:
+                if self.p['background']['direct'] == 'bg':
+                    bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
+                    bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+                    # bg_banks = torch.matmul(bg_q_mean, negatives.t()) ## remove 2lines it if  we dont used bank
+                    # bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives, bg_banks], dim=1)
+                    bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                elif self.p['background']['direct'] == 'object':
+                    bg_positives = torch.einsum('ij, ij->i', q_mean, prototypes)
+                    bg_negatives = torch.matmul(q_mean, backgrounds.t())
+                    bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                elif self.p['background']['direct'] == 'both':
+                    bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
+                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes.t()) 
+                    bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+                    obj_negaties = torch.matmul(q_mean, backgrounds.t())
+                    
+                    logits1 = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+                    logits2 = torch.cat([obj_positives.unsqueeze(1), obj_negaties], dim=1)
+                    bg_logits = torch.cat([logits1, logits2], dim=0)
+                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+
+            elif self.p['background']['type'] == 2:
+                bg_positives = torch.matmul(bg_q_mean, backgrounds)
+                bg_positives = bg_positives.t()
+                bg_positives = bg_positives.reshape(-1, 1) # (B^2, 1)
+
+
+                bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+                bg_negatives = torch.cat([bg_negatives]*batch_size, dim=0) # (B^2, negatives)
+
+                bg_logits = torch.cat([bg_positives, bg_negatives], dim=1) 
+                bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                
+
+
 
         else:
             bg_logits = torch.zeros([])

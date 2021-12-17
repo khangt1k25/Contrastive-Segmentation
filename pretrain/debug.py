@@ -19,20 +19,35 @@ import os
 # print(out.shape)
 # print(out)
 
-bg_q_mean = torch.randn((64, 32))
-backgrounds = torch.randn((64,32))
-prototypes = torch.randn((64,32))
-# bg_positives = torch.matmul(bg_q_mean, backgrounds.t())
-print(torch.matmul(bg_q_mean, backgrounds.t())[1][1])
-bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
+# bg_q_mean = torch.randn((64, 32))
+# backgrounds = torch.randn((64, 32))
+# x = torch.matmul(bg_q_mean, backgrounds.t())
 
-print(bg_positives.shape)            
-print(bg_positives[1])
-bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
-print(bg_negatives.shape)
+x= torch.Tensor([[1, 2], [3, 4]])
+x = x.t()
+x = x.reshape(-1, 1)
 
-bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
-print(bg_logits.shape)
+y = torch.Tensor([[5,6,7], [8,9,10]])
+y = torch.cat([y]*2, dim=0)
+print(x.shape)
+print(x)
+print(y.shape)
+
+logit = torch.cat([x, y], dim=1)
+print(logit.shape)
+print(logit)
+# prototypes = torch.randn((64,32))
+# # bg_positives = torch.matmul(bg_q_mean, backgrounds.t())
+# print(torch.matmul(bg_q_mean, backgrounds.t())[1][1])
+# bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
+
+# print(bg_positives.shape)            
+# print(bg_positives[1])
+# bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+# print(bg_negatives.shape)
+
+# bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
+# print(bg_logits.shape)
 # from copy import deepcopy
 # import matplotlib.pyplot as plt
 # from numpy import matrix, mod
