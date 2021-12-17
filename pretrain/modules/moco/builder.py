@@ -314,12 +314,12 @@ class ContrastiveModel(nn.Module):
                     # bg_banks = torch.matmul(bg_q_mean, negatives.t()) ## remove 2lines it if  we dont used bank
                     # bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives, bg_banks], dim=1)
                     bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
-                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                    bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
                 elif self.p['background']['direct'] == 'object':
                     bg_positives = torch.einsum('ij, ij->i', q_mean, prototypes)
                     bg_negatives = torch.matmul(q_mean, backgrounds.t())
                     bg_logits = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
-                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                    bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
                 elif self.p['background']['direct'] == 'both':
                     bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
                     obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes.t()) 
@@ -329,7 +329,7 @@ class ContrastiveModel(nn.Module):
                     logits1 = torch.cat([bg_positives.unsqueeze(1), bg_negatives], dim=1)
                     logits2 = torch.cat([obj_positives.unsqueeze(1), obj_negaties], dim=1)
                     bg_logits = torch.cat([logits1, logits2], dim=0)
-                    bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                    bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
 
             elif self.p['background']['type'] == 2:
                 bg_positives = torch.matmul(bg_q_mean, backgrounds)
@@ -341,7 +341,7 @@ class ContrastiveModel(nn.Module):
                 bg_negatives = torch.cat([bg_negatives]*batch_size, dim=0) # (B^2, negatives)
 
                 bg_logits = torch.cat([bg_positives, bg_negatives], dim=1) 
-                bg_labels = torch.zeros(size=(bg_logits.shape[0])).to(q.device)
+                bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
                 
 
 
@@ -366,7 +366,7 @@ class ContrastiveModel(nn.Module):
         logits /= self.T
         mean_logits /= self.T
         bg_logits /= self.T
-        
+
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 
