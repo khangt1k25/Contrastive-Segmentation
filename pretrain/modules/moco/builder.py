@@ -365,7 +365,8 @@ class ContrastiveModel(nn.Module):
         # Apply temperature
         logits /= self.T
         mean_logits /= self.T
-
+        bg_logits /= self.T
+        
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes) 
 

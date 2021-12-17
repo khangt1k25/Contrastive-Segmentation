@@ -29,12 +29,12 @@ loss_coeff:
    background: 0 
 
 background:
-   type: 1
+   type: 1 # 1 or 2
    direct: bg # bg or object or both
 
 #baseline: set this to 'mean' both 'side'
-superpixel_query_type: filter 
-superpixel_key_type: filter
+superpixel_query_type: mean 
+superpixel_key_type: mean
 
 use_prediction_head: False 
 
