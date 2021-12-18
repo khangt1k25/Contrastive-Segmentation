@@ -332,17 +332,32 @@ class ContrastiveModel(nn.Module):
                     bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
 
             elif self.p['background']['type'] == 2:
-                bg_positives = torch.matmul(bg_q_mean, backgrounds)
-                bg_positives = bg_positives.t()
-                bg_positives = bg_positives.reshape(-1, 1) # (B^2, 1)
+                if self.p['background']['direct'] == 'bg':
+                    bg_positives = torch.matmul(bg_q_mean, backgrounds)
+                    bg_positives = bg_positives.t()
+                    bg_positives = bg_positives.reshape(-1, 1) # (B^2, 1)
 
+                    bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+                    bg_negatives = torch.cat([bg_negatives]*batch_size, dim=0) # (B^2, negatives)
 
-                bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
-                bg_negatives = torch.cat([bg_negatives]*batch_size, dim=0) # (B^2, negatives)
+                    bg_logits = torch.cat([bg_positives, bg_negatives], dim=1) 
+                    bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
+                elif  self.p['background']['type'] == 'both':
+                    bg_positives = torch.matmul(bg_q_mean, backgrounds)
+                    bg_positives = bg_positives.t()
+                    bg_positives = bg_positives.reshape(-1, 1) # (B^2, 1)
+                    bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
+                    bg_negatives = torch.cat([bg_negatives]*batch_size, dim=0) # (B^2, negatives)
 
-                bg_logits = torch.cat([bg_positives, bg_negatives], dim=1) 
-                bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
-                
+                    logits1 = torch.cat([bg_positives, bg_negatives], dim=1) # (B^2, 1+negatives)
+                    
+                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes.t())
+                    obj_negaties = torch.matmul(q_mean, backgrounds.t())
+                    logits2 = torch.cat([obj_positives, obj_negaties], dim=1)
+
+                    bg_logits = torch.cat([logits1, logits2], dim=0)
+
+                    bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
 
 
 

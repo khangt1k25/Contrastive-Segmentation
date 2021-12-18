@@ -1,7 +1,7 @@
 import torch
 from PIL import Image
 import os
-
+import torch.nn as nn
 
 # sal = torch.rand((64, 224, 224))
 
@@ -23,19 +23,23 @@ import os
 # backgrounds = torch.randn((64, 32))
 # x = torch.matmul(bg_q_mean, backgrounds.t())
 
-x= torch.Tensor([[1, 2], [3, 4]])
-x = x.t()
-x = x.reshape(-1, 1)
-
-y = torch.Tensor([[5,6,7], [8,9,10]])
-y = torch.cat([y]*2, dim=0)
+x= torch.Tensor([[1, 2, 3], [3, 4, 5]])
 print(x.shape)
-print(x)
-print(y.shape)
+bn = nn.BatchNorm1d(3)
+y = bn(x)
+print(y)
+# x = x.t()
+# x = x.reshape(-1, 1)
 
-logit = torch.cat([x, y], dim=1)
-print(logit.shape)
-print(logit)
+# y = torch.Tensor([[5,6,7], [8,9,10]])
+# y = torch.cat([y]*2, dim=0)
+# print(x.shape)
+# print(x)
+# print(y.shape)
+
+# logit = torch.cat([x, y], dim=1)
+# print(logit.shape)
+# print(logit)
 # prototypes = torch.randn((64,32))
 # # bg_positives = torch.matmul(bg_q_mean, backgrounds.t())
 # print(torch.matmul(bg_q_mean, backgrounds.t())[1][1])
@@ -209,3 +213,12 @@ print(logit)
     # break
 
 
+x = torch.Tensor([[1, 0, 0, 0], [0.99, 0, 0, 0], [0.9, 0, 0, 0]])
+bn = nn.BatchNorm1d(num_features=4)
+
+y = bn(x)
+
+print(y)
+[[ 0.8134,  0.0000,  0.0000,  0.0000],
+[ 0.5915,  0.0000,  0.0000,  0.0000],
+[-1.4049,  0.0000,  0.0000,  0.0000
