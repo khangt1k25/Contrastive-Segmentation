@@ -322,7 +322,7 @@ class ContrastiveModel(nn.Module):
                     bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
                 elif self.p['background']['direct'] == 'both':
                     bg_positives = torch.einsum('ij, ij->i', bg_q_mean, backgrounds)
-                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes.t()) 
+                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes) 
                     bg_negatives = torch.matmul(bg_q_mean, prototypes.t())
                     obj_negaties = torch.matmul(q_mean, backgrounds.t())
                     
@@ -342,7 +342,7 @@ class ContrastiveModel(nn.Module):
 
                     bg_logits = torch.cat([bg_positives, bg_negatives], dim=1) 
                     bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
-                elif  self.p['background']['type'] == 'both':
+                elif  self.p['background']['direct'] == 'both':
                     bg_positives = torch.matmul(bg_q_mean, backgrounds)
                     bg_positives = bg_positives.t()
                     bg_positives = bg_positives.reshape(-1, 1) # (B^2, 1)
@@ -351,16 +351,13 @@ class ContrastiveModel(nn.Module):
 
                     logits1 = torch.cat([bg_positives, bg_negatives], dim=1) # (B^2, 1+negatives)
                     
-                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes.t())
+                    obj_positives = torch.einsum('ij, ij->i', q_mean, prototypes)
                     obj_negaties = torch.matmul(q_mean, backgrounds.t())
-                    logits2 = torch.cat([obj_positives, obj_negaties], dim=1)
+                    logits2 = torch.cat([obj_positives.unsqueeze(1), obj_negaties], dim=1)
 
                     bg_logits = torch.cat([logits1, logits2], dim=0)
 
                     bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
-
-
-
         else:
             bg_logits = torch.zeros([])
             bg_labels = torch.zeros([]) 
