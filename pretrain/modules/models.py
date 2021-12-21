@@ -90,39 +90,6 @@ class PredictionHead(nn.Module):
         return output
 
 
-def get_gaussian_kernel(kernel_size=3, sigma=2, channels=3):
-    # Create a x, y coordinate grid of shape (kernel_size, kernel_size, 2)
-    x_coord = torch.arange(kernel_size)
-    x_grid = x_coord.repeat(kernel_size).view(kernel_size, kernel_size)
-    y_grid = x_grid.t()
-    xy_grid = torch.stack([x_grid, y_grid], dim=-1).float()
-
-    mean = (kernel_size - 1)/2.
-    variance = sigma**2.
-
-    # Calculate the 2-dimensional gaussian kernel which is
-    # the product of two gaussian distributions for two different
-    # variables (in this case called x and y)
-    gaussian_kernel = (1./(2.*math.pi*variance)) *\
-                      torch.exp(
-                          -torch.sum((xy_grid - mean)**2., dim=-1) /\
-                          (2*variance)
-                      )
-
-    # Make sure sum of values in gaussian kernel equals 1.
-    gaussian_kernel = gaussian_kernel / torch.sum(gaussian_kernel)
-
-    # Reshape to 2d depthwise convolutional weight
-    gaussian_kernel = gaussian_kernel.view(1, 1, kernel_size, kernel_size)
-    gaussian_kernel = gaussian_kernel.repeat(channels, 1, 1, 1)
-
-    gaussian_filter = nn.Conv2d(in_channels=channels, out_channels=channels,
-                                kernel_size=kernel_size, groups=channels, bias=False)
-
-    gaussian_filter.weight.data = gaussian_kernel
-    gaussian_filter.weight.requires_grad = False
-    
-    return gaussian_filter
 
 class Filter(nn.Module):
     def __init__(self):
@@ -138,57 +105,3 @@ class Filter(nn.Module):
         
         return output
 
-class GaussianSmoothing(nn.Module):
-    def __init__(self, channels, kernel_size, sigma, dim=2):
-        super(GaussianSmoothing, self).__init__()
-        if isinstance(kernel_size, numbers.Number):
-            kernel_size = [kernel_size] * dim
-        if isinstance(sigma, numbers.Number):
-            sigma = [sigma] * dim
-
-        # The gaussian kernel is the product of the
-        # gaussian function of each dimension.
-        kernel = 1
-        meshgrids = torch.meshgrid(
-            [
-                torch.arange(size, dtype=torch.float32)
-                for size in kernel_size
-            ]
-        )
-        for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
-            mean = (size - 1) / 2
-            kernel *= 1 / (std * math.sqrt(2 * math.pi)) * \
-                      torch.exp(-((mgrid - mean) / (2 * std)) ** 2)
-
-        # Make sure sum of values in gaussian kernel equals 1.
-        kernel = kernel / torch.sum(kernel)
-
-        # Reshape to depthwise convolutional weight
-        kernel = kernel.view(1, 1, *kernel.size())
-        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))
-
-        self.register_buffer('weight', kernel)
-        self.groups = channels
-
-        if dim == 1:
-            self.conv = F.conv1d
-        elif dim == 2:
-            self.conv = F.conv2d
-        elif dim == 3:
-            self.conv = F.conv3d
-        else:
-            raise RuntimeError(
-                'Only 1, 2 and 3 dimensions are supported. Received {}.'.format(dim)
-            )
-
-        self.pad = F.pad 
-        self.pad_value = (1, 1, 1, 1)
-
-    def forward(self, input):
-        output = input.unsqueeze(1)
-
-        output = self.pad(output, self.pad_value)
-
-        output  = self.conv(output, weight=self.weight, groups=self.groups)
-        
-        return output

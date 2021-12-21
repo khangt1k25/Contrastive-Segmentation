@@ -62,12 +62,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         
 
         if p['loss_coeff']['superpixel'] > 0:
-            uniq_mean, freq_mean = torch.unique(m_labels, return_counts=True)
-            p_class_mean = torch.zeros(m_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-            p_class_non_zero_classes_mean = freq_mean.float() / m_labels.numel()
-            p_class_mean[uniq_mean] = p_class_non_zero_classes_mean
-            w_class_mean = 1 / torch.log(1.02 + p_class_mean)
-            superpixel_loss = cross_entropy(m_logits, m_labels, weight= w_class_mean, reduction='mean')
+            # uniq_mean, freq_mean = torch.unique(m_labels, return_counts=True)
+            # p_class_mean = torch.zeros(m_logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+            # p_class_non_zero_classes_mean = freq_mean.float() / m_labels.numel()
+            # p_class_mean[uniq_mean] = p_class_non_zero_classes_mean
+            # w_class_mean = 1 / torch.log(1.02 + p_class_mean)
+            superpixel_loss = cross_entropy(m_logits, m_labels, reduction='mean')
         else:
             superpixel_loss = torch.zeros([])
         

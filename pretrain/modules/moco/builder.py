@@ -30,9 +30,7 @@ class ContrastiveModel(nn.Module):
         # create the model 
         self.model_q = get_model(p)
         self.model_k = get_model(p)
-        
-        if self.p['use_prediction_head']:
-            self.pHead = get_pHead(p)
+
         self.filter = get_filter(p)
 
         # Init params
@@ -267,30 +265,23 @@ class ContrastiveModel(nn.Module):
                 backgrounds = nn.functional.normalize(backgrounds, dim=1)
                 
 
-            # transform eqv for repr
+            # transform eqv for sal predict
             if self.p['loss_coeff']['inveqv'] > 0:
-                ie, _ = self.model_k(im_ie)
-                ie = nn.functional.normalize(ie, dim=1)   
+                _, sal_ie = self.model_k(im_ie)
+
                 for j in range(len(dataloader.dataset.eqv_list_query)):
                     m = [ele[j] for ele in matrix_eqv]
                     m = torch.stack(m, dim=0).squeeze()
-                    ie = k_trans.warp_perspective(ie, m, size_eqv[0][0])
+                    sal_ie = k_trans.warp_perspective(sal_ie, m, size_eqv[0][0])
             
             
             
         
         ## Compute inveqv loss
         if self.p['loss_coeff']['inveqv'] > 0:
-            if self.p['use_prediction_head']:
-                pred = self.pHead(q)
-                pred = nn.functional.normalize(pred, dim=1)
-                pred = pred.permute((0, 2, 3, 1))
-                ie = ie.permute((0, 2, 3, 1))
-                inveqv_loss = self.mse(pred * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
-            else:
-                q_selected = q.permute((0, 2, 3, 1))
-                ie = ie.permute((0, 2, 3, 1))
-                inveqv_loss = self.mse(q_selected * sal_q.unsqueeze(-1), ie * sal_q.unsqueeze(-1))
+            
+            sal_ie = sal_ie.permute((0, 2, 3, 1))
+            inveqv_loss = self.mse(sal_ie, bg_q)
         else:
             inveqv_loss = torch.zeros([])
         
