@@ -35,12 +35,10 @@ class VOC12(data.Dataset):
     def __init__(self, root=Path.db_root_dir('VOCSegmentation'),
                  split='val', transform=None, download=True, ignore_classes=[]):
         # Set paths
-        
         self.root = root
         valid_splits = ['trainaug', 'train', 'val']
         assert(split in valid_splits)
         self.split = split
-
          
         if split == 'trainaug':
             _semseg_dir = os.path.join(self.root, 'SegmentationClassAug')
@@ -50,7 +48,6 @@ class VOC12(data.Dataset):
         _image_dir = os.path.join(self.root, 'images')
 
 
-        
         # Download
         if download:
             self._download()
@@ -61,10 +58,8 @@ class VOC12(data.Dataset):
         # Splits are pre-cut
         print("Initializing dataloader for PASCAL VOC12 {} set".format(''.join(self.split)))
         split_file = os.path.join(self.root, 'sets', self.split + '.txt')
-        
         self.images = []
         self.semsegs = []
-
         
         with open(split_file, "r") as f:
             lines = f.read().splitlines()
@@ -72,14 +67,15 @@ class VOC12(data.Dataset):
         for ii, line in enumerate(lines):
             # Images
             _image = os.path.join(_image_dir, line + ".jpg")
-            _semseg = os.path.join(_semseg_dir, line + '.png')
-            if os.path.isfile(_image) and os.path.isfile(_semseg):
-                self.images.append(_image)
-                self.semsegs.append(_semseg)
+            assert os.path.isfile(_image)
+            self.images.append(_image)
 
+            # Semantic Segmentation
+            _semseg = os.path.join(_semseg_dir, line + '.png')
+            assert os.path.isfile(_semseg)
+            self.semsegs.append(_semseg)
 
         assert(len(self.images) == len(self.semsegs))
-
 
         # Display stats
         print('Number of dataset images: {:d}'.format(len(self.images)))
@@ -100,10 +96,7 @@ class VOC12(data.Dataset):
         if _semseg.shape != _img.shape[:2]:
             _semseg = cv2.resize(_semseg, _img.shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
         sample['semseg'] = _semseg
-
-
-
-
+	
         sample['meta'] = {'im_size': (_img.shape[0], _img.shape[1]),
                           'image_file': self.images[index],
                           'image': os.path.basename(self.semsegs[index]).split('.')[0]}
@@ -126,7 +119,6 @@ class VOC12(data.Dataset):
         for ignore_class in self.ignore_classes:
             _semseg[_semseg == ignore_class] = 255
         return _semseg
-
 
     def get_img_size(self, idx=0):
         img = Image.open(os.path.join(self.root, 'JPEGImages', self.images[idx] + '.jpg'))
@@ -169,5 +161,4 @@ if __name__ == '__main__':
     sample = dataset.__getitem__(0)
     axes[0].imshow(sample['image'])
     axes[1].imshow(sample['semseg'])
-    axes[2].imshow(sample['sal'])
     plt.show()

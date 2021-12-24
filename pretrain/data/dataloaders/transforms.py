@@ -19,13 +19,10 @@ class RandomResizedCrop(torchvision.transforms.RandomResizedCrop):
     def __call__(self, sample):
         img = sample['image']
         sal = sample['sal']
-        
-        i, j, h, w = self.get_params(img, self.scale, self.ratio)
-        
-        sample['image'] = F.resized_crop(img, i, j, h, w, self.size, self.interpolation_img)
 
+        i, j, h, w = self.get_params(img, self.scale, self.ratio)
+        sample['image'] = F.resized_crop(img, i, j, h, w, self.size, self.interpolation_img)
         sample['sal'] = F.resized_crop(sal, i, j, h, w, self.size, self.interpolation_sal)
-    
         return sample
 
 
@@ -107,7 +104,6 @@ class ToTensor(object):
 class Normalize(object):
     def __init__(self, mean, std):
         self.normalize = torchvision.transforms.Normalize(mean=mean, std=std)
-     
 
     def __call__(self, sample):
         sample['image'] = self.normalize(sample['image'])

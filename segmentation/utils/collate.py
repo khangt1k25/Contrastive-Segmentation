@@ -5,8 +5,7 @@
 import torch
 import numpy as np
 import collections
-from torch._six import string_classes
-
+from torch._six import string_classes 
 int_classes = (int, bytes)
 
 def collate_custom(batch):
@@ -31,7 +30,7 @@ def collate_custom(batch):
     elif isinstance(batch[0], collections.Mapping):
         batch_modified = {key: collate_custom([d[key] for d in batch]) for key in batch[0] if key.find('idx') < 0}
         return batch_modified
-    
+
     elif isinstance(batch[0], collections.Sequence):
         transposed = zip(*batch)
         return [collate_custom(samples) for samples in transposed]

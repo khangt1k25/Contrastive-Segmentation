@@ -8,7 +8,7 @@ import os
 class Path(object):
     @staticmethod
     def db_root_dir(database=''):
-        db_root = '/content/drive/MyDrive/UCS_local/PASCAL_VOC' # change path here, VOC will be automatically downloaded
+        db_root = '/content/drive/MyDrive/UCS_local/PASCAL_VOC' # VOC will be automatically downloaded
         db_names = ['VOCSegmentation']
 
         if database == '':

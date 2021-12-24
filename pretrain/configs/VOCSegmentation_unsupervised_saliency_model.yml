@@ -13,34 +13,16 @@ train_batch_size: 32
 backbone: resnet50
 backbone_kwargs:
    dilated: True
-   pretraining: imagenet_moco  ## or imagenet_moco
+   pretraining: imagenet_moco 
    moco_state_dict: /content/drive/MyDrive/UCS_local/moco_v2_800ep_pretrain.pth.tar
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
-
-loss_coeff:
-   contrastive: 1
-   saliency: 1
-   inveqv: 0
-   superpixel: 0
-   background: 0 
-
-background:
-   type: 1 # 1 or 2
-   direct: bg # bg or object or both
-
-#baseline: set this to 'mean' both 'side'
-superpixel_query_type: mean 
-superpixel_key_type: mean
-
-
-
 head: deeplab
-# Freeze block 1 and 2 in backbone (~1% miou improvement)
-freeze_layers: True 
+freeze_layers: False
+
 # Optimizer
 epochs: 60
 optimizer: sgd

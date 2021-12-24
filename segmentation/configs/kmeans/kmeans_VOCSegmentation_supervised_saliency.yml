@@ -3,22 +3,19 @@ train_db_name: VOCSegmentation
 val_db_name: VOCSegmentation
 val_db_kwargs:
   batch_size: 10
-num_workers: 4
-
-
+num_workers: 2
 
 # Model
-backbone: resnet50
+backbone: 'resnet50'
 backbone_kwargs:
    dilated: True
-   pretrained: True 
+   pretrained: True
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
-
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
+pretraining: /path/to/checkpoint.pth.tar # Change this
 kmeans_eval: True

@@ -80,15 +80,78 @@ def get_model(p):
         import torch.nn as nn
         model = ContrastiveSegmentationModel(backbone, head, p['model_kwargs']['head'], 
                                                     p['model_kwargs']['upsample'], 
-                                                    p['model_kwargs']['use_classification_head']
-                                                    )
+                                                    p['model_kwargs']['use_classification_head'], p['freeze_layer'])
     else:
         from models.models import SimpleSegmentationModel
         model = SimpleSegmentationModel(backbone, head)
-        if p['pretraining']:
+    
         # Load pretrained weights
-            load_pretrained_weights(p, model)
+        load_pretrained_weights(p, model)
     return model
+
+
+def get_train_dataloader(p, dataset):
+    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
+            batch_size=p['train_db_kwargs']['batch_size'], pin_memory=True, 
+            collate_fn=collate_custom, drop_last=True, shuffle=True)
+
+
+def get_val_dataloader(p, dataset):
+    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'],
+            batch_size=p['val_db_kwargs']['batch_size'], pin_memory=True, 
+            collate_fn=collate_custom, drop_last=False, shuffle=False)
+
+
+def get_train_transformations(augmentation_strategy='pascal'):
+    return transforms.Compose([custom_tr.RandomHorizontalFlip(),
+                                   custom_tr.ScaleNRotate(rots=(-5,5), scales=(.75,1.25),
+                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                   custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 'semseg': tuple((512,512))},
+                                    flagvals={'semseg': cv2.INTER_NEAREST, 'image': cv2.INTER_CUBIC}),
+                                   custom_tr.ToTensor(),
+                                    custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+
+    
+def get_val_transformations():
+    return transforms.Compose([custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
+                                                        'semseg': tuple((512,512))},
+                                            flagvals={'image': cv2.INTER_CUBIC, 'semseg': cv2.INTER_NEAREST}),
+                                custom_tr.ToTensor(),
+                                custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
+
+
+def get_optimizer(p, parameters):
+    if p['optimizer'] == 'sgd':
+        optimizer = torch.optim.SGD(parameters, **p['optimizer_kwargs'])
+
+    elif p['optimizer'] == 'adam':
+        optimizer = torch.optim.Adam(parameters, **p['optimizer_kwargs'])
+    
+    else:
+        raise ValueError('Invalid optimizer {}'.format(p['optimizer']))
+
+    return optimizer
+
+
+def adjust_learning_rate(p, optimizer, epoch):
+    lr = p['optimizer_kwargs']['lr']
+    
+    if p['scheduler'] == 'step':
+        steps = np.sum(epoch > np.array(p['scheduler_kwargs']['lr_decay_epochs']))
+        if steps > 0:
+            lr = lr * (p['scheduler_kwargs']['lr_decay_rate'] ** steps)
+
+    elif p['scheduler'] == 'poly':
+        lambd = pow(1-(epoch/p['epochs']), 0.9)
+        lr = lr * lambd
+
+    else:
+        raise ValueError('Invalid learning rate schedule {}'.format(p['scheduler']))
+
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
+
+    return lr
 
 
 def get_train_dataset(p, transform=None):
@@ -104,7 +167,6 @@ def get_train_dataset(p, transform=None):
     return dataset
 
 
-
 def get_val_dataset(p, transform=None):
     if p['val_db_name'] == 'VOCSegmentation':
         from data.dataloaders.pascal_voc import VOC12
@@ -117,18 +179,6 @@ def get_val_dataset(p, transform=None):
     
     return dataset
 
-
-def get_train_dataloader(p, dataset):
-    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
-            batch_size=p['train_db_kwargs']['batch_size'], pin_memory=True, 
-            collate_fn=collate_custom, drop_last=True, shuffle=True)
-
-
-def get_val_dataloader(p, dataset):
-    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'],
-            batch_size=p['val_db_kwargs']['batch_size'], pin_memory=True, 
-            collate_fn=collate_custom, drop_last=False, shuffle=False)
-    
 
 def get_train_transformations(augmentation_strategy='pascal'):
     if augmentation_strategy=='pascal':
@@ -166,39 +216,8 @@ def get_val_transformations(augmentation_strategy='pascal'):
     else:
         raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
 
-def get_optimizer(p, parameters):
-    if p['optimizer'] == 'sgd':
-        optimizer = torch.optim.SGD(parameters, **p['optimizer_kwargs'])
 
-    elif p['optimizer'] == 'adam':
-        optimizer = torch.optim.Adam(parameters, **p['optimizer_kwargs'])
-    
-    else:
-        raise ValueError('Invalid optimizer {}'.format(p['optimizer']))
-
-    return optimizer
-
-
-def adjust_learning_rate(p, optimizer, epoch):
-    lr = p['optimizer_kwargs']['lr']
-    
-    if p['scheduler'] == 'step':
-        steps = np.sum(epoch > np.array(p['scheduler_kwargs']['lr_decay_epochs']))
-        if steps > 0:
-            lr = lr * (p['scheduler_kwargs']['lr_decay_rate'] ** steps)
-
-    elif p['scheduler'] == 'poly':
-        lambd = pow(1-(epoch/p['epochs']), 0.9)
-        lr = lr * lambd
-
-    else:
-        raise ValueError('Invalid learning rate schedule {}'.format(p['scheduler']))
-
-    for param_group in optimizer.param_groups:
-        param_group['lr'] = lr
-
-    return lr
-
-def get_filter():
+def get_filter(kernel_size=3):
     from models.models import Filter
-    return Filter()
+    return Filter(kernel_size)
+

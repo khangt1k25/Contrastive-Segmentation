@@ -39,7 +39,7 @@ def main():
     print('Python script is {}'.format(os.path.abspath(__file__)))
     print(colored(p, 'red'))
 
-    #Get model
+    # Get model
     print(colored('Retrieve model', 'blue'))
     model = get_model(p)
     print(model)
@@ -77,7 +77,6 @@ def main():
     train_dataloader = get_train_dataloader(p, train_dataset)
     val_dataloader = get_val_dataloader(p, val_dataset)
     print(colored('Train samples %d - Val samples %d' %(len(train_dataset), len(val_dataset)), 'yellow'))
-    
 
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
@@ -96,7 +95,7 @@ def main():
         best_epoch = 0
         best_iou = 0
         model = model.cuda()
-    
+
     # Main loop
     print(colored('Starting main loop', 'blue'))
     
@@ -107,7 +106,7 @@ def main():
         # Adjust lr
         lr = adjust_learning_rate(p, optimizer, epoch)
         print('Adjusted learning rate to {:.5f}'.format(lr))
-        
+
         # Train 
         print('Train ...')
         eval_train = train_segmentation_vanilla(p, train_dataloader, model, criterion, optimizer, epoch,
@@ -116,7 +115,6 @@ def main():
         # Evaluate online -> This will use batched eval where every image is resized to the same resolution.
         print('Evaluate ...')
         eval_val = eval_segmentation_supervised_online(p, val_dataloader, model)
-        
         if eval_val['mIoU'] > best_iou:
             print('Found new best model: %.2f -> %.2f (mIoU)' %(100*best_iou, 100*eval_val['mIoU']))
             best_iou = eval_val['mIoU']
@@ -138,6 +136,6 @@ def main():
     model.load_state_dict(torch.load(p['best_model']))
     save_results_to_disk(p, val_dataloader, model, crf_postprocess=args.crf_postprocess)
     eval_stats = eval_segmentation_supervised_offline(p, true_val_dataset, verbose=True)
-        
+
 if __name__ == "__main__":
     main()

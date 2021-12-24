@@ -15,7 +15,7 @@ class DeepLabHead(nn.Sequential):
             nn.ReLU(),
             nn.Conv2d(256, num_classes, 1)
         )
-    
+
 
 class ASPPConv(nn.Sequential):
     def __init__(self, in_channels, out_channels, dilation):

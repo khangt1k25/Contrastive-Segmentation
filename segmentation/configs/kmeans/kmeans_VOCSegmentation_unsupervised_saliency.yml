@@ -5,19 +5,17 @@ val_db_kwargs:
   batch_size: 10
 num_workers: 2
 
-
 # Model
-backbone: resnet50
+backbone: 'resnet50'
 backbone_kwargs:
    dilated: True
-   pretrained: True 
+   pretrained: True
 model_kwargs:
    ndim: 32
    head: linear
    upsample: True
    use_classification_head: True
-
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
+pretraining: /content/drive/MyDrive/UCS_local/ourhighhope/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar
 kmeans_eval: True

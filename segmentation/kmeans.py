@@ -24,7 +24,7 @@ parser.add_argument('--config_env',
                     help='Config file for the environment')
 parser.add_argument('--config_exp',
                     help='Config file for the experiment')
-parser.add_argument('--num_seeds', default=10, type=int,
+parser.add_argument('--num_seeds', default=5, type=int,
                     help='number of seeds during kmeans')
 args = parser.parse_args()
 
@@ -75,11 +75,10 @@ def main():
     n_clusters = 21
     results_miou = []
     for i in range(args.num_seeds):
-        save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=2021 + i)
+        save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)
         eval_stats = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
         results_miou.append(eval_stats['mIoU'])
-    
-    print(colored('Average mIoU is {} and {}'.format(np.mean(results_miou)*100, np.std(results_miou)), 'green'))
+    print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)*100), 'green'))
     
 
 if __name__ == "__main__":

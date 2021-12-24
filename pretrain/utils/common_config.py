@@ -8,8 +8,7 @@ import torch
 import torchvision
 import data.dataloaders.transforms as transforms
 from data.util.mypath import Path
-import kornia.augmentation as k_aug
-
+from utils.collate import collate_custom
 
 
 def load_pretrained_weights(p, model):
@@ -36,9 +35,8 @@ def load_pretrained_weights(p, model):
                 new_dict[k.rsplit('module.encoder_q.')[1]] = v
         msg = model.load_state_dict(new_dict, strict=False)   
         assert(all(['fc' in k for k in msg[0]])) 
-        assert(all(['fc' in k for k in msg[1]]))
-        print(msg) 
-        
+        assert(all(['fc' in k for k in msg[1]])) 
+
     else:
         raise ValueError('Invalid value {}'.format(p['backbone_kwargs']['pretraining']))
  
@@ -80,13 +78,6 @@ def get_model(p):
                                                 p['model_kwargs']['upsample'], 
                                                 p['model_kwargs']['use_classification_head'])
 
-def get_pHead(p):
-    from modules.models import PredictionHead
-    return PredictionHead(p['model_kwargs']['ndim'])
-
-def get_filter(p):
-    from modules.models import Filter
-    return Filter()
 
 def get_train_dataset(p, transform=None):
     if p['train_db_name'] == 'VOCSegmentation':
@@ -97,15 +88,15 @@ def get_train_dataset(p, transform=None):
     
     else:    
         raise ValueError('Invalid train db name {}'.format(p['train_db_name']))   
+ 
+
+def get_train_dataloader(p, dataset):
+    return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
+            batch_size=p['train_batch_size'], pin_memory=True, collate_fn=collate_custom,
+            drop_last=True, shuffle=True)
 
 
-# def get_train_dataloader(p, dataset):
-#     return torch.utils.data.DataLoader(dataset, num_workers=p['num_workers'], 
-#             batch_size=p['train_batch_size'], pin_memory=True, collate_fn=collate_custom,
-#             drop_last=True, shuffle=True)
-
-
-def get_train_transformations(): # code from baseline
+def get_train_transformations():
     augmentation = [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
         torchvision.transforms.RandomApply([
@@ -120,89 +111,7 @@ def get_train_transformations(): # code from baseline
 
     return torchvision.transforms.Compose(augmentation)
 
-
-# def get_base_transforms():
-#     augmentation = [
-#         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-#         torchvision.transforms.RandomApply([
-#             transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
-#         ], p=0.8),
-#         transforms.RandomGrayscale(p=0.2),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#     ]
     
-#     return torchvision.transforms.Compose(augmentation)
-
-# def get_key_transforms():
-#     augmentation = [
-#         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-#         torchvision.transforms.RandomApply([
-#             transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
-#         ], p=0.8),
-#         transforms.RandomGrayscale(p=0.2),
-#         transforms.RandomHorizontalFlip(),
-#         transforms.ToTensor(),
-#     ]
-#     return torchvision.transforms.Compose(augmentation)
-
-def get_crop_inv_transforms():
-    augmentation = [
-        transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-        torchvision.transforms.RandomApply([
-            transforms.ColorJitter([0.4, 0.4, 0.4, 0.1])
-        ], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor(),
-    ]
-    return torchvision.transforms.Compose(augmentation)
-
-
-
-def get_eqv_transforms(eqv_list):
-    aug = []
-    if 'hflip' in eqv_list:
-        aug.append(
-            k_aug.RandomHorizontalFlip(
-                p=0.5,
-                return_transform=True,
-                same_on_batch=False
-                )
-            )
-    if 'vflip' in eqv_list:  #discard
-        aug.append(
-            k_aug.RandomVerticalFlip(
-                p=0.5, 
-                return_transform=True,
-                same_on_batch=False
-                )
-            )
-    if 'affine' in eqv_list:
-        aug.append(
-            k_aug.RandomAffine(
-                degrees=(-20, 20),
-                translate=(0.1, 0.1), 
-                scale=(1, 1.5),
-                shear=(-5, 5),
-                return_transform=True,
-                same_on_batch=False,
-                p=0.5,
-                )
-            )
-       
-    return aug
-    
-# def get_inv_transforms(inv_list):
-#     aug = []
-#     if 'colorjitter' in inv_list:
-#         aug.append(k_aug.ColorJitter(0.4, 0.4, 0.4, 0.1, p=0.8, return_transform=True))
-#     if 'gray' in inv_list:
-#         aug.append(k_aug.RandomGrayscale(p=0.2, return_transform=True))
-#     if 'blur' in inv_list:
-#         aug.append(k_aug.RandomGaussianBlur(p=0.2, return_transform=True))
-#     return aug
-    
-
 def get_val_transformations():
     augmentation = [
         transforms.Resize(224),

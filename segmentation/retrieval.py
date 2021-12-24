@@ -54,7 +54,7 @@ def main():
             new_state[k.rsplit('module.model_q.')[1]] = v
     msg = model.load_state_dict(new_state, strict=False)
     print(msg)
-    
+
     # CUDNN
     print(colored('Set CuDNN benchmark', 'blue')) 
     torch.backends.cudnn.benchmark = True

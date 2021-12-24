@@ -8,21 +8,17 @@ import numpy as np
 import torch
 from PIL import Image
 from utils.utils import SemsegMeter
-from sklearn.cluster import MiniBatchKMeans
-from sklearn.cluster import KMeans
+from sklearn.cluster import MiniBatchKMeans, KMeans
 from scipy.optimize import linear_sum_assignment
 from sklearn.decomposition import PCA
 from termcolor import colored
 from joblib import Parallel, delayed
 from sklearn import metrics
-from utils.common_config import get_filter
 
 N_JOBS = 1 # set to number of threads
-myfilter = get_filter()
-myfilter = myfilter.cuda()
 
 
-def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=True):
+def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=True):
     n_classes = p['num_classes'] + int(p['has_bg'])
 
     # Iterate
@@ -74,7 +70,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=Tru
     else:
         print('Using majority voting for matching')
         match = _majority_vote(all_pixels, all_gt, preds_k=n_clusters, targets_k=n_classes)
-    
+
     # Remap predictions
     reordered_preds = np.zeros(num_elems, dtype=all_pixels.dtype)
     for pred_i, target_i in match:
@@ -83,10 +79,8 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=Tru
     if compute_metrics:
         print('Computing acc, nmi, ari ...')
         acc = int((reordered_preds == all_gt).sum()) / float(num_elems)
-        nmi = None 
-        ari = None
-        # nmi = metrics.normalized_mutual_info_score(all_gt, reordered_preds)
-        # ari = metrics.adjusted_rand_score(all_gt, reordered_preds)
+        nmi = metrics.normalized_mutual_info_score(all_gt, reordered_preds)
+        ari = metrics.adjusted_rand_score(all_gt, reordered_preds)
     else: 
         acc, nmi, ari = None, None, None
 
@@ -119,12 +113,12 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=True, verbose=Tru
             print('IoU class %s is %.2f' %(class_names[i_part], 100*jac[i_part]))
 
     print(eval_result)
-    
+
     return eval_result
 
-    
+
 @torch.no_grad()
-def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
+def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     import torch.nn as nn
     print('Save embeddings to disk ...')
     model.eval()
@@ -137,27 +131,20 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
         output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta']
 
-        sal_proto = myfilter(sal)*(sal>0.5)
-        # sal_proto = sal*(sal>0.5)
-
-        
+        # compute prototypes
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
-        sal_proto = sal_proto.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
         prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
         prototypes = nn.functional.normalize(prototypes, dim=1)        
-        
-
-
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
         ptr += bs
         for name in meta['image']:
             names.append(name)
-        
+
         if ptr % 300 == 0:
             print('Computing prototype {}'.format(ptr))
-
 
     # perform kmeans
     all_prototypes = all_prototypes.cpu().numpy()
@@ -166,17 +153,13 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=2021):
     print('Kmeans clustering to {} clusters'.format(n_clusters))
     
     print(colored('Starting kmeans with scikit', 'green'))
-    print(np.where(np.isnan(all_prototypes)))
-
     pca = PCA(n_components = 32, whiten = True)
     all_prototypes = pca.fit_transform(all_prototypes)
     # kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
     kmeans = KMeans(n_clusters=n_clusters, random_state=seed)
-
     prediction_kmeans = kmeans.fit_predict(all_prototypes)
 
-
-    # # save predictions
+    # save predictions
     for i, fname, pred in zip(range(len(val_loader.sampler)), names, prediction_kmeans):
         prediction = all_sals[i].copy()
         prediction[prediction == 1] = pred + 1

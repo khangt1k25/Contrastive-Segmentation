@@ -24,7 +24,7 @@ class VOCSegmentation(data.Dataset):
     FILE = 'PASCAL_VOC.tgz'
 
     def __init__(self, root=Path.db_root_dir('VOCSegmentation'),
-                 saliency='supervised_model', download=False,
+                 saliency='supervised_model', download=True,
                  transform=None, overfit=False):
         super(VOCSegmentation, self).__init__()
 

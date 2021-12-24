@@ -12,12 +12,8 @@ num_workers: 2
 backbone: 'resnet50'
 backbone_kwargs:
    dilated: True
-model_kwargs:
-   ndim: 32
-
 head: 'deeplab'
-pretraining: /path/to/checkpoint.pth.tar # Change this path
-
+pretraining: /path/to/checkpoint.pth.tar # Change this.
 
 # Optimizer
 epochs: 60
