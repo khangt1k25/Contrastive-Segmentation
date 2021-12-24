@@ -126,14 +126,18 @@ class ContrastiveModel(nn.Module):
 
         q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
-        q_mean = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+        q_reshape = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
 
         sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-        q_mean = torch.bmm(q_mean, sal_q_flat).squeeze() # B x dim
+        q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_mean = nn.functional.normalize(q_mean, dim=1)
+
+        q_bg_mean = torch.bmm(q_reshape, 1.-sal_q_flat).squeeze()
+        q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
+
 
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
@@ -162,31 +166,61 @@ class ContrastiveModel(nn.Module):
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
             prototypes_foreground = torch.bmm(k, sal_k).squeeze() # B x dim
-            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+            prototypes_foreground = nn.functional.normalize(prototypes_foreground, dim=1)
+
+            prototypes_background = torch.bmm(k, 1. -sal_k).squeeze()
+            prototypes_background = nn.functional.normalize(prototypes_background, dim=1)     
 
         # q: pixels x dim
         # k: pixels x dim
         # prototypes_k: proto x dim
         q = torch.index_select(q, index=mask_indexes, dim=0)
-        l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
+        l_batch = torch.matmul(q, prototypes_foreground.t())   # shape: pixels x proto
         negatives = self.queue.clone().detach()     # shape: dim x negatives
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([l_batch, l_mem], dim=1) # pixels x (proto + negatives)
 
-
-        l_positive = torch.matmul(q_mean, prototypes.t())
+        ## Superpixel 
+        l_positive = torch.matmul(q_mean, prototypes_foreground.t())
         l_negative = torch.matmul(q_mean, negatives)
         mean_logits = torch.cat([l_positive, l_negative], dim=1)
         mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
+        bg_logits = torch.zeros([])
+        bg_labels = torch.zeros([])
+
+        ## Background: type1 
+        # bg_positive = torch.einsum('ij, ij->i', q_bg_mean, prototypes_background)
+        # bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
+        # bg_logits = torch.cat([bg_positive, bg_negative], dim=1)
+        # bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
+        
+        ## Background: type2 (combine with superpixel)
+        # l_positive = torch.matmul(q_mean, prototypes_foreground.t()) # BxB
+        # l_negative = torch.matmul(q_mean, negatives) # Bx mem
+        # l_bg_negative = torch.matmul(q_mean, prototypes_background.t()) #BxB
+        # mean_logits = torch.cat([l_positive, l_negative, l_bg_negative], dim=1)
+        # mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
+        # bg_logits = torch.zeros([])
+        # bg_labels = torch.zeros([])
+        
+        ## Background: type3 
+        bg_positive = torch.matmul(q_bg_mean, prototypes_background.t()).t()
+        bg_positive = bg_positive.reshape(-1, 1) # (B^2, 1)
+        bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
+        bg_negative = torch.cat([bg_negative]*batch_size, dim=0) # (B^2, negatives)
+        bg_logits = torch.cat([bg_positive, bg_negative], dim=1) 
+        bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
+
 
         # apply temperature
         logits /= self.T
         mean_logits /= self.T
+        bg_logits /= self.T
 
         # dequeue and enqueue
-        self._dequeue_and_enqueue(prototypes) 
+        self._dequeue_and_enqueue(prototypes_foreground) 
 
-        return logits, sal_q, mean_logits, mean_labels, sal_loss
+        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss
 
 
 # utils

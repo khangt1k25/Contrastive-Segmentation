@@ -13,10 +13,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     superpixel_losses = AverageMeter('Superpixel', ':.4e')
+    background_losses = AverageMeter('Background', ':.4e')
+
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, superpixel_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, superpixel_losses, background_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -30,7 +32,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels, mean_logits, mean_labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, mean_logits, mean_labels, bg_logits, bg_labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
 
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -43,14 +45,19 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
 
         superpixel_loss = cross_entropy(mean_logits, mean_labels, reduction='mean')
-
+        background_loss = cross_entropy(bg_logits, bg_logits, reduction='mean')
+        
+        background_loss = torch.zeros([])
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + superpixel_loss
+        loss = contrastive_loss + saliency_loss + superpixel_loss + background_loss
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
         superpixel_losses.update(superpixel_loss.item())
+        background_losses.update(background_loss.item())
+        
         losses.update(loss.item())
+        
 
 
         acc1, acc5 = accuracy(logits, labels, topk=(1, 5))
@@ -77,6 +84,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
     writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
+    writer.add_scalar('background loss', background_losses.avg, epoch)
     writer.close()      
 
 

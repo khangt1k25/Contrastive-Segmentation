@@ -55,3 +55,5 @@ class BalancedCrossEntropyLoss(Module):
             final_loss /= labels.size()[0]
 
         return final_loss
+
+
