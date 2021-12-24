@@ -191,7 +191,7 @@ class ContrastiveModel(nn.Module):
         ## Background: type1 
         # bg_positive = torch.einsum('ij, ij->i', q_bg_mean, prototypes_background)
         # bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
-        # bg_logits = torch.cat([bg_positive, bg_negative], dim=1)
+        # bg_logits = torch.cat([bg_positive.unsqueeze(1), bg_negative], dim=1)
         # bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
         
         ## Background: type2 (combine with superpixel)

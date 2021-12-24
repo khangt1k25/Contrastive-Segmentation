@@ -13,18 +13,17 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import  DatasetKeyQueryInvEqv, DatasetKeyQuery
+from data.dataloaders.dataset import DatasetKeyQuery
 
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
-from utils.common_config import get_crop_inv_transforms, get_train_dataset,\
-                                get_optimizer, adjust_learning_rate,\
-                                get_eqv_transforms, get_train_transformations
+from utils.common_config import get_train_dataset, get_train_transformations,\
+                                get_train_dataloader, get_optimizer, adjust_learning_rate
 
 from utils.train_utils import train
 from utils.logger import Logger
-from utils.collate import collate_custom_forkeyquery, collate_custom_forkeyqueryinveqv
+from utils.collate import collate_custom
 
 
 # Parser
@@ -128,26 +127,16 @@ def main_worker(gpu, ngpus_per_node, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    if p['loss_coeff']['inveqv'] > 0:
-        base_dataset = get_train_dataset(p, transform=None)
-        crop_inv_transfrom = get_crop_inv_transforms()
-        eqv_list_key = ['hflip'] ## vflip, affine
-        eqv_list_query = ['hflip']    
-        train_dataset = DatasetKeyQueryInvEqv(base_dataset, crop_inv_transfrom, get_eqv_transforms(eqv_list_key), get_eqv_transforms(eqv_list_query))
-        collate_custom = collate_custom_forkeyqueryinveqv
-    else:
-        train_transform = get_train_transformations()
-        train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
-                                    downsample_sal=not p['model_kwargs']['upsample'])
-        collate_custom = collate_custom_forkeyquery
-    
+    train_transform = get_train_transformations()
+    print(train_transform)
+    train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
+                                downsample_sal=not p['model_kwargs']['upsample'])
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=(train_sampler is None),
                     num_workers=p['num_workers'], pin_memory=True, sampler=train_sampler, drop_last=True, collate_fn=collate_custom)
-                    
     print(colored('Train samples %d' %(len(train_dataset)), 'yellow'))
     print(colored(train_dataset, 'yellow'))
-    
+
     # Resume from checkpoint
     if os.path.exists(p['checkpoint']):
         print(colored('Restart from checkpoint {}'.format(p['checkpoint']), 'blue'))
@@ -167,7 +156,6 @@ def main_worker(gpu, ngpus_per_node, args):
     # Main loop
     print(colored('Starting main loop', 'blue'))
     
-    best_train_before = 999999
     for epoch in range(start_epoch, p['epochs']):
         print(colored('Epoch %d/%d' %(epoch+1, p['epochs']), 'yellow'))
         print(colored('-'*10, 'yellow'))
@@ -178,32 +166,18 @@ def main_worker(gpu, ngpus_per_node, args):
 
         # Train 
         print('Train ...')
-        
         eval_train = train(p, train_dataloader, model, 
                                     optimizer, epoch, amp)
-        
+
         # Checkpoint
         if args.rank % ngpus_per_node == 0:
             print('Checkpoint ...')
             if args.nvidia_apex:
-                
-                if eval_train <= best_train_before: # save the best
-                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
-                            'amp': amp.state_dict(), 'epoch': epoch + 1}, 
-                            p['bestcheckpoint'])
-                    best_train_before = eval_train
-
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(),
                             'amp': amp.state_dict(), 'epoch': epoch + 1}, 
                             p['checkpoint'])
 
             else:
-                if eval_train <= best_train_before: # save the best
-                    torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
-                            'epoch': epoch + 1}, 
-                            p['bestcheckpoint'])
-                    best_train_before = eval_train
-                 
                 torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
                             'epoch': epoch + 1}, 
                             p['checkpoint'])
