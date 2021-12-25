@@ -45,7 +45,7 @@ class ContrastiveModel(nn.Module):
 
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-        self.rg = Regression_loss()
+        self.reg = Regression_loss()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -218,7 +218,9 @@ class ContrastiveModel(nn.Module):
         ## Background: type4
 
         predictedfg = self.bg2fg_head(q_bg_mean)
+        predictedfg = nn.functional.normalize(predictedfg, dim=1) 
         bg2 = self.reg(predictedfg, prototypes_foreground)
+        
         # bg2 = self.reg(predictedfg, prototypes_background)
 
 

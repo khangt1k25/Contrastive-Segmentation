@@ -48,7 +48,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         # background_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
         
         # background_loss = torch.zeros([])
-        background_losses = bg2
+        background_loss = bg2
 
         # Calculate total loss and update meters
         loss = contrastive_loss + saliency_loss + superpixel_loss + background_loss

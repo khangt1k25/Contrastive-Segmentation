@@ -8,7 +8,6 @@ import torch
 import torchvision
 import data.dataloaders.transforms as transforms
 from data.util.mypath import Path
-from pretrain.modules.models import Filter
 from utils.collate import collate_custom
 
 
