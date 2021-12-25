@@ -4,6 +4,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
+from torch.nn.modules.module import Module
 
 
 """
@@ -69,3 +70,17 @@ class Filter(nn.Module):
         
         return output
 
+class PredictionHead(nn.Module):
+    def __init__(self, dim=32):
+      
+        super(PredictionHead, self).__init__()
+        
+        self.net = nn.Sequential(
+            nn.Linear(dim, 64),
+            nn.BatchNorm1d(64),
+            nn.ReLU(inplace=True),
+            nn.Linear(64, 32)
+        )
+    def forward(self, x):
+        output = self.net(x)
+        return output

@@ -15,12 +15,11 @@ model_kwargs:
    head: linear
    upsample: True
    use_classification_head: True
-
 head: 'deeplab'
 freeze_layer: 'none'
-pretraining: /content/drive/MyDrive/UCS_local/pretrained_result/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar # Change this.
+pretraining: /content/drive/MyDrive/UCS_local/highhope/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar
 kmeans_eval: True
 
-kneighbor: 5
+# Retrieval kwargs
 retrieval_kwargs:
-    ignore_classes: ['bicycle', 'bird', 'boat', 'chair', 'diningtable', 'dog', 'horse', 'motorbike', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
+   ignore_classes: ['bicycle', 'bird', 'boat', 'chair', 'diningtable', 'dog', 'horse', 'motorbike', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']

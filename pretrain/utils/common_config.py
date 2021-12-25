@@ -8,6 +8,7 @@ import torch
 import torchvision
 import data.dataloaders.transforms as transforms
 from data.util.mypath import Path
+from pretrain.modules.models import Filter
 from utils.collate import collate_custom
 
 
@@ -162,3 +163,13 @@ def adjust_learning_rate(p, optimizer, epoch):
         param_group['lr'] = lr
 
     return lr
+
+
+
+def get_filter(p):
+    from modules.models import Filter
+    return Filter(kernel_size=p['kernel_size'])
+
+def get_predictionHead(p):
+    from modules.models import PredictionHead
+    return PredictionHead(dim=p['model_kwargs']['ndim'])

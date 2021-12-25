@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.common_config import get_model
-from modules.losses import BalancedCrossEntropyLoss
+from utils.common_config import get_model, get_filter, get_predictionHead
+from modules.losses import BalancedCrossEntropyLoss, Regression_loss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -29,6 +29,9 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
 
+        self.filter = get_filter(p)
+        self.bg2fg_head = get_predictionHead(p)
+
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
             param_k.requires_grad = False  # not update by gradient
@@ -42,6 +45,7 @@ class ContrastiveModel(nn.Module):
 
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
+        self.rg = Regression_loss()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -204,12 +208,18 @@ class ContrastiveModel(nn.Module):
         # bg_labels = torch.zeros([])
         
         ## Background: type3 
-        bg_positive = torch.matmul(q_bg_mean, prototypes_background.t()).t()
-        bg_positive = bg_positive.reshape(-1, 1) # (B^2, 1)
-        bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
-        bg_negative = torch.cat([bg_negative]*batch_size, dim=0) # (B^2, negatives)
-        bg_logits = torch.cat([bg_positive, bg_negative], dim=1) 
-        bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
+        # bg_positive = torch.matmul(q_bg_mean, prototypes_background.t()).t()
+        # bg_positive = bg_positive.reshape(-1, 1) # (B^2, 1)
+        # bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
+        # bg_negative = torch.cat([bg_negative]*batch_size, dim=0) # (B^2, negatives)
+        # bg_logits = torch.cat([bg_positive, bg_negative], dim=1) 
+        # bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
+
+        ## Background: type4
+
+        predictedfg = self.bg2fg_head(q_bg_mean)
+        bg2 = self.reg(predictedfg, prototypes_foreground)
+        # bg2 = self.reg(predictedfg, prototypes_background)
 
 
         # apply temperature
@@ -220,7 +230,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_foreground) 
 
-        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss
+        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss, bg2
 
 
 # utils
