@@ -134,12 +134,14 @@ class ContrastiveModel(nn.Module):
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
-
-        sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+        with torch.no_grad():
+            sal_q_filter = self.filter(sal_q) * sal_q
+            sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+        
         q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_mean = nn.functional.normalize(q_mean, dim=1)
 
-        q_bg_mean = torch.bmm(q_reshape, 1.-sal_q_flat).squeeze()
+        q_bg_mean = torch.bmm(q_reshape, 1.-sal_q.reshape(batch_size, -1, 1).type(q.dtype)).squeeze()
         q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
 
 
@@ -168,11 +170,18 @@ class ContrastiveModel(nn.Module):
             
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            
+            sal_k_filter = self.filter(sal_k) * sal_k
+            sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            
+            # sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            
             prototypes_foreground = torch.bmm(k, sal_k).squeeze() # B x dim
             prototypes_foreground = nn.functional.normalize(prototypes_foreground, dim=1)
 
-            prototypes_background = torch.bmm(k, 1. -sal_k).squeeze()
+
+
+            prototypes_background = torch.bmm(k, 1.-sal_k.reshape(batch_size, -1, 1).type(k.dtype)).squeeze()
             prototypes_background = nn.functional.normalize(prototypes_background, dim=1)     
 
         # q: pixels x dim
@@ -217,9 +226,9 @@ class ContrastiveModel(nn.Module):
 
         ## Background: type4
 
-        predictedfg = self.bg2fg_head(q_bg_mean)
-        predictedfg = nn.functional.normalize(predictedfg, dim=1) 
-        bg2 = self.reg(predictedfg, prototypes_foreground)
+        # predictedfg = self.bg2fg_head(q_bg_mean)
+        # predictedfg = nn.functional.normalize(predictedfg, dim=1) 
+        # bg2 = self.reg(predictedfg, prototypes_foreground)
         
         # bg2 = self.reg(predictedfg, prototypes_background)
 
@@ -232,7 +241,7 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_foreground) 
 
-        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss, bg2
+        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss
 
 
 # utils

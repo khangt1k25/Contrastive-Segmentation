@@ -32,7 +32,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels, mean_logits, mean_labels, bg_logits, bg_labels, saliency_loss, bg2 = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, mean_logits, mean_labels, bg_logits, bg_labels, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
 
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -47,11 +47,11 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         superpixel_loss = cross_entropy(mean_logits, mean_labels, reduction='mean')
         # background_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
         
-        # background_loss = torch.zeros([])
-        background_loss = bg2
+        background_loss = torch.zeros([])
+        # background_loss = bg2
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + superpixel_loss + background_loss
+        loss = contrastive_loss + saliency_loss + superpixel_loss #+ background_loss
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
         superpixel_losses.update(superpixel_loss.item())

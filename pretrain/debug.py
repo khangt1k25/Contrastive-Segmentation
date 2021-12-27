@@ -3,15 +3,20 @@ from PIL import Image
 import os
 import torch.nn as nn
 
-# sal = torch.rand((64, 224, 224))
+sal = torch.randn((64, 224, 224))
 
 
 # sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
 
 # sal = sal.unsqueeze(0)
 
-# from modules.models import GaussianSmoothing, Filter
+from modules.models import Filter
 
+filter = Filter(kernel_size=3)
+y = filter(sal) * sal
+print(y.shape)
+
+# print(y)
 # filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)
 
 # out = filter(sal)
@@ -23,11 +28,11 @@ import torch.nn as nn
 # backgrounds = torch.randn((64, 32))
 # x = torch.matmul(bg_q_mean, backgrounds.t())
 
-x= torch.Tensor([[1, 2, 3], [3, 4, 5]])
-print(x.shape)
-bn = nn.BatchNorm1d(3)
-y = bn(x)
-print(y)
+# x= torch.Tensor([[1, 2, 3], [3, 4, 5]])
+# print(x.shape)
+# bn = nn.BatchNorm1d(3)
+# y = bn(x)
+# print(y)
 # x = x.t()
 # x = x.reshape(-1, 1)
 
@@ -213,12 +218,12 @@ print(y)
     # break
 
 
-x = torch.Tensor([[1, 0, 0, 0], [0.99, 0, 0, 0], [0.9, 0, 0, 0]])
-bn = nn.BatchNorm1d(num_features=4)
+# x = torch.Tensor([[1, 0, 0, 0], [0.99, 0, 0, 0], [0.9, 0, 0, 0]])
+# bn = nn.BatchNorm1d(num_features=4)
 
-y = bn(x)
+# y = bn(x)
 
-print(y)
-[[ 0.8134,  0.0000,  0.0000,  0.0000],
-[ 0.5915,  0.0000,  0.0000,  0.0000],
-[-1.4049,  0.0000,  0.0000,  0.0000
+# print(y)
+# [[ 0.8134,  0.0000,  0.0000,  0.0000],
+# [ 0.5915,  0.0000,  0.0000,  0.0000],
+# [-1.4049,  0.0000,  0.0000,  0.0000
