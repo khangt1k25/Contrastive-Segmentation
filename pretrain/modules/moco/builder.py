@@ -135,14 +135,14 @@ class ContrastiveModel(nn.Module):
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
         with torch.no_grad():
-            sal_q_filter = self.filter(sal_q) * sal_q
+            sal_q_filter = (1.0-self.filter(sal_q)) * sal_q
             sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
         
         q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_mean = nn.functional.normalize(q_mean, dim=1)
 
-        q_bg_mean = torch.bmm(q_reshape, 1.-sal_q.reshape(batch_size, -1, 1).type(q.dtype)).squeeze()
-        q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
+        # q_bg_mean = torch.bmm(q_reshape, 1.-sal_q.reshape(batch_size, -1, 1).type(q.dtype)).squeeze()
+        # q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
 
 
         # compute saliency loss
@@ -171,7 +171,7 @@ class ContrastiveModel(nn.Module):
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
-            sal_k_filter = self.filter(sal_k) * sal_k
+            sal_k_filter = (1.0-self.filter(sal_k)) * sal_k
             sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
             
             # sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
@@ -181,8 +181,8 @@ class ContrastiveModel(nn.Module):
 
 
 
-            prototypes_background = torch.bmm(k, 1.-sal_k.reshape(batch_size, -1, 1).type(k.dtype)).squeeze()
-            prototypes_background = nn.functional.normalize(prototypes_background, dim=1)     
+            # prototypes_background = torch.bmm(k, 1.-sal_k.reshape(batch_size, -1, 1).type(k.dtype)).squeeze()
+            # prototypes_background = nn.functional.normalize(prototypes_background, dim=1)     
 
         # q: pixels x dim
         # k: pixels x dim
