@@ -19,3 +19,6 @@ head: 'deeplab'
 freeze_layer: 'none'
 pretraining: /content/drive/MyDrive/UCS_local/ourhighhope/VOCSegmentation_unsupervised_saliency_model/checkpoint.pth.tar
 kmeans_eval: True
+
+
+kernel_size: False # 3, 5, 7

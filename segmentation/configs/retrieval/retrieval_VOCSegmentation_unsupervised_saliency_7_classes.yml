@@ -23,3 +23,5 @@ kmeans_eval: True
 # Retrieval kwargs
 retrieval_kwargs:
    ignore_classes: ['bicycle', 'bird', 'boat', 'chair', 'diningtable', 'dog', 'horse', 'motorbike', 'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
+
+kernel_size: False # 3, 5, 7

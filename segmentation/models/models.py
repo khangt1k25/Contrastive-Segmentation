@@ -82,6 +82,7 @@ class Filter(nn.Module):
 
     def forward(self, x):
         output = self.filter(x.float())
-        
+        output[output==0]=99999
+        output = 1/output
         return output
 

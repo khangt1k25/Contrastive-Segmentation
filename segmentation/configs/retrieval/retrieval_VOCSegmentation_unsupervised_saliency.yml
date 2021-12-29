@@ -22,3 +22,5 @@ kmeans_eval: True
 
 retrieval_kwargs:
    ignore_classes: []
+
+kernel_size: False # 3, 5, 7

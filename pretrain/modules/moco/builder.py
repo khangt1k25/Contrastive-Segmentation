@@ -171,7 +171,6 @@ class ContrastiveModel(nn.Module):
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
-            # sal_k_filter = (1.0-self.filter(sal_k)) * sal_k
             
             sal_k_filter = self.filter(sal_k) * sal_k
 

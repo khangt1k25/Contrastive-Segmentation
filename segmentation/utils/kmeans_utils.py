@@ -14,11 +14,16 @@ from sklearn.decomposition import PCA
 from termcolor import colored
 from joblib import Parallel, delayed
 from sklearn import metrics
+from utils.common_config import get_filter
 
 N_JOBS = 1 # set to number of threads
 
 
+
+
 def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=True):
+    
+    
     n_classes = p['num_classes'] + int(p['has_bg'])
 
     # Iterate
@@ -120,6 +125,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
 @torch.no_grad()
 def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     import torch.nn as nn
+    filter = get_filter(kernel_size=p['kernel_size'])
     print('Save embeddings to disk ...')
     model.eval()
     ptr = 0
@@ -134,8 +140,15 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         # compute prototypes
         bs, dim, _, _ = output.shape
         output = output.reshape(bs, dim, -1) # B x dim x H.W
-        sal_proto = sal.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
-        prototypes = torch.bmm(output, sal_proto*(sal_proto>0.5).float()).squeeze() # B x dim
+
+        if p['kernel_size']:
+            sal_proto = filter(sal) * (sal > 0.5)
+        else:
+            sal_proto = sal * (sal > 0.5)
+
+        sal_proto = sal_proto.reshape(bs, -1, 1).type(output.dtype) # B x H.W x 1
+        prototypes = torch.bmm(output, sal_proto.float()).squeeze() # B x dim
+        
         prototypes = nn.functional.normalize(prototypes, dim=1)        
         all_prototypes[ptr: ptr + bs] = prototypes
         all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
