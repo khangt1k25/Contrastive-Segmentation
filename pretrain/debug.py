@@ -5,7 +5,7 @@ import torch.nn as nn
 
 sal = torch.randn((64, 224, 224))
 
-
+sal = torch.Tensor([[[0, 0, 0], [0, 1, 0], [1, 1, 1]]])
 # sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
 
 # sal = sal.unsqueeze(0)
@@ -13,9 +13,14 @@ sal = torch.randn((64, 224, 224))
 from modules.models import Filter
 
 filter = Filter(kernel_size=3)
-y = filter(sal) * sal
-print(y.shape)
+# y = (1/filter(sal))* sal
+# z = torch.inverse(filter(sal)*sal)
+# z = (1-filter(sal))*sal
+y = filter(sal)*sal
 
+
+print(y)
+# print(z)
 # print(y)
 # filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)
 

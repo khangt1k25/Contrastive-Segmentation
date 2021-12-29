@@ -135,7 +135,7 @@ class ContrastiveModel(nn.Module):
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
         with torch.no_grad():
-            sal_q_filter = (1.0-self.filter(sal_q)) * sal_q
+            sal_q_filter = self.filter(sal_q) * sal_q
             sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
         
         q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
@@ -154,7 +154,7 @@ class ContrastiveModel(nn.Module):
             sal_q = sal_q.view(-1)
             mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
             sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
-
+        
         # compute key prototypes
         with torch.no_grad():  # no gradient to keys
             self._momentum_update_key_encoder()  # update the key encoder
@@ -171,7 +171,10 @@ class ContrastiveModel(nn.Module):
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
-            sal_k_filter = (1.0-self.filter(sal_k)) * sal_k
+            # sal_k_filter = (1.0-self.filter(sal_k)) * sal_k
+            
+            sal_k_filter = self.filter(sal_k) * sal_k
+
             sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
             
             # sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
