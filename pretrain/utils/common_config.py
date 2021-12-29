@@ -14,7 +14,11 @@ from utils.collate import collate_custom
 def load_pretrained_weights(p, model):
     if p['backbone_kwargs']['pretraining'] == 'imagenet_classification':
         # Load pre-trained ImageNet classification weights from torchvision
-        from torchvision.models.utils import load_state_dict_from_url
+        try:
+            from torch.hub import load_state_dict_from_url
+        except ImportError:
+            from torch.utils.model_zoo import load_url as load_state_dict_from_url
+            
         print('Loading ImageNet pre-trained classification (supervised) weights for backbone')
         model_urls = {
             'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
