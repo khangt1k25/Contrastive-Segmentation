@@ -66,6 +66,7 @@ def build_memory_bank(p, dataset, loader, model):
 @torch.no_grad()
 def retrieval(p, memory_bank, val_dataset, val_loader, model):
     print('Performing retrieval ...')
+    filter = get_filter(p['kernel_size'])
     model.eval()
 
     memory_prototypes = memory_bank['prototypes'].cuda()

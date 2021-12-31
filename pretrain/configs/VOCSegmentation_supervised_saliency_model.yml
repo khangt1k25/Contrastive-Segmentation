@@ -41,4 +41,4 @@ moco_kwargs:
 
 
 
-kernel_size: 3
+kernel_size: False

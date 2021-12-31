@@ -40,4 +40,4 @@ moco_kwargs:
    K: 128 # Negatives
 
 
-kernel_size: 3
+kernel_size: False

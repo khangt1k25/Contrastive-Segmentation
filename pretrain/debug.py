@@ -3,7 +3,9 @@ from PIL import Image
 import os
 import torch.nn as nn
 
-sal = torch.randn((64, 224, 224))
+
+x = torch.tensor([[[1., 2., 3.], [4.,5.,6.], [7.,8.,9.]]], requires_grad=True)
+# sal = torch.randn((64, 224, 224))
 
 sal = torch.Tensor([[[0, 0, 0], [0, 1, 0], [1, 1, 1]]])
 # sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
@@ -16,10 +18,13 @@ filter = Filter(kernel_size=3)
 # y = (1/filter(sal))* sal
 # z = torch.inverse(filter(sal)*sal)
 # z = (1-filter(sal))*sal
-y = filter(sal)*sal
+with torch.no_grad():
+    y = filter(sal)*sal
 
-
-print(y)
+z = x*y
+print(z.requires_grad)
+print(x.requires_grad)
+# print(y)
 # print(z)
 # print(y)
 # filter = GaussianSmoothing(channels=1, kernel_size=3, sigma=2)

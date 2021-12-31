@@ -28,9 +28,12 @@ class ContrastiveModel(nn.Module):
         # create the model 
         self.model_q = get_model(p)
         self.model_k = get_model(p)
-
-        self.filter = get_filter(p)
-        self.bg2fg_head = get_predictionHead(p)
+        
+        if p['kernel_size']:
+            self.kernel = True
+            self.filter = get_filter(p)
+        else:
+            self.kernel = False
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
@@ -45,7 +48,7 @@ class ContrastiveModel(nn.Module):
 
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-        self.reg = Regression_loss()
+        # self.reg = Regression_loss()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -134,15 +137,15 @@ class ContrastiveModel(nn.Module):
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
-        with torch.no_grad():
+        if self.kernel:
             sal_q_filter = self.filter(sal_q) * sal_q
             sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-        
+        else:
+            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
+
         q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_mean = nn.functional.normalize(q_mean, dim=1)
 
-        # q_bg_mean = torch.bmm(q_reshape, 1.-sal_q.reshape(batch_size, -1, 1).type(q.dtype)).squeeze()
-        # q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
 
 
         # compute saliency loss
@@ -171,20 +174,16 @@ class ContrastiveModel(nn.Module):
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
-            
-            sal_k_filter = self.filter(sal_k) * sal_k
-
-            sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            
-            # sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            if self.kernel:
+                sal_k_filter = self.filter(sal_k) * sal_k
+                sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            else:
+                sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
             
             prototypes_foreground = torch.bmm(k, sal_k).squeeze() # B x dim
             prototypes_foreground = nn.functional.normalize(prototypes_foreground, dim=1)
 
-
-
-            # prototypes_background = torch.bmm(k, 1.-sal_k.reshape(batch_size, -1, 1).type(k.dtype)).squeeze()
-            # prototypes_background = nn.functional.normalize(prototypes_background, dim=1)     
+  
 
         # q: pixels x dim
         # k: pixels x dim
@@ -200,50 +199,15 @@ class ContrastiveModel(nn.Module):
         l_negative = torch.matmul(q_mean, negatives)
         mean_logits = torch.cat([l_positive, l_negative], dim=1)
         mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
-        bg_logits = torch.zeros([])
-        bg_labels = torch.zeros([])
-
-        ## Background: type1 
-        # bg_positive = torch.einsum('ij, ij->i', q_bg_mean, prototypes_background)
-        # bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
-        # bg_logits = torch.cat([bg_positive.unsqueeze(1), bg_negative], dim=1)
-        # bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
-        
-        ## Background: type2 (combine with superpixel)
-        # l_positive = torch.matmul(q_mean, prototypes_foreground.t()) # BxB
-        # l_negative = torch.matmul(q_mean, negatives) # Bx mem
-        # l_bg_negative = torch.matmul(q_mean, prototypes_background.t()) #BxB
-        # mean_logits = torch.cat([l_positive, l_negative, l_bg_negative], dim=1)
-        # mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
-        # bg_logits = torch.zeros([])
-        # bg_labels = torch.zeros([])
-        
-        ## Background: type3 
-        # bg_positive = torch.matmul(q_bg_mean, prototypes_background.t()).t()
-        # bg_positive = bg_positive.reshape(-1, 1) # (B^2, 1)
-        # bg_negative = torch.matmul(q_bg_mean, prototypes_foreground.t())
-        # bg_negative = torch.cat([bg_negative]*batch_size, dim=0) # (B^2, negatives)
-        # bg_logits = torch.cat([bg_positive, bg_negative], dim=1) 
-        # bg_labels = torch.zeros(bg_logits.shape[0], dtype=torch.long).to(q.device)
-
-        ## Background: type4
-
-        # predictedfg = self.bg2fg_head(q_bg_mean)
-        # predictedfg = nn.functional.normalize(predictedfg, dim=1) 
-        # bg2 = self.reg(predictedfg, prototypes_foreground)
-        
-        # bg2 = self.reg(predictedfg, prototypes_background)
-
 
         # apply temperature
         logits /= self.T
         mean_logits /= self.T
-        bg_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_foreground) 
 
-        return logits, sal_q, mean_logits, mean_labels, bg_logits, bg_labels, sal_loss
+        return logits, sal_q, mean_logits, mean_labels,  sal_loss
 
 
 # utils
