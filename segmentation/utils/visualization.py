@@ -18,12 +18,14 @@ def visualize_sample(sample, filename=None):
     image[0] = image[0] * 0.229 + 0.485
     image[1] = image[1] * 0.224 + 0.456
     image[2] = image[2] * 0.225 + 0.406
-    image = np.transpose(255*image.numpy(), (1,2,0)).astype(np.uint8)
+    # image = np.transpose(255*image.numpy(), (1,2,0)).astype(np.uint8)
+    image = np.transpose(255*image, (1,2,0)).astype(np.uint8)
     image = cv2.resize(image, im_size, interpolation=cv2.INTER_CUBIC)
     
 
     if 'semseg' in sample.keys():
-        sem = sample['semseg'].squeeze().numpy().astype(np.uint8)
+        # sem = sample['semseg'].squeeze().numpy().astype(np.uint8)
+        sem = sample['semseg'].squeeze().astype(np.uint8)
         sem = cv2.resize(sem, im_size, interpolation=cv2.INTER_NEAREST)
         cmap = color_map()
         array = np.empty((sem.shape[0], sem.shape[1], cmap.shape[1]), dtype=cmap.dtype)
@@ -72,6 +74,11 @@ def visualize_sample_with_saved_prediction(p, sample, filename):
     # Read and apply color map to visualize segmentation prediction
     mask = (os.path.join(p['save_dir'], meta['image'] + '.png'))
     mask = np.array(Image.open(mask)).astype(np.uint8)
+
+    # print(p['save_dir'])
+    # print(mask.shape)
+    # print(sem.shape)
+
     assert(mask.shape[0] == sem.shape[0] and mask.shape[1] == sem.shape[1])
     array_pred = np.empty((mask.shape[0], mask.shape[1], cmap.shape[1]), dtype=cmap.dtype)
     for class_i in np.unique(mask):
