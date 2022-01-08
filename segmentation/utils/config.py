@@ -66,6 +66,9 @@ def create_config(config_file_env, config_file_exp, run_idx=None):
     cfg['retrieval_dir'] = os.path.join(cfg['output_dir'], 'retrieval')
     mkdir_if_missing(cfg['retrieval_dir'])
     
+    cfg['visualize_dir'] = os.path.join(cfg['output_dir'], 'visualize')
+    mkdir_if_missing(cfg['visualize_dir'])
+
     if 'kmeans_eval' not in cfg.keys():
         cfg['kmeans_eval'] = False
 
