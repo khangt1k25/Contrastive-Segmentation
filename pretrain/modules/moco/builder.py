@@ -137,15 +137,17 @@ class ContrastiveModel(nn.Module):
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
-        if self.kernel:
-            sal_q_filter = self.filter(sal_q) * sal_q
-            sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-        else:
-            sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
+        # if self.kernel:
+        #     sal_q_filter = self.filter(sal_q) * sal_q
+        #     sal_q_flat = sal_q_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+        # else:
+        sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
 
         q_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_mean = nn.functional.normalize(q_mean, dim=1)
 
+        q_bg_mean = torch.bmm(q_reshape, 1-sal_q_flat).squeeze()
+        q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
 
 
         # compute saliency loss
@@ -174,16 +176,18 @@ class ContrastiveModel(nn.Module):
             # prototypes k
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             
-            if self.kernel:
-                sal_k_filter = self.filter(sal_k) * sal_k
-                sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
-            else:
-                sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
+            # if self.kernel:
+            #     sal_k_filter = self.filter(sal_k) * sal_k
+            #     sal_k = sal_k_filter.reshape(batch_size, -1, 1).type(q.dtype) # B x H.W x 1
+            # else:
+            sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
             
             prototypes_foreground = torch.bmm(k, sal_k).squeeze() # B x dim
             prototypes_foreground = nn.functional.normalize(prototypes_foreground, dim=1)
 
-  
+            prototypes_background = torch.bmm(k, 1.-sal_k).squeeze() # B x dim
+            prototypes_background = nn.functional.normalize(prototypes_background, dim=1)
+        
 
         # q: pixels x dim
         # k: pixels x dim
@@ -200,14 +204,22 @@ class ContrastiveModel(nn.Module):
         mean_logits = torch.cat([l_positive, l_negative], dim=1)
         mean_labels = torch.arange(mean_logits.shape[0]).to(q.device)
 
+
+        ## Backgrounds
+        bg_positive = torch.matmul(q_bg_mean, prototypes_background.t())
+        bg_negative = torch.matmul(q_bg_mean, negatives)
+        bg_logits = torch.cat([bg_positive, bg_negative], dim=1)
+        bg_labels = torch.arange(bg_logits.shape[0]).to(q.device)
+
         # apply temperature
         logits /= self.T
         mean_logits /= self.T
+        bg_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_foreground) 
 
-        return logits, sal_q, mean_logits, mean_labels,  sal_loss
+        return logits, sal_q, mean_logits, mean_labels,  sal_loss, bg_logits, bg_labels
 
 
 # utils

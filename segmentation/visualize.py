@@ -57,12 +57,6 @@ def main():
       sample = true_val_dataset[i]
       visualize_sample_with_saved_prediction(p, sample, os.path.join(p['visualize_dir'], 'vis{}.png'.format(str(i))))
     
-   
-    
-
-    
-
-    
 
 if __name__ == "__main__":
     main()
