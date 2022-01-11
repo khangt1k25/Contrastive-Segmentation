@@ -74,12 +74,17 @@ def main():
     # Kmeans Clustering
     n_clusters = 21
     results_miou = []
+    best = 0.0
     for i in range(args.num_seeds):
         save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)
-        eval_stats = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
+        eval_stats, match = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
         results_miou.append(eval_stats['mIoU'])
+        if eval_stats['mIoU'] > best:
+          best = eval_stats['mIoU']
+          np.save(os.path.join(p['output_dir'], 'match.npy'), match)
+        
     print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)*100), 'green'))
     print(colored('STD mIoU is %2.1f' %(np.std(results_miou)*100), 'green'))
-
+    
 if __name__ == "__main__":
     main()

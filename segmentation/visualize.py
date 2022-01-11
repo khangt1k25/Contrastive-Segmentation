@@ -43,20 +43,37 @@ def main():
     
     # Transforms 
     from data.dataloaders.pascal_voc import VOC12
-    # val_transforms = get_val_transformations()
-    # print(val_transforms)
-    # val_dataset = VOC12(split='val', transform=val_transforms)
-    # val_dataloader = get_val_dataloader(p, val_dataset)
+    val_transforms = get_val_transformations()
+    print(val_transforms)
+    val_dataset = VOC12(split='val', transform=val_transforms)
+    val_dataloader = get_val_dataloader(p, val_dataset)
 
     true_val_dataset = VOC12(split='val', transform=None)
     print(colored('Val samples %d' %(len(true_val_dataset)), 'yellow'))
+    
+    match = np.load(p['output_dir'], 'match.npy')
+    def visualize_sample_kmeans(sample):
+        filename = os.path.join(p['embedding_dir'], sample['meta']['image'] + '.npy')
+        embedding = np.load(filename)
+        gt = sample['semseg']
+        if embedding.shape != gt.shape:
+            embedding = cv2.resize(embedding, gt.shape[::-1], interpolation=cv2.INTER_NEAREST)
+
+        for pred_i, target_i in match:
+            embedding[embedding == int(pred_i)] = int(target_i)
+        
+        visualize_sample_with_prediction(sample['image'], sample['semseg'], embedding, os.path.join(p['visualize_dir'], sample['meta']['image'] + '.png'))
+        
 
     num_samples = 20
 
     for i in tqdm(range(num_samples)):
-      sample = true_val_dataset[i]
-      visualize_sample_with_saved_prediction(p, sample, os.path.join(p['visualize_dir'], 'vis{}.png'.format(str(i))))
-    
+      ## for finetune
+      # sample = true_val_dataset[i]
+      # visualize_sample_with_saved_prediction(p, sample, os.path.join(p['visualize_dir'], 'vis{}.png'.format(str(i))))
+      ## for kmeans
+      sample = true_val_dataset[i+20]
+      visualize_sample_kmeans(sample)
 
 if __name__ == "__main__":
     main()

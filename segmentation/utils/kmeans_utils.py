@@ -75,11 +75,14 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
     else:
         print('Using majority voting for matching')
         match = _majority_vote(all_pixels, all_gt, preds_k=n_clusters, targets_k=n_classes)
-
+    
     # Remap predictions
     reordered_preds = np.zeros(num_elems, dtype=all_pixels.dtype)
     for pred_i, target_i in match:
         reordered_preds[all_pixels == int(pred_i)] = int(target_i)
+
+     
+    
 
     if compute_metrics:
         print('Computing acc, nmi, ari ...')
@@ -119,7 +122,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
 
     print(eval_result)
 
-    return eval_result
+    return eval_result, match
 
 
 @torch.no_grad()
