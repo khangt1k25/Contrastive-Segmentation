@@ -4,26 +4,37 @@ import os
 import torch.nn as nn
 
 
-x = torch.tensor([[[1., 2., 3.], [4.,5.,6.], [7.,8.,9.]]], requires_grad=True)
-# sal = torch.randn((64, 224, 224))
 
+# sal = torch.randn((64, 224, 224))
+x_cluster = torch.tensor([[[[1., 2., 3.], [4.,5.,6.], [7.,8.,9.]],[[0.1, 2.2, 3.3], [4.4,5.5,6.7], [7.1,8.1,9.1]]]], requires_grad=True)
+x_cluster = nn.functional.softmax(x_cluster, dim=1)
+x_cluster = x_cluster.reshape(1, 2, -1)
 sal = torch.Tensor([[[0, 0, 0], [0, 1, 0], [1, 1, 1]]])
 # sal = torch.FloatTensor([[1, 1, 1, 1, 1],[1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1], [1, 1, 1, 1, 1]])
-
+sal = sal.reshape(1, -1, 1)
 # sal = sal.unsqueeze(0)
-
+print(x_cluster.sum(dim=1))
+print(sal)
 from modules.models import Filter
 
 filter = Filter(kernel_size=3)
+
+y = torch.bmm(x_cluster, sal)
+print(x_cluster)
+print(y)
+y = nn.functional.normalize(y, dim=1, p=1)
+print(y.shape)
+print(y)
+
 # y = (1/filter(sal))* sal
 # z = torch.inverse(filter(sal)*sal)
 # z = (1-filter(sal))*sal
-with torch.no_grad():
-    y = filter(sal)*sal
+# with torch.no_grad():
+#     y = filter(sal)*sal
 
-z = x*y
-print(z.requires_grad)
-print(x.requires_grad)
+# z = x*y
+# print(z.requires_grad)
+# print(x.requires_grad)
 # print(y)
 # print(z)
 # print(y)

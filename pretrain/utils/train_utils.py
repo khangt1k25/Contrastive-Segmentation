@@ -14,13 +14,14 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     superpixel_losses = AverageMeter('Superpixel', ':.4e')
-    background_losses = AverageMeter('Background', ':.4e')
-    image_losses = AverageMeter('Image', ':.4e')
+    cluster_losses = AverageMeter('Cluster', ':.4e')
+    # background_losses = AverageMeter('Background', ':.4e')
+    # image_losses = AverageMeter('Image', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, superpixel_losses, background_losses, image_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, superpixel_losses, cluster_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -34,7 +35,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
 
-        logits, labels, obj_logits, obj_labels, bg_logits, bg_labels, img_logits, img_labels ,saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
+        logits, labels, obj_logits, obj_labels, cluster_loss, saliency_loss = model(im_q=im_q, im_k=im_k, sal_q=sal_q, sal_k=sal_k)
 
         # Use E-Net weighting for calculating the pixel-wise loss.
         uniq, freq = torch.unique(labels, return_counts=True)
@@ -48,17 +49,14 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
 
         superpixel_loss = cross_entropy(obj_logits, obj_labels, reduction='mean')
-        bg_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
-        img_loss = cross_entropy(img_logits, img_labels, reduction='mean')
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + superpixel_loss + bg_loss + img_loss
+        loss = contrastive_loss + saliency_loss + superpixel_loss + cluster_loss
         
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
         superpixel_losses.update(superpixel_loss.item())
-        background_losses.update(bg_loss.item())
-        image_losses.update(img_loss.item())
+        cluster_losses.update(cluster_losses.item())
         losses.update(loss.item())
         
         
@@ -88,8 +86,9 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
     writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
-    writer.add_scalar('background_loss', background_losses.avg, epoch)
-    writer.add_scalar('image_loss', image_losses.avg, epoch)
+    writer.add_scalar('cluster loss', cluster_losses.avg, epoch)
+    # writer.add_scalar('background_loss', background_losses.avg, epoch)
+    # writer.add_scalar('image_loss', image_losses.avg, epoch)
     writer.close()      
 
 

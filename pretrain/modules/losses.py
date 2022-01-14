@@ -1,5 +1,7 @@
 # Code referenced from https://github.com/facebookresearch/astmt
 
+from cProfile import label
+from turtle import forward
 import numpy as np
 import torch
 import torch.nn as nn
@@ -64,3 +66,27 @@ class Regression_loss(Module):
         # x = F.normalize(output, dim=1)
         # y = F.normalize(labels, dim=1)
         return (2 - 2 * (output * labels).sum(dim=-1)).mean()
+
+class Clustering_loss(Module):
+    def __init__(self):
+        super(Clustering_loss, self).__init__()
+        self.criterion = nn.CrossEntropyLoss(reduction='mean')
+        self.temperature = 1.0
+
+    def forward(self, c_q, c_k):
+        '''
+        c_q, c_k: Bxclusters
+        '''
+        p_q = c_q.sum(0).view(-1)
+        p_q /= p_q.sum()
+        ne_loss = torch.log(p_q.size(0)) + (p_q * torch.log(p_q)).sum() 
+        
+
+        logits = torch.matmul(c_q.t(), c_k)
+        labels = torch.arange(logits.shape[0]).to(c_q.device)
+        
+        logits /=  self.temperature
+
+        cluster_loss = self.criterion(logits, labels)
+        
+        return cluster_loss + ne_loss
