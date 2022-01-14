@@ -77,6 +77,8 @@ class Clustering_loss(Module):
         '''
         c_q, c_k: Bxclusters
         '''
+        B=c_q.shape[0]
+
         p_q = c_q.sum(0).view(-1)
         p_q /= p_q.sum()
         ne_loss = torch.log(p_q.size(0)) + (p_q * torch.log(p_q)).sum() 
@@ -87,6 +89,6 @@ class Clustering_loss(Module):
         
         logits /=  self.temperature
 
-        cluster_loss = self.criterion(logits, labels)
+        cluster_loss = self.criterion(logits, labels)/B
         
-        return cluster_loss + ne_loss
+        return cluster_loss, ne_loss

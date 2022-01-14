@@ -159,14 +159,14 @@ class ContrastiveModel(nn.Module):
         
         ## Cluster
         
-        cluster_loss = self.cons_cluster(q_cluster_mean, prototypes_cluster)
+        cluster_loss, ne_loss = self.cons_cluster(q_cluster_mean, prototypes_cluster)
 
 
         # apply temperature
         logits /= self.T
-
+        obj_logits /= self.T
 
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_obj) 
 
-        return logits, sal_q, obj_logits, obj_labels, cluster_loss, sal_loss
+        return logits, sal_q, obj_logits, obj_labels, cluster_loss, ne_loss, sal_loss
