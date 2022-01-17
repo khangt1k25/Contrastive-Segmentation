@@ -48,11 +48,12 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
 
         superpixel_loss = cross_entropy(obj_logits, obj_labels, reduction='mean')
-        bg_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
+        # bg_loss = cross_entropy(bg_logits, bg_labels, reduction='mean')
+        bg_loss = torch.zeros([])
         img_loss = cross_entropy(img_logits, img_labels, reduction='mean')
 
         # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + superpixel_loss + bg_loss + img_loss
+        loss = contrastive_loss + saliency_loss + superpixel_loss + img_loss #+ bg_loss 
         
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())

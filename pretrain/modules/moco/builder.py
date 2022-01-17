@@ -29,11 +29,11 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
         
-        if p['kernel_size']:
-            self.kernel = True
-            self.filter = get_filter(p)
-        else:
-            self.kernel = False
+        # if p['kernel_size']:
+        #     self.kernel = True
+        self.filter = get_filter(p)
+        # else:
+            # self.kernel = False
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
@@ -110,7 +110,9 @@ class ContrastiveModel(nn.Module):
         q_bg_mean = nn.functional.normalize(q_bg_mean, dim=1)
 
         q_img_mean = q_obj_mean + q_bg_mean # B x dim
-        
+        q_img_mean =  nn.functional.normalize(q_img_mean, dim=1)
+
+
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
    
@@ -141,10 +143,12 @@ class ContrastiveModel(nn.Module):
             prototypes_bg = nn.functional.normalize(prototypes_bg, dim=1)
 
             prototypes_images = prototypes_obj + prototypes_bg
+            prototypes_images = nn.functional.normalize(prototypes_images, dim=1)
         
         banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
         banks_bg = self.bg_queue.clone().detach()
         banks_image = banks_obj + banks_bg
+        banks_image =  nn.functional.normalize(banks_image, dim=0)
 
         # Main from MaskContrast
         # q, k: pixels x dim
@@ -154,25 +158,27 @@ class ContrastiveModel(nn.Module):
         logits = torch.cat([l_batch, l_mem], dim=1)         # pixels x (proto + negatives)
 
         
-        ## Superpixel 
-        l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
-        l_negative = torch.matmul(q_obj_mean, banks_obj)
-        l_vs_bg = torch.matmul(q_obj_mean, prototypes_bg.t())
-        obj_logits = torch.cat([l_positive, l_negative, l_vs_bg], dim=1)
+        ## Superpixel vs Image
+        l_positive = torch.matmul(q_obj_mean, prototypes_images.t())
+        l_negative = torch.matmul(q_obj_mean, banks_image)
+
+        obj_logits = torch.cat([l_positive, l_negative], dim=1)
         obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
 
 
-        ## Backgrounds
-        bg_positive = torch.matmul(q_bg_mean, prototypes_bg.t())
-        bg_negative = torch.matmul(q_bg_mean, banks_bg)
-        l_vs_obj = torch.matmul(q_bg_mean, prototypes_obj.t())
+        # ## Backgrounds
+        # bg_positive = torch.matmul(q_bg_mean, prototypes_bg.t())
+        # bg_negative = torch.matmul(q_bg_mean, banks_bg)
+        # # l_vs_obj = torch.matmul(q_bg_mean, prototypes_obj.t())
 
-        bg_logits = torch.cat([bg_positive, bg_negative, l_vs_obj], dim=1)
-        bg_labels = torch.arange(bg_logits.shape[0]).to(q.device)
+        # bg_logits = torch.cat([bg_positive, bg_negative], dim=1)
+        # bg_labels = torch.arange(bg_logits.shape[0]).to(q.device)
+        bg_logits = torch.zeros([])
+        bg_labels = torch.zeros([])
 
         ## Images
-        img_positive = torch.matmul(q_img_mean, prototypes_images.t())
-        img_negative = torch.matmul(q_img_mean, banks_image)
+        img_positive = torch.matmul(q_img_mean, prototypes_obj.t())
+        img_negative = torch.matmul(q_img_mean, banks_obj)
         img_logits = torch.cat([img_positive, img_negative], dim=1)
         img_labels = torch.arange(img_logits.shape[0]).to(q.device)
 
