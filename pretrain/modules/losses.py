@@ -89,6 +89,6 @@ class Clustering_loss(Module):
         
         logits /=  self.temperature
 
-        cluster_loss = self.criterion(logits, labels)/B
+        cluster_loss = self.criterion(logits, labels)
         
         return cluster_loss, ne_loss

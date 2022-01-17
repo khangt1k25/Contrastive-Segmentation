@@ -24,7 +24,8 @@ class SimpleSegmentationModel(nn.Module):
         return x
 
 class ContrastiveSegmentationModel(nn.Module):
-    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, freeze_batchnorm='none'):
+    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, freeze_batchnorm='none'
+    ):
         super(ContrastiveSegmentationModel, self).__init__()
         self.backbone = backbone
         self.upsample = upsample
@@ -40,9 +41,17 @@ class ContrastiveSegmentationModel(nn.Module):
         else:
             raise NotImplementedError('Head {} is currently not supported'.format(head))
 
+        self.use_cluster_head = True
+        self.n_cluster = 20
 
         if self.use_classification_head: # Add classification head for saliency prediction
             self.classification_head = nn.Conv2d(self.head.in_channels, 1, 1, bias=False)
+
+        if self.use_cluster_head:
+            self.cluster_head = nn.Sequential(
+                nn.Conv2d(self.head.in_channels, self.n_cluster, 1, bias=False),
+                nn.Softmax(dim=1),
+            )
 
     def forward(self, x):
         # Standard model
@@ -54,19 +63,23 @@ class ContrastiveSegmentationModel(nn.Module):
         x = self.head(embedding)
         if self.use_classification_head:
             sal = self.classification_head(embedding)
+        if self.use_cluster_head:
+            cluster = self.cluster_head(embedding)
 
         # Upsample to input resolution
         if self.upsample: 
             x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
             if self.use_classification_head:
                 sal = F.interpolate(sal, size=input_shape, mode='bilinear', align_corners=False)
-
+            if self.use_cluster_head:
+                cluster = F.interpolate(cluster, size=input_shape, mode='bilinear', align_corners=False)
         # Return outputs
         if self.use_classification_head:
             return x, sal.squeeze()
+        elif self.use_classification_head and self.use_cluster_head:
+            return x, sal.squeeze(), cluster
         else:
             return x
-
 
 
 class Filter(nn.Module):

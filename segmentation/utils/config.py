@@ -62,6 +62,10 @@ def create_config(config_file_env, config_file_exp, run_idx=None):
     mkdir_if_missing(cfg['embedding_dir'])
     mkdir_if_missing(cfg['sal_dir'])
 
+    # Save cluster
+    cfg['cluster_dir'] = os.path.join(cfg['output_dir'], 'cluster')
+    mkdir_if_missing(cfg['cluster_dir'])
+
     # Special directories for retrieval
     cfg['retrieval_dir'] = os.path.join(cfg['output_dir'], 'retrieval')
     mkdir_if_missing(cfg['retrieval_dir'])
@@ -71,5 +75,5 @@ def create_config(config_file_env, config_file_exp, run_idx=None):
 
     if 'kmeans_eval' not in cfg.keys():
         cfg['kmeans_eval'] = False
-
+    
     return cfg 
