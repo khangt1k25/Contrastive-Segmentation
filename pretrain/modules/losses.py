@@ -102,7 +102,7 @@ class InfoMax_loss(Module):
         '''
         ## Smooth
         c_q = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)
-        c_k  = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)
+        c_k  = (1.0 - self.alpha) * c_k + self.alpha * (1.0 / self.n_clusters)
 
 
 
