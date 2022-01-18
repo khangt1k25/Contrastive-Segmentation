@@ -35,7 +35,9 @@ class ContrastiveSegmentationModel(nn.Module):
 
         if self.use_cluster_head:
             self.cluster_head = nn.Sequential(
-                nn.Conv2d(self.head.in_channels, self.n_cluster, 1, bias=False),
+                nn.Conv2d(self.head.in_channels, self.head.in_channels, 1),
+                nn.ReLU(),
+                nn.Conv2d(self.head.in_channels, self.n_cluster, 1),
                 nn.Softmax(dim=1),
             )
 

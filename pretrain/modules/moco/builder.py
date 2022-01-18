@@ -160,7 +160,7 @@ class ContrastiveModel(nn.Module):
         ## Cluster
         
         cluster_loss, ne_loss = self.cons_cluster(q_cluster_mean, prototypes_cluster)
-
+        
 
         # apply temperature
         logits /= self.T
