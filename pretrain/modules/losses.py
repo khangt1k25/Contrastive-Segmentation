@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.module import Module
-
+import math 
 
 class BalancedCrossEntropyLoss(Module):
     """
@@ -59,13 +59,7 @@ class BalancedCrossEntropyLoss(Module):
         return final_loss
 
 
-class Regression_loss(Module):
-    def __init__(self):
-        super(Regression_loss, self).__init__()
-    def forward(self, output, labels):
-        # x = F.normalize(output, dim=1)
-        # y = F.normalize(labels, dim=1)
-        return (2 - 2 * (output * labels).sum(dim=-1)).mean()
+
 
 class Clustering_loss(Module):
     def __init__(self):
@@ -81,7 +75,7 @@ class Clustering_loss(Module):
 
         p_q = c_q.sum(0).view(-1)
         p_q /= p_q.sum()
-        ne_loss = torch.log(p_q.size(0)) + (p_q * torch.log(p_q)).sum() 
+        ne_loss = math.log(p_q.size(0)) + (p_q * torch.log(p_q)).sum() 
         
 
         logits = torch.matmul(c_q.t(), c_k)
@@ -91,4 +85,39 @@ class Clustering_loss(Module):
 
         cluster_loss = self.criterion(logits, labels)
         
+        return cluster_loss, ne_loss
+
+
+class InfoMax_loss(Module):
+    def __init__(self):
+        super(Clustering_loss, self).__init__()
+        self.criterion = nn.CrossEntropyLoss(reduction='mean')
+        self.temperature = 1.0
+        self.n_clusters = 20 
+        self.alpha = 0.01
+
+    def forward(self, c_q, c_k):
+        '''
+        c_q, c_k: Bxclusters
+        '''
+
+        ## Smooth
+        c_q = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)
+        c_k  = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)
+
+
+
+   
+        c_q_mean = c_q.mean(0)
+        ne_loss = math.log(c_q_mean.size(0)) + (c_q_mean * c_q_mean.log()).sum(0)
+
+        
+        logits = torch.matmul(c_q, c_k.t()).log()
+
+        labels = torch.arange(logits.shape[0]).to(c_q.device)
+        
+        logits /=  self.temperature
+
+        cluster_loss = self.criterion(logits, labels)
+
         return cluster_loss, ne_loss

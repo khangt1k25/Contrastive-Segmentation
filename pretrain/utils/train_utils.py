@@ -90,8 +90,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
     writer.add_scalar('cluster loss', cluster_losses.avg, epoch)
     writer.add_scalar('netropy loss', nentropy_losses.avg, epoch)
-    # writer.add_scalar('background_loss', background_losses.avg, epoch)
-    # writer.add_scalar('image_loss', image_losses.avg, epoch)
+
     writer.close()      
 
 

@@ -23,9 +23,9 @@ class SimpleSegmentationModel(nn.Module):
         x = F.interpolate(x, size=input_shape, mode='bilinear', align_corners=False)
         return x
 
+
 class ContrastiveSegmentationModel(nn.Module):
-    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, freeze_batchnorm='none'
-    ):
+    def __init__(self, backbone, decoder, head, upsample, use_classification_head=False, freeze_batchnorm='none'):
         super(ContrastiveSegmentationModel, self).__init__()
         self.backbone = backbone
         self.upsample = upsample
@@ -49,7 +49,9 @@ class ContrastiveSegmentationModel(nn.Module):
 
         if self.use_cluster_head:
             self.cluster_head = nn.Sequential(
-                nn.Conv2d(self.head.in_channels, self.n_cluster, 1, bias=False),
+                nn.Conv2d(self.head.in_channels, self.head.in_channels, 1),
+                nn.ReLU(),
+                nn.Conv2d(self.head.in_channels, self.n_cluster, 1),
                 nn.Softmax(dim=1),
             )
 
@@ -74,26 +76,27 @@ class ContrastiveSegmentationModel(nn.Module):
             if self.use_cluster_head:
                 cluster = F.interpolate(cluster, size=input_shape, mode='bilinear', align_corners=False)
         # Return outputs
-        if self.use_classification_head:
-            return x, sal.squeeze()
-        elif self.use_classification_head and self.use_cluster_head:
+        if self.use_classification_head and self.use_cluster_head:
             return x, sal.squeeze(), cluster
+        elif self.use_classification_head:
+            return x, sal.squeeze()
         else:
             return x
 
 
-class Filter(nn.Module):
-    def __init__(self, kernel_size=3):
+
+# class Filter(nn.Module):
+#     def __init__(self, kernel_size=3):
   
-        super(Filter, self).__init__()
+#         super(Filter, self).__init__()
         
-        padd = (kernel_size-1)//2
+#         padd = (kernel_size-1)//2
 
-        self.filter = nn.Sequential(
-            nn.AvgPool2d(kernel_size=kernel_size, stride=1, padding=padd) ## change filter here
-        )
+#         self.filter = nn.Sequential(
+#             nn.AvgPool2d(kernel_size=kernel_size, stride=1, padding=padd) ## change filter here
+#         )
 
-    def forward(self, x):
-        output = self.filter(x.float())
-        return output
+#     def forward(self, x):
+#         output = self.filter(x.float())
+#         return output
 

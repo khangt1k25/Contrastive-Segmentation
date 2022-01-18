@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from utils.common_config import get_model, get_filter
-from modules.losses import BalancedCrossEntropyLoss, Regression_loss, Clustering_loss
+from modules.losses import BalancedCrossEntropyLoss, InfoMax_loss, Regression_loss, Clustering_loss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -29,11 +29,6 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
         
-        if p['kernel_size']:
-            self.kernel = True
-            self.filter = get_filter(p)
-        else:
-            self.kernel = False
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize
@@ -45,19 +40,16 @@ class ContrastiveModel(nn.Module):
         self.register_buffer("obj_queue", torch.randn(self.dim, self.K))
         self.obj_queue = nn.functional.normalize(self.obj_queue, dim=0)
         
-        # self.register_buffer("bg_queue", torch.randn(self.dim, self.K))
-        # self.bg_queue = nn.functional.normalize(self.bg_queue, dim=0)
 
 
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
         
         self.n_clusters = 20
-
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
-
         # clustering contrastive loss 
         self.cons_cluster = Clustering_loss()
+        self.cons_infomax = InfoMax_loss()
 
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
@@ -142,7 +134,6 @@ class ContrastiveModel(nn.Module):
         banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
         
 
-
         # Main from MaskContrast
         # q, k: pixels x dim
         q = torch.index_select(q, index=mask_indexes, dim=0)
@@ -158,9 +149,8 @@ class ContrastiveModel(nn.Module):
         obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
         
         ## Cluster
-        
-        cluster_loss, ne_loss = self.cons_cluster(q_cluster_mean, prototypes_cluster)
-        
+        # cluster_loss, ne_loss = self.cons_cluster(q_cluster_mean, prototypes_cluster)
+        cluster_loss, ne_loss = self.cons_infomax(q_cluster_mean, prototypes_cluster)
 
         # apply temperature
         logits /= self.T

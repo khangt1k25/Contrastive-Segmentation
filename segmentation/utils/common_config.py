@@ -18,8 +18,8 @@ def load_pretrained_weights(p, model):
     new_state = {}
 
     for k, v in state_dict.items():
-        if k.startswith('module.model_q.'):
-            new_state[k.rsplit('module.model_q.')[1]] = v
+        if k.startswith('model_q.'):
+            new_state[k.rsplit('model_q.')[1]] = v
         
         else:
             pass
