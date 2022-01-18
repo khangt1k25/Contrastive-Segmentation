@@ -62,7 +62,7 @@ class Filter(nn.Module):
         padd = (kernel_size-1)//2
 
         self.filter = nn.Sequential(
-            nn.AvgPool2d(kernel_size=kernel_size, stride=1, padding=padd) ## change filter here
+            nn.AvgPool2d(kernel_size=kernel_size, stride=1, padding=padd)
         )
 
     def forward(self, x):
