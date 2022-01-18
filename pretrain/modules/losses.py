@@ -90,7 +90,7 @@ class Clustering_loss(Module):
 
 class InfoMax_loss(Module):
     def __init__(self):
-        super(Clustering_loss, self).__init__()
+        super(InfoMax_loss, self).__init__()
         self.criterion = nn.CrossEntropyLoss(reduction='mean')
         self.temperature = 1.0
         self.n_clusters = 20 
@@ -100,7 +100,6 @@ class InfoMax_loss(Module):
         '''
         c_q, c_k: Bxclusters
         '''
-
         ## Smooth
         c_q = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)
         c_k  = (1.0 - self.alpha) * c_q + self.alpha * (1.0 / self.n_clusters)

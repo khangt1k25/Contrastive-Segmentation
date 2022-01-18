@@ -47,7 +47,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         contrastive_loss = cross_entropy(logits, labels, weight=w_class,
                                             reduction='mean')
 
-
+            
 
         superpixel_loss = cross_entropy(obj_logits, obj_labels, reduction='mean')
 
@@ -57,7 +57,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
         superpixel_losses.update(superpixel_loss.item())
-        cluster_losses.update(cluster_losses.item())
+        cluster_losses.update(cluster_loss.item())
         nentropy_losses.update(ne_loss.item())
         losses.update(loss.item())
         

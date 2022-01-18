@@ -11,8 +11,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from utils.common_config import get_model, get_filter
-from modules.losses import BalancedCrossEntropyLoss, InfoMax_loss, Regression_loss, Clustering_loss
+from utils.common_config import get_model
+from modules.losses import BalancedCrossEntropyLoss, InfoMax_loss, Clustering_loss
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
