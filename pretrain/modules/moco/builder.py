@@ -10,9 +10,10 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.nn import MSELoss
 from utils.common_config import get_model, get_filter
 from modules.losses import BalancedCrossEntropyLoss
+
 
 class ContrastiveModel(nn.Module):
     def __init__(self, p):
@@ -50,6 +51,9 @@ class ContrastiveModel(nn.Module):
         # balanced cross-entropy loss
         self.bce = BalancedCrossEntropyLoss(size_average=True)
 
+        self.mse = MSELoss(reduction='mean')
+
+
     @torch.no_grad()
     def _momentum_update_key_encoder(self):
         """
@@ -85,13 +89,14 @@ class ContrastiveModel(nn.Module):
         """
         batch_size = im_q.size(0)
 
-        q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
+        q, q_recon, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
         q_reshape = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
 
+        recon_loss = self.mse(q_recon, im_q)
 
         sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
         
@@ -126,8 +131,7 @@ class ContrastiveModel(nn.Module):
 
 
         banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
-
-
+        
         # Main from MaskContrast
         # q, k: pixels x dim
         q = torch.index_select(q, index=mask_indexes, dim=0)
@@ -151,4 +155,4 @@ class ContrastiveModel(nn.Module):
         # dequeue and enqueue
         self._dequeue_and_enqueue(prototypes_obj) 
 
-        return logits, sal_q, obj_logits, obj_labels, sal_loss
+        return logits, sal_q, obj_logits, obj_labels, sal_loss, recon_loss
