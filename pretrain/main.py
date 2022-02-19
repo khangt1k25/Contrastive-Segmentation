@@ -130,7 +130,7 @@ def main_worker(gpu, args):
 
         # Train 
         print('Train ...')
-        eval_train = train(p, train_dataloader, model, 
+        eval_train = train(p, len(train_dataset), train_dataloader, model, 
                                     optimizer, epoch, amp)
 
         torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 

@@ -9,6 +9,7 @@ from utils.utils import AverageMeter, ProgressMeter, freeze_layers
 from torch.utils.tensorboard import SummaryWriter, writer 
 import os
 import torch.nn as nn 
+import numpy as np 
 
 def get_all_features(p, train_loader, model, N):
    
@@ -20,6 +21,7 @@ def get_all_features(p, train_loader, model, N):
         bsz = img.shape[0]
 
         feat, _ = model.model_q(img) 
+        
         feat = nn.functional.normalize(feat, dim=1)
         feat = feat.reshape(feat, feat.shape[1], -1) # B x dim x H.W
         feat = feat.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
@@ -29,8 +31,10 @@ def get_all_features(p, train_loader, model, N):
         feat_mean = torch.bmm(feat, sal).squeeze() # B x dim
         feat_mean = nn.functional.normalize(feat_mean, dim=1)  # Bx dim
         
+        feat_mean = feat_mean.cpu().numpy()
+
         if i == 0:
-            all_feat = torch.zeros((N, feat_mean.shape[-1]))
+            all_feat = np.zeros((N, feat_mean.shape[-1]))
         
         if i < len(train_loader) - 1:
             all_feat[i * bsz: (i + 1) * bsz] = feat_mean
@@ -39,7 +43,7 @@ def get_all_features(p, train_loader, model, N):
     
     return all_feat
 
-def train(p, train_loader, model, optimizer, epoch, amp):
+def train(p, N, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
@@ -57,7 +61,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
         model = freeze_layers(model)
     
     # All feat
-    all_featues = get_all_features(p, train_loader, model)
+    all_featues = get_all_features(p, train_loader, model, N)
 
     # for i, batch in enumerate(train_loader):
     #     # Forward pass
