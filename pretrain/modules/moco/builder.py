@@ -75,80 +75,63 @@ class ContrastiveModel(nn.Module):
 
 
 
-    def forward(self, im_q, im_k, sal_q, sal_k):
-        """
-        Input:
-            images: a batch of images (B x 3 x H x W) 
-            sal: a batch of saliency masks (B x H x W)
-        Output:
-            logits, targets
-        """
-        batch_size = im_q.size(0)
+    def forward(self, im_q, sal_q, anchor, pseudo_dataset, indices):
+
+        batch_size, dim, H, W = im_q.shape
+        
+
 
         q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
+        
+        
+        mask_pseudo = torch.zeros(batch_size, H, W).cuda().type(q.dtype) # BxHxW
+        pseudo_labels = pseudo_dataset[indices]
+        pseudo_labels = torch.from_numpy(pseudo_labels)
+        for i in range(batch_size):
+            mask_pseudo[i, :, :] = pseudo_labels[i] 
+        mask_pseudo = mask_pseudo.reshape(-1, 1)
+
+
         q = nn.functional.normalize(q, dim=1)
         q_reshape = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
         
-
-
         sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
-        
-
         q_obj_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
         q_obj_mean = nn.functional.normalize(q_obj_mean, dim=1)
 
-
-
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
-   
+
+        # 
+        
+
+
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
             sal_q = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
             sal_q = sal_q.view(-1)
             mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
             sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
+
         
-        # compute key prototypes
-        with torch.no_grad():
-            self._momentum_update_key_encoder()  # update the key encoder
-
-            k, _ = self.model_k(im_k)  # keys: N x C x H x W
-            k = nn.functional.normalize(k, dim=1)
-            k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
-            
-            sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
-            
-            prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
-            prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1)
-
-
-        banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
-
-
-        # Main from MaskContrast
-        # q, k: pixels x dim
+    
+        # compute pixel-level loss 
         q = torch.index_select(q, index=mask_indexes, dim=0)
-        l_batch = torch.matmul(q, prototypes_obj.t())
-        l_mem = torch.matmul(q, banks_obj)              # shape: pixels x negatives (Memory bank)
-        logits = torch.cat([l_batch, l_mem], dim=1)         # pixels x (proto + negatives)
-
+        pixel_logits = torch.matmul(q, anchor.t()) # pixels x cluster
         
-        ## Superpixel
-        l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
-        l_negative = torch.matmul(q_obj_mean, banks_obj)
-        obj_logits = torch.cat([l_positive, l_negative], dim=1)
-        obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
+        mask_pseudo = torch.index_select(mask_pseudo, index=mask_indexes, dim=0)
 
+
+        with torch.no_grad():
+            self._momentum_update_key_encoder()
         
+        pixel_logits /= self.T
+        mask_pseudo = mask_pseudo.long()
+        
+        return pixel_logits, mask_pseudo, sal_loss
 
-        # apply temperature
-        logits /= self.T
-        obj_logits /= self.T
 
-        # dequeue and enqueue
-        self._dequeue_and_enqueue(prototypes_obj) 
 
-        return logits, sal_q, obj_logits, obj_labels, sal_loss
+

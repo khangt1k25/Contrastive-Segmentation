@@ -107,7 +107,6 @@ class DatasetKeyQuery(data.Dataset):
             else:
                 count += 1 # Try again. Areas of foreground/background to small.
 
-
 if __name__=='__main__':
     import numpy as np
     from matplotlib import pyplot as plt
