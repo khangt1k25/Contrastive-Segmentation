@@ -129,6 +129,7 @@ class ContrastiveModel(nn.Module):
         
         pixel_logits /= self.T
         mask_pseudo = mask_pseudo.long()
+        mask_pseudo = mask_pseudo.reshape(-1)
         
         return pixel_logits, mask_pseudo, sal_loss
 
