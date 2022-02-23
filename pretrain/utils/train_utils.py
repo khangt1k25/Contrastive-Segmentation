@@ -3,6 +3,7 @@
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
 from audioop import cross
+from cv2 import reduce
 import torch
 from torch.nn.functional import cross_entropy
 from utils.utils import AverageMeter, ProgressMeter, freeze_layers
@@ -134,11 +135,14 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         # Forward pass
         im_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
+        im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+        sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         indices = batch['query']['meta']['index']
         
+        pseudo_labels = pseudo_dataset[indices]
+        pseudo_labels = torch.from_numpy(pseudo_labels).long()
 
-
-        logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, anchor=anchor_features, pseudo_dataset=pseudo_dataset, indices=indices)
+        superpixel_logits, superpixel_labels, logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, anchor=anchor_features, pseudo_labels=pseudo_labels)
 
 
         # print(logits.shape)
@@ -155,12 +159,15 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         #                                     reduction='mean')
         contrastive_loss = cross_entropy(logits, labels,
                                             reduction='mean')
+
+        superpixel_loss = cross(superpixel_logits, superpixel_labels, reduction='mean')
+
     #     # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss
+        loss = contrastive_loss + saliency_loss + superpixel_loss
         
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
-    #     superpixel_losses.update(superpixel_loss.item())
+        superpixel_losses.update(superpixel_loss.item())
 
         losses.update(loss.item())
         
@@ -190,7 +197,7 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('total loss', losses.avg, epoch)
     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
-    # writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
+    writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
     writer.close()      
 
 

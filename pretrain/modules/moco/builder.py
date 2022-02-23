@@ -75,7 +75,7 @@ class ContrastiveModel(nn.Module):
 
 
 
-    def forward(self, im_q, sal_q, anchor, pseudo_dataset, indices):
+    def forward(self, im_q, sal_q, im_k, sal_k, anchor, pseudo_labels):
 
         batch_size, dim, H, W = im_q.shape
         
@@ -85,11 +85,10 @@ class ContrastiveModel(nn.Module):
         
         
         mask_pseudo = torch.zeros(batch_size, H, W).cuda().type(q.dtype) # BxHxW
-        pseudo_labels = pseudo_dataset[indices]
-        pseudo_labels = torch.from_numpy(pseudo_labels)
         for i in range(batch_size):
             mask_pseudo[i, :, :] = pseudo_labels[i] 
         mask_pseudo = mask_pseudo.reshape(-1, 1)
+
 
 
         q = nn.functional.normalize(q, dim=1)
@@ -104,9 +103,7 @@ class ContrastiveModel(nn.Module):
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
 
-        # 
-        
-
+    
 
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
@@ -117,21 +114,48 @@ class ContrastiveModel(nn.Module):
 
         
     
-        # compute pixel-level loss 
+        # compute pixel-level loss: Contrast pixels to centroids
         q = torch.index_select(q, index=mask_indexes, dim=0)
         pixel_logits = torch.matmul(q, anchor.t()) # pixels x cluster
-        
         mask_pseudo = torch.index_select(mask_pseudo, index=mask_indexes, dim=0)
-
-
-        with torch.no_grad():
-            self._momentum_update_key_encoder()
-        
-        pixel_logits /= self.T
         mask_pseudo = mask_pseudo.long()
         mask_pseudo = mask_pseudo.reshape(-1)
+
         
-        return pixel_logits, mask_pseudo, sal_loss
+        
+        with torch.no_grad():
+            self._momentum_update_key_encoder()  # update the key encoder
+
+            k, _ = self.model_k(im_k)  # keys: N x C x H x W
+            k = nn.functional.normalize(k, dim=1)
+            k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            
+            sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
+            
+            prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
+            prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1)
+
+        banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
+
+        
+        
+        ## compute superpixel loss: contrast superpixel vs superpixel
+        l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
+        l_negative = torch.matmul(q_obj_mean, banks_obj)
+        obj_logits = torch.cat([l_positive, l_negative], dim=1)
+        obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
+
+        
+
+        # apply temperature
+        obj_logits /= self.T
+        pixel_logits /= self.T
+        
+
+
+
+        
+        return obj_logits, obj_labels, pixel_logits, mask_pseudo, sal_loss
 
 
 
