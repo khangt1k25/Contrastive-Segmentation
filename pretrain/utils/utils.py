@@ -57,28 +57,28 @@ class ProgressMeter(object):
 
 def freeze_layers(model):
     # Freeze block 1+2 layers in the backbone
-    model.module.model_q.backbone.conv1.eval()
-    model.module.model_q.backbone.bn1.eval()
-    model.module.model_k.backbone.conv1.eval()
-    model.module.model_k.backbone.bn1.eval()
-    model.module.model_q.backbone.layer1.eval()
-    model.module.model_k.backbone.layer1.eval()
-    model.module.model_q.backbone.layer2.eval()
-    model.module.model_k.backbone.layer2.eval()
-    for name, param in model.module.model_q.backbone.conv1.named_parameters():
+    model.model_q.backbone.conv1.eval()
+    model.model_q.backbone.bn1.eval()
+    model.model_k.backbone.conv1.eval()
+    model.model_k.backbone.bn1.eval()
+    model.model_q.backbone.layer1.eval()
+    model.model_k.backbone.layer1.eval()
+    model.model_q.backbone.layer2.eval()
+    model.model_k.backbone.layer2.eval()
+    for name, param in model.model_q.backbone.conv1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_q.backbone.bn1.named_parameters():
+    for name, param in model.model_q.backbone.bn1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_k.backbone.conv1.named_parameters():
+    for name, param in model.model_k.backbone.conv1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_k.backbone.bn1.named_parameters():
+    for name, param in model.model_k.backbone.bn1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_q.backbone.layer1.named_parameters():
+    for name, param in model.model_q.backbone.layer1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_q.backbone.layer2.named_parameters():
+    for name, param in model.model_q.backbone.layer2.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_k.backbone.layer1.named_parameters():
+    for name, param in model.model_k.backbone.layer1.named_parameters():
         param.requires_grad = False
-    for name, param in model.module.model_k.backbone.layer2.named_parameters():
+    for name, param in model.model_k.backbone.layer2.named_parameters():
         param.requires_grad = False
     return model

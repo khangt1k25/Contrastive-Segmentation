@@ -10,11 +10,14 @@ from utils.utils import AverageMeter, ProgressMeter, freeze_layers
 from torch.utils.tensorboard import SummaryWriter, writer 
 import os
 import torch.nn as nn 
+import torch.nn.functional as F
 import numpy as np 
 from tqdm import tqdm 
 from sklearn.decomposition import PCA
 from sklearn.cluster import MiniBatchKMeans, KMeans 
 import torch.utils.data as data
+import faiss 
+
 
 def get_anchor_features(all_features, all_assignments):
     
@@ -54,14 +57,17 @@ class PseudoDataset(data.Dataset):
     def __str__(self):
         return 'Pseudo dataset'
 
+
+
+
 def get_all_features(p, train_loader, model, N):
     
     for i, batch in tqdm(enumerate(train_loader)):
         # Forward pass
         with torch.no_grad():
-            img = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
-            sal = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
-            indices = batch['query']['meta']['index']
+            img = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+            sal = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+            indices = batch['key']['meta']['index']
             indices = indices.long().cpu().numpy()
             
             feat, _ = model.model_k(img) 
@@ -91,7 +97,6 @@ def get_all_features(p, train_loader, model, N):
       
     return all_feat, all_indices
 
-
 def cluster_all_features(all_features, n_clusters=20, seed=2022):
     print('Start PCA.')
     pca = PCA(n_components = 32, whiten = True)
@@ -103,6 +108,199 @@ def cluster_all_features(all_features, n_clusters=20, seed=2022):
     
     return prediction_kmeans
 
+def get_faiss_module(in_dim):
+    res = faiss.StandardGpuResources()
+    cfg = faiss.GpuIndexFlatConfig()
+    cfg.useFloat16 = False 
+    cfg.device     = 0 #NOTE: Single GPU only. 
+    idx = faiss.GpuIndexFlatL2(res, in_dim, cfg)
+
+    return idx
+
+def feature_flatten(feats):
+    if len(feats.size()) == 2:
+        return feats
+    feats = feats.view(feats.size(0), feats.size(1), -1).transpose(2, 1)\
+            .contiguous().view(-1, feats.size(1))
+    return feats 
+def get_init_centroids(in_dim, seed, K, featlist, index):
+    clus = faiss.Clustering(in_dim, K)
+    clus.seed  = np.random.randint(seed)
+    clus.niter = 100000 #fix
+    clus.max_points_per_centroid = 10000000
+    clus.train(featlist, index)
+
+    return faiss.vector_float_to_array(clus.centroids).reshape(K, in_dim)
+
+def module_update_centroids(index, centroids):
+    index.reset()
+    index.add(centroids)
+
+    return index 
+
+def run_mini_batch_kmeans(p, dataloader, model):
+    """
+    num_init_batches: (int) The number of batches/iterations to accumulate before the initial k-means clustering.
+    num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
+    """
+
+
+    num_init_batches = 32
+    in_dim = 32
+    K_train = 20
+
+
+    kmeans_loss  = AverageMeter()
+    faiss_module = get_faiss_module(in_dim=in_dim)
+    data_count   = np.zeros(K_train)
+    featslist    = []
+    num_batches  = 0
+    first_batch  = True
+    model.eval()
+    with torch.no_grad():
+        for i_batch, batch in enumerate(dataloader):
+            img = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+            sal = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+            indices = batch['key']['meta']['index']
+            indices = indices.long().cpu().numpy()
+            
+            feats, _ = model.model_k(img) 
+
+            bsz = feats.shape[0]
+            dim = feats.shape[1]
+            feats = nn.functional.normalize(feats, dim=1)
+            feats = feats.reshape(bsz, dim, -1) # B x dim x H.W
+
+            sal = sal.reshape(bsz, -1, 1).type(feats.dtype)
+
+
+            #feats = F.normalize(feats, dim=1, p=2)
+            #  feats = feature_flatten(feats).detach().cpu()
+
+
+            feats = torch.bmm(feats, sal).squeeze() # B x dim
+            feats = nn.functional.normalize(feats, dim=1)  # Bx dim
+            
+            
+    
+            
+            if i_batch == 0:
+                print('Batch input size : {}'.format(list(img.shape)))
+                print('Batch feature : {}'.format(list(feats.shape)))
+            
+            feats = feats.detach().cpu()
+
+            if num_batches < num_init_batches:
+                featslist.append(feats)
+                num_batches += 1
+                
+                if num_batches == num_init_batches or num_batches == len(dataloader):
+                    if first_batch:
+                        featslist = torch.cat(featslist).cpu().numpy().astype('float32')
+                        centroids = get_init_centroids(in_dim=32, seed=2022, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
+                        D, I = faiss_module.search(featslist, 1)
+                        kmeans_loss.update(D.mean())
+                        print('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
+                        
+                        for k in np.unique(I):
+                            data_count[k] += len(np.where(I == k)[0])
+                        first_batch = False
+                    else:
+                        b_feat = torch.cat(featslist)
+                        faiss_module = module_update_centroids(faiss_module, centroids)
+                        D, I = faiss_module.search(b_feat.numpy().astype('float32'), 1)
+
+                        kmeans_loss.update(D.mean())
+
+                        # Update centroids. 
+                        for k in np.unique(I):
+                            idx_k = np.where(I == k)[0]
+                            data_count[k] += len(idx_k)
+                            centroid_lr    = len(idx_k) / (data_count[k] + 1e-6)
+                            centroids[k]   = (1 - centroid_lr) * centroids[k] + centroid_lr * b_feat[idx_k].mean(0).numpy().astype('float32')
+
+                    # Empty. 
+                    featslist   = []
+                    num_batches = num_init_batches - num_batches
+
+            if (i_batch % 100) == 0:
+                print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
+    centroids = torch.tensor(centroids, requires_grad=False).cuda()
+
+    return centroids, kmeans_loss.avg
+
+def get_metric_as_conv(centroids, device):
+    N, C = centroids.size()
+
+    centroids_weight = centroids.unsqueeze(-1).unsqueeze(-1)
+    metric_function  = nn.Conv2d(C, N, 1, padding=0, stride=1, bias=False)
+    metric_function.weight.data = centroids_weight
+    metric_function = metric_function.to(device)
+    
+    return metric_function
+
+def compute_negative_euclidean(featmap, centroids, metric_function):
+    centroids = centroids.unsqueeze(-1).unsqueeze(-1)
+    return - (1 - 2*metric_function(featmap)\
+                + (centroids*centroids).sum(dim=1).unsqueeze(0)) # negative l2 squared 
+
+def postprocess_label(p, K, idx, idx_img, scores, n_dual):
+    out = scores[idx].topk(1, dim=0)[1].flatten().detach().cpu().numpy()
+
+    # Save labels. 
+    # if not os.path.exists(os.path.join(save_model_path, 'label_' + str(n_dual))):
+        # os.makedirs(os.path.join(args.save_model_path, 'label_' + str(n_dual)))
+    # torch.save(out, os.path.join(args.save_model_path, 'label_' + str(n_dual), '{}.pkl'.format(idx_img)))
+    
+    # Count for re-weighting. 
+    counts = torch.tensor(np.bincount(out, minlength=K)).float()
+
+    return counts
+
+def compute_labels(p, logger, dataloader, model, centroids, device):
+    """
+    Label all images for each view with the obtained cluster centroids. 
+    The distance is efficiently computed by setting centroids as convolution layer. 
+    """
+    K = centroids.size(0)
+
+    # Define metric function with conv layer. 
+    metric_function = get_metric_as_conv(centroids, device)
+
+    counts = torch.zeros(K, requires_grad=False).cpu()
+    model.eval()
+    with torch.no_grad():
+        for i, batch in enumerate(dataloader):
+            img = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
+            sal = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
+            indices = batch['query']['meta']['index']
+            
+            feats, _ = model.model_q(img) 
+
+            B, C, H, W = feats.shape
+            if i == 0:
+                print('Centroid size      : {}'.format(list(centroids.shape)))
+                print('Batch input size   : {}'.format(list(img.shape)))
+                print('Batch feature size : {}\n'.format(list(feats.shape)))
+ 
+
+            # Compute distance and assign label. 
+            scores  = compute_negative_euclidean(feats, centroids, metric_function) 
+
+            # Save labels and count. 
+            for idx, idx_img in enumerate(indices):
+                counts += postprocess_label(K, idx, idx_img, scores, n_dual=view)
+
+            if (i % 200) == 0:
+                print('[Assigning labels] {} / {}'.format(i, len(dataloader)))
+    weight = counts / counts.sum()
+        
+    return weight
+            
+
+def do_kmeans(p, dataloader, model):
+    centroids, kmloss = run_mini_batch_kmeans(p, dataloader, model)
+    
 
 def train(p, N, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
@@ -121,6 +319,9 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
     if p['freeze_layers']:
         model = freeze_layers(model)
     
+    #
+    do_kmeans(p, train_loader, model)
+
     # All feat
     all_features, all_indices = get_all_features(p, train_loader, model, N) # N x dim 
     # Cluster all 
