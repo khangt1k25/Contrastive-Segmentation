@@ -19,94 +19,7 @@ import torch.utils.data as data
 import faiss 
 
 
-def get_anchor_features(all_features, all_assignments):
-    
-    n_cluster = len(np.unique(all_assignments))
-    anchor = np.zeros((n_cluster, all_features.shape[-1]))
-    
-    for c in range(n_cluster):        
-        
-        c_features = np.mean(all_features[all_assignments==c], axis = 0)
 
-        
-        anchor[c,:] = c_features
-
-
-    return anchor
-
-
-class PseudoDataset(data.Dataset):
-    
-    def __init__(self, indices, assigments):
-        super(PseudoDataset, self).__init__()
-
-        self.indices = indices
-        self.assigments = assigments
-        
-        assert(len(self.indices) == len(self.assigments))
-
-        print('Number of samples {}'.format(len(indices)))
-
-    def __getitem__(self, index):
-        return self.assigments[index]
-        
-    def __len__(self):
-            return len(self.indices)
-
-
-    def __str__(self):
-        return 'Pseudo dataset'
-
-
-
-
-def get_all_features(p, train_loader, model, N):
-    
-    for i, batch in tqdm(enumerate(train_loader)):
-        # Forward pass
-        with torch.no_grad():
-            img = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
-            sal = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-            indices = batch['key']['meta']['index']
-            indices = indices.long().cpu().numpy()
-            
-            feat, _ = model.model_k(img) 
-            bsz = feat.shape[0]
-            dim = feat.shape[1]
-            feat = nn.functional.normalize(feat, dim=1)
-            feat = feat.reshape(bsz, dim, -1) # B x dim x H.W
-
-            sal = sal.reshape(bsz, -1, 1).type(feat.dtype)
-
-            feat_mean = torch.bmm(feat, sal).squeeze() # B x dim
-            feat_mean = nn.functional.normalize(feat_mean, dim=1)  # Bx dim
-            
-            feat_mean = feat_mean.cpu().numpy()
-
-            if i == 0:
-                all_feat = np.zeros((N, dim))
-                all_indices = np.zeros((N, ))
-            # if i==5:
-            #   break
-            
-            all_feat[i * bsz: (i + 1) * bsz] = feat_mean
-            all_indices[i * bsz: (i + 1) * bsz] = indices
-    
-    # all_feat = all_feat[:(i+1)*bsz]
-    # all_indices = all_indices[:(i+1)*bsz]
-      
-    return all_feat, all_indices
-
-def cluster_all_features(all_features, n_clusters=20, seed=2022):
-    print('Start PCA.')
-    pca = PCA(n_components = 32, whiten = True)
-    all_features = pca.fit_transform(all_features)
-    print('Start Kmeans clustering to {} clusters'.format(n_clusters))
-    # # kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
-    kmeans = KMeans(n_clusters=n_clusters, random_state=seed)
-    prediction_kmeans = kmeans.fit_predict(all_features)
-    
-    return prediction_kmeans
 
 def get_faiss_module(in_dim):
     res = faiss.StandardGpuResources()
@@ -123,16 +36,19 @@ def feature_flatten(feats):
     feats = feats.view(feats.size(0), feats.size(1), -1).transpose(2, 1)\
             .contiguous().view(-1, feats.size(1))
     return feats 
+
 def get_init_centroids(in_dim, seed, K, featlist, index):
+
     clus = faiss.Clustering(in_dim, K)
     clus.seed  = np.random.randint(seed)
-    clus.niter = 100000 #fix
+    clus.niter = 30 #fix
     clus.max_points_per_centroid = 10000000
     clus.train(featlist, index)
 
     return faiss.vector_float_to_array(clus.centroids).reshape(K, in_dim)
 
 def module_update_centroids(index, centroids):
+
     index.reset()
     index.add(centroids)
 
@@ -144,13 +60,12 @@ def run_mini_batch_kmeans(p, dataloader, model):
     num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
     """
 
-
-    num_init_batches = 32
+    num_init_batches = 2
     in_dim = 32
     K_train = 20
 
 
-    kmeans_loss  = AverageMeter()
+    kmeans_loss  = AverageMeter("Kmeans loss")
     faiss_module = get_faiss_module(in_dim=in_dim)
     data_count   = np.zeros(K_train)
     featslist    = []
@@ -159,39 +74,36 @@ def run_mini_batch_kmeans(p, dataloader, model):
     model.eval()
     with torch.no_grad():
         for i_batch, batch in enumerate(dataloader):
-            img = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
-            sal = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-            indices = batch['key']['meta']['index']
-            indices = indices.long().cpu().numpy()
+            img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+            sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
             
-            feats, _ = model.model_k(img) 
+            indices = batch['key']['meta']['index'].long().cpu().numpy()
 
-            bsz = feats.shape[0]
-            dim = feats.shape[1]
-            feats = nn.functional.normalize(feats, dim=1)
-            feats = feats.reshape(bsz, dim, -1) # B x dim x H.W
+            k, _ = model.model_k(img_k) # Bx dim x H x W
+            k = nn.functional.normalize(k, dim=1)
+            batch_size, dim = k.shape[0], k.shape[1]
+  
+            k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
+            k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
 
-            sal = sal.reshape(bsz, -1, 1).type(feats.dtype)
+            offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
+            sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k # all bg's to 0
+            sal_k = sal_k.view(-1)
+            mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
+            # sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
 
+            k = torch.index_select(k, index=mask_indexes, dim=0) # pixels x dim 
+            k = k.detach().cpu()
 
-            #feats = F.normalize(feats, dim=1, p=2)
-            #  feats = feature_flatten(feats).detach().cpu()
-
-
-            feats = torch.bmm(feats, sal).squeeze() # B x dim
-            feats = nn.functional.normalize(feats, dim=1)  # Bx dim
             
-            
-    
             
             if i_batch == 0:
-                print('Batch input size : {}'.format(list(img.shape)))
-                print('Batch feature : {}'.format(list(feats.shape)))
-            
-            feats = feats.detach().cpu()
+                print('Batch input size : {}'.format(list(img_k.shape)))
+                print('Batch feature : {}'.format(list(k.shape)))
+
 
             if num_batches < num_init_batches:
-                featslist.append(feats)
+                featslist.append(k)
                 num_batches += 1
                 
                 if num_batches == num_init_batches or num_batches == len(dataloader):
@@ -199,7 +111,9 @@ def run_mini_batch_kmeans(p, dataloader, model):
                         featslist = torch.cat(featslist).cpu().numpy().astype('float32')
                         centroids = get_init_centroids(in_dim=32, seed=2022, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
                         D, I = faiss_module.search(featslist, 1)
+                        
                         kmeans_loss.update(D.mean())
+                        
                         print('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
                         
                         for k in np.unique(I):
@@ -225,8 +139,11 @@ def run_mini_batch_kmeans(p, dataloader, model):
 
             if (i_batch % 100) == 0:
                 print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
+            if i_batch == 3:
+                break 
+    
     centroids = torch.tensor(centroids, requires_grad=False).cuda()
-
+    
     return centroids, kmeans_loss.avg
 
 def get_metric_as_conv(centroids, device):
@@ -298,39 +215,31 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
     return weight
             
 
-def do_kmeans(p, dataloader, model):
-    centroids, kmloss = run_mini_batch_kmeans(p, dataloader, model)
-    
+# def do_kmeans(p, dataloader, model):
+#     centroids, kmloss = run_mini_batch_kmeans(p, dataloader, model)
+  
+
 
 def train(p, N, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     superpixel_losses = AverageMeter('Superpixel', ':.4e')
-
+    kmeans_losses = AverageMeter('Kmeans', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, superpixel_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, superpixel_losses, kmeans_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
     if p['freeze_layers']:
         model = freeze_layers(model)
     
-    #
-    do_kmeans(p, train_loader, model)
+    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model)
 
-    # All feat
-    all_features, all_indices = get_all_features(p, train_loader, model, N) # N x dim 
-    # Cluster all 
-    all_assignments = cluster_all_features(all_features, n_clusters=20)
-    
-    # Anchor feat 
-    anchor_features = get_anchor_features(all_features, all_assignments) # C x dim
-    anchor_features = torch.from_numpy(anchor_features).float().cuda(p['gpu'], non_blocking=True)
-    pseudo_dataset = PseudoDataset(all_indices, all_assignments)
+    kmeans_losses.update(kmloss)
 
     for i, batch in enumerate(train_loader):
         # Forward pass
@@ -340,24 +249,12 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         indices = batch['query']['meta']['index']
         
-        pseudo_labels = pseudo_dataset[indices]
-        pseudo_labels = torch.from_numpy(pseudo_labels).long()
 
-        superpixel_logits, superpixel_labels, logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, anchor=anchor_features, pseudo_labels=pseudo_labels)
+        superpixel_logits, superpixel_labels, logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
+        
 
 
-        # print(logits.shape)
-        # print(labels.shape)
-        # print(torch.unique(labels))
 
-        # Use E-Net weighting for calculating the pixel-wise loss.
-        # uniq, freq = torch.unique(labels, return_counts=True)
-        # p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-        # p_class_non_zero_classes = freq.float() / labels.numel()
-        # p_class[uniq] = p_class_non_zero_classes
-        # w_class = 1 / torch.log(1.02 + p_class)
-        # contrastive_loss = cross_entropy(logits, labels, weight=w_class,
-        #                                     reduction='mean')
         contrastive_loss = cross_entropy(logits, labels,
                                             reduction='mean')
 

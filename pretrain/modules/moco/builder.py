@@ -41,9 +41,6 @@ class ContrastiveModel(nn.Module):
         self.register_buffer("obj_queue", torch.randn(self.dim, self.K))
         self.obj_queue = nn.functional.normalize(self.obj_queue, dim=0)
         
-
-
-
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
 
 
@@ -75,35 +72,24 @@ class ContrastiveModel(nn.Module):
 
 
 
-    def forward(self, im_q, sal_q, im_k, sal_k, anchor, pseudo_labels):
+    def forward(self, im_q, sal_q, im_k, sal_k, centroids):
 
         batch_size, dim, H, W = im_q.shape
         
-
-
+    
         q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
-        
-        
-        mask_pseudo = torch.zeros(batch_size, H, W).cuda().type(q.dtype) # BxHxW
-        for i in range(batch_size):
-            mask_pseudo[i, :, :] = pseudo_labels[i] 
-        mask_pseudo = mask_pseudo.reshape(-1, 1)
-
-
-
         q = nn.functional.normalize(q, dim=1)
         q_reshape = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
         q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
-        q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
+        q = torch.reshape(q, [-1, self.dim]) # queries: BHW x dim
         
         sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
         q_obj_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
-        q_obj_mean = nn.functional.normalize(q_obj_mean, dim=1)
-
+        q_obj_mean = nn.functional.normalize(q_obj_mean, dim=1) 
+        
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
 
-    
 
         with torch.no_grad():
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
@@ -111,17 +97,6 @@ class ContrastiveModel(nn.Module):
             sal_q = sal_q.view(-1)
             mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
             sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
-
-        
-    
-        # compute pixel-level loss: Contrast pixels to centroids
-        q = torch.index_select(q, index=mask_indexes, dim=0)
-        pixel_logits = torch.matmul(q, anchor.t()) # pixels x cluster
-        mask_pseudo = torch.index_select(mask_pseudo, index=mask_indexes, dim=0)
-        mask_pseudo = mask_pseudo.long()
-        mask_pseudo = mask_pseudo.reshape(-1)
-
-        
         
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
@@ -133,10 +108,25 @@ class ContrastiveModel(nn.Module):
             sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
             
             prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
-            prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1)
+            prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1) 
 
-        banks_obj = self.obj_queue.clone().detach()     # shape: dim x negatives
+        # compute pixel-level loss: Contrast pixels to centroids
+        q = torch.index_select(q, index=mask_indexes, dim=0)  # pixels x dim
+        
+        cluster_logits = torch.matmul(q, centroids.t()) # pixels x cluster
+        pseudo_labels = torch.argmax(cluster_logits, dim=0) # pixels  
 
+
+        batch_logits = torch.matmul(q, prototypes_obj.t()) # pixels x B
+        bank_obj = self.obj_queue.clone().detach()         # dim x negatives
+        bank_logits =  torch.matmul(q, bank_obj)          # pixels x negatives
+        obj_logits = torch.cat([batch_logits, bank_logits], dim=0) # pixels x (B+ negatives)
+        
+        
+
+        
+
+    
         
         
         ## compute superpixel loss: contrast superpixel vs superpixel
