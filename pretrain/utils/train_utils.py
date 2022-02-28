@@ -62,10 +62,11 @@ def run_mini_batch_kmeans(p, dataloader, model):
 
     num_init_batches = 32
     arg_num_batches  = 32
+    reducer = 100
     in_dim = 32
     K_train = 100
 
-    
+
     kmeans_loss  = AverageMeter("Kmeans loss")
     faiss_module = get_faiss_module(in_dim=in_dim)
     data_count   = np.zeros(K_train)
@@ -93,7 +94,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
             k = torch.index_select(k, index=mask_indexes, dim=0) # pixels x dim 
             
-            reducer = 100
+            
             reducer_idx = torch.randperm(k.shape[0])[:reducer]
             k = k[reducer_idx].detach().cpu()
 
