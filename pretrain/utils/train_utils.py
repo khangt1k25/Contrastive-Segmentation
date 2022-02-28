@@ -60,9 +60,10 @@ def run_mini_batch_kmeans(p, dataloader, model):
     num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
     """
 
-    num_init_batches = 2
+    num_init_batches = 32
+    arg_num_batches  = 32
     in_dim = 32
-    K_train = 20
+    K_train = 100
 
 
     kmeans_loss  = AverageMeter("Kmeans loss")
@@ -71,7 +72,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
     featslist    = []
     num_batches  = 0
     first_batch  = True
-    model.eval()
+    
     with torch.no_grad():
         for i_batch, batch in enumerate(dataloader):
             img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
@@ -82,21 +83,20 @@ def run_mini_batch_kmeans(p, dataloader, model):
             k, _ = model.model_k(img_k) # Bx dim x H x W
             k = nn.functional.normalize(k, dim=1)
             batch_size, dim = k.shape[0], k.shape[1]
-  
+
             k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
             k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
 
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
-            sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k # all bg's to 0
+            sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
             sal_k = sal_k.view(-1)
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            # sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
-
             k = torch.index_select(k, index=mask_indexes, dim=0) # pixels x dim 
-            k = k.detach().cpu()
+            
+            reducer = 100
+            reducer_idx = torch.randperm(k.shape[0])[:reducer]
+            k = k[reducer_idx].detach().cpu()
 
-            
-            
             if i_batch == 0:
                 print('Batch input size : {}'.format(list(img_k.shape)))
                 print('Batch feature : {}'.format(list(k.shape)))
@@ -135,12 +135,11 @@ def run_mini_batch_kmeans(p, dataloader, model):
 
                     # Empty. 
                     featslist   = []
-                    num_batches = num_init_batches - num_batches
+                    num_batches = num_init_batches - arg_num_batches
 
             if (i_batch % 100) == 0:
                 print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
-            if i_batch == 3:
-                break 
+
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda()
     
@@ -215,22 +214,19 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
     return weight
             
 
-# def do_kmeans(p, dataloader, model):
-#     centroids, kmloss = run_mini_batch_kmeans(p, dataloader, model)
-  
 
 
 def train(p, N, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
-    superpixel_losses = AverageMeter('Superpixel', ':.4e')
+  
     kmeans_losses = AverageMeter('Kmeans', ':.4e')
 
     top1 = AverageMeter('Acc@1', ':6.2f')
     top5 = AverageMeter('Acc@5', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, superpixel_losses, kmeans_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, kmeans_losses, saliency_losses, top1, top5],
                         prefix="Epoch: [{}]".format(epoch))
     model.train()
 
@@ -250,22 +246,29 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         indices = batch['query']['meta']['index']
         
 
-        superpixel_logits, superpixel_labels, logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
-        
+        logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
 
 
+        # Use E-Net weighting for calculating the pixel-wise loss.
+        # uniq, freq = torch.unique(labels, return_counts=True)
+        # p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+        # p_class_non_zero_classes = freq.float() / labels.numel()
+        # p_class[uniq] = p_class_non_zero_classes
+        # w_class = 1 / torch.log(1.02 + p_class)
+        # contrastive_loss = cross_entropy(logits, labels, weight=w_class,
+        #                                     reduction='mean')
 
         contrastive_loss = cross_entropy(logits, labels,
                                             reduction='mean')
 
-        superpixel_loss = cross(superpixel_logits, superpixel_labels, reduction='mean')
+    
 
     #     # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + superpixel_loss
+        loss = contrastive_loss + saliency_loss 
         
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
-        superpixel_losses.update(superpixel_loss.item())
+
 
         losses.update(loss.item())
         
@@ -295,7 +298,7 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
     writer.add_scalar('total loss', losses.avg, epoch)
     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
-    writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
+    writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
     writer.close()      
 
 

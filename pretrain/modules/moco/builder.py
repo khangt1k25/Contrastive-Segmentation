@@ -110,42 +110,33 @@ class ContrastiveModel(nn.Module):
             prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
             prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1) 
 
-        # compute pixel-level loss: Contrast pixels to centroids
+        # compute pixel-level loss
         q = torch.index_select(q, index=mask_indexes, dim=0)  # pixels x dim
         
+
+
+
+
         cluster_logits = torch.matmul(q, centroids.t()) # pixels x cluster
-        pseudo_labels = torch.argmax(cluster_logits, dim=0) # pixels  
+        pseudo_labels = torch.argmax(cluster_logits, dim=1) # pixels  
 
 
-        batch_logits = torch.matmul(q, prototypes_obj.t()) # pixels x B
+        batch_logits = torch.matmul(q, prototypes_obj.t()) #pixels x B
+        mask = torch.ones_like(batch_logits).scatter_(1, sal_q.unsqueeze(1), 0.)
+        batch_logits = batch_logits[mask.bool()].view(batch_logits.shape[0], -1)
+
+
+
         bank_obj = self.obj_queue.clone().detach()         # dim x negatives
         bank_logits =  torch.matmul(q, bank_obj)          # pixels x negatives
-        obj_logits = torch.cat([batch_logits, bank_logits], dim=0) # pixels x (B+ negatives)
+        
+        logits  = torch.cat([cluster_logits, batch_logits, bank_logits], dim=1) # pixels x (cluster+ negatives)
         
         
 
+        logits /= self.T
         
-
-    
-        
-        
-        ## compute superpixel loss: contrast superpixel vs superpixel
-        l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
-        l_negative = torch.matmul(q_obj_mean, banks_obj)
-        obj_logits = torch.cat([l_positive, l_negative], dim=1)
-        obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
-
-        
-
-        # apply temperature
-        obj_logits /= self.T
-        pixel_logits /= self.T
-        
-
-
-
-        
-        return obj_logits, obj_labels, pixel_logits, mask_pseudo, sal_loss
+        return logits, pseudo_labels.long(), sal_loss
 
 
 
