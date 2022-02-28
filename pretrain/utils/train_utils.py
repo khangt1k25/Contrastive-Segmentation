@@ -65,7 +65,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
     in_dim = 32
     K_train = 100
 
-
+    
     kmeans_loss  = AverageMeter("Kmeans loss")
     faiss_module = get_faiss_module(in_dim=in_dim)
     data_count   = np.zeros(K_train)
