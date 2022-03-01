@@ -76,7 +76,8 @@ def main():
     results_miou = []
     best = 0.0
     for i in range(args.num_seeds):
-        save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)
+        kmloss = save_embeddings_to_disk(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)
+        print("Kmloss %2.1f" %(kmloss))
         eval_stats, match = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
         results_miou.append(eval_stats['mIoU'])
         if eval_stats['mIoU'] > best:

@@ -16,7 +16,6 @@ from tqdm import tqdm
 from sklearn.decomposition import PCA
 from sklearn.cluster import MiniBatchKMeans, KMeans 
 import torch.utils.data as data
-import faiss 
 
 
 
@@ -27,11 +26,11 @@ def run_mini_batch_kmeans(p, dataloader, model):
     num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
     """
 
-    num_init_batches = 32
-    arg_num_batches  = 32
+    # num_init_batches = 32
+    # arg_num_batches  = 32
     reducer = 100
     in_dim = 32
-    K_train = 100
+    K_train = 20
     featslist = []
 
     with torch.no_grad():
@@ -51,12 +50,12 @@ def run_mini_batch_kmeans(p, dataloader, model):
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
             sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
             sal_k = sal_k.view(-1)
+       
+            
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            k = torch.index_select(k, index=mask_indexes, dim=0) # pixels x dim 
-            
-            
-            reducer_idx = torch.randperm(k.shape[0])[:reducer]
-            k = k[reducer_idx].detach().cpu()
+            reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer]
+            mask_indexes = mask_indexes[reducer_idx]
+            k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
 
             featslist.append(k)
 
