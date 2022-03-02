@@ -118,7 +118,7 @@ class ContrastiveModel(nn.Module):
 
 
         cluster_logits = torch.matmul(q, centroids.t()) # pixels x cluster
-        pseudo_labels = torch.argmax(cluster_logits, dim=1) # pixels  
+        pseudo_labels = torch.argmax(cluster_logits, dim=1).detach() # pixels  
 
 
         batch_logits = torch.matmul(q, prototypes_obj.t()) #pixels x B

@@ -33,42 +33,42 @@ def run_mini_batch_kmeans(p, dataloader, model):
     K_train = 20
     featslist = []
 
-    with torch.no_grad():
-        for i_batch, batch in enumerate(dataloader):
-            img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
-            sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-            
-            indices = batch['key']['meta']['index'].long().cpu().numpy()
 
-            k, _ = model.model_k(img_k) # Bx dim x H x W
-            k = nn.functional.normalize(k, dim=1)
-            batch_size, dim = k.shape[0], k.shape[1]
+    for i_batch, batch in enumerate(dataloader):
+        with torch.no_grad():
+          img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+          sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+          
+          indices = batch['key']['meta']['index'].long().cpu().numpy()
 
-            k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
-            k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
+          k, _ = model.model_k(img_k) # Bx dim x H x W
+          k = nn.functional.normalize(k, dim=1)
+          batch_size, dim = k.shape[0], k.shape[1]
 
-            offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
-            sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
-            sal_k = sal_k.view(-1)
-       
-            
-            mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer]
-            mask_indexes = mask_indexes[reducer_idx]
-            k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
+          k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
+          k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
 
-            featslist.append(k)
+          offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
+          sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
+          sal_k = sal_k.view(-1)
+      
+          
+          mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
+          reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*batch_size]
+          mask_indexes = mask_indexes[reducer_idx]
+          k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
 
-        featslist = torch.cat(featslist).cpu().numpy().astype('float32')
+          featslist.append(k)
+
+    featslist = torch.cat(featslist).cpu().numpy().astype('float32')
 
 
-        print('Start Kmeans clustering to {} clusters'.format(K_train))
-        # # kmeans = MiniBatchKMeans(n_clusters=n_clusters, batch_size=1000, random_state=seed)
-        kmeans = KMeans(n_clusters=K_train, random_state=2022)
-        prediction_kmeans = kmeans.fit_predict(featslist)
+    print('Start Kmeans clustering to {} clusters'.format(K_train))
+    kmeans = MiniBatchKMeans(n_clusters=K_train, batch_size=1000, random_state=2022)
+    prediction_kmeans = kmeans.fit_predict(featslist)
 
-        centroids = torch.tensor(kmeans.cluster_centers_, requires_grad=False).cuda()
-        kmloss = kmeans.inertia_
+    centroids = torch.tensor(kmeans.cluster_centers_, requires_grad=False).cuda()
+    kmloss = kmeans.inertia_
     
     return centroids, kmloss
 

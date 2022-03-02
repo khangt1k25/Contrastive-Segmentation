@@ -5,15 +5,20 @@ from PIL import Image
 import os
 import torch.nn as nn
 
+predicted = torch.zeros(100, 96, 96)
+sal = torch.randn(64, 96, 96)
+output = torch.randn((64*96*96, 32))
+centroids = torch.randn(10, 32)
+prediction = torch.matmul(output, centroids.t()) # BHW x C
+prediction = torch.argmax(prediction, dim=1) + 1 # BHW x 1
+prediction = prediction.reshape(64, 96, 96)
+prediction = prediction * sal # B, H, W
 
-x = torch.rand(10, 32)
-perm = torch.randperm(x.shape[0])
-idx = perm[:3]
-samples = x[idx]
+ptr = 0
+bs = 64
+predicted[ptr: ptr+bs, :, :]  = prediction
+print(predicted)
 
-
-print(idx)
-print(samples.shape)
 
 # sal_q = torch.Tensor([0])
 

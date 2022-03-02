@@ -129,6 +129,7 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     print('Save embeddings to disk ...')
     model.eval()
     ptr = 0
+    ptr2 = 0
     
     reducer = 100
 
@@ -147,20 +148,28 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         
         offset = torch.arange(0, 2 * bs, 2).to(sal.device)
         sal_tmp = (sal + torch.reshape(offset, [-1, 1, 1]))*sal 
+        sal_tmp = sal_tmp.view(-1)
+        
         mask_indexes = torch.nonzero((sal_tmp)).view(-1).squeeze()
-        reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer]
+        reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*bs]
         mask_indexes = mask_indexes[reducer_idx]
         
-        k = torch.index_select(k, index=mask_indexes, dim=0).detach() # pixels x dim 
+        output = torch.index_select(output, index=mask_indexes, dim=0).detach() # pixels x dim 
         
+        # print(output.shape)
+        # print(ptr, ptr+bs*reducer)
 
-        all_prototypes[ptr: ptr + bs*reducer] = k
-        all_sals[ptr: ptr + bs, :, :] = (sal > 0.5).float()
-        ptr += bs
+        all_prototypes[ptr: ptr + bs*reducer] = output
+        
+        all_sals[ptr2: ptr2 + bs, :, :] = (sal > 0.5).float()
+        
+        ptr += bs*reducer
+        ptr2 += bs
+
         for name in meta['image']:
             names.append(name)
 
-        if ptr % 300 == 0:
+        if ptr2 % 300 == 0:
             print('Computing prototype {}'.format(ptr))
 
     # perform kmeans
@@ -179,6 +188,7 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
     
     kmloss = kmeans.inertia_
 
+    ptr = 0
     predicted = torch.zeros((len(val_loader.sampler), 512, 512))
     for i, batch in enumerate(val_loader):
         output, sal = model(batch['image'].cuda(non_blocking=True))
@@ -194,8 +204,11 @@ def save_embeddings_to_disk(p, val_loader, model, n_clusters=21, seed=1234):
         prediction = torch.argmax(prediction, dim=1) + 1 # BHW x 1
         prediction = prediction.reshape(bs, h, w)
         prediction = prediction * sal # B, H, W
+        
+        # print(prediction.shape)
 
-        predicted[ptr: ptr+bs, :, :]  = prediction.cpu()
+        predicted[ptr: ptr+bs, :, :]  = prediction.long()
+        
     
     predicted = predicted.cpu().numpy()
     
