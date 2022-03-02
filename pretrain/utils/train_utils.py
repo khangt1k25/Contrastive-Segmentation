@@ -30,12 +30,6 @@ def get_faiss_module(in_dim):
 
     return idx
 
-def feature_flatten(feats):
-    if len(feats.size()) == 2:
-        return feats
-    feats = feats.view(feats.size(0), feats.size(1), -1).transpose(2, 1)\
-            .contiguous().view(-1, feats.size(1))
-    return feats 
 
 def get_init_centroids(in_dim, seed, K, featlist, index):
 
@@ -60,11 +54,11 @@ def run_mini_batch_kmeans(p, dataloader, model):
     num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
     """
 
-    num_init_batches = 32
-    arg_num_batches  = 32
-    reducer = 100
+    num_init_batches = 64  
+    arg_num_batches  = 64
+    reducer = 100 # no pixels per image
     in_dim = 32
-    K_train = 100
+    K_train = 20
 
 
     kmeans_loss  = AverageMeter("Kmeans loss")
@@ -76,6 +70,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
     
     with torch.no_grad():
         for i_batch, batch in enumerate(dataloader):
+            
             img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
             sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
             
@@ -91,12 +86,15 @@ def run_mini_batch_kmeans(p, dataloader, model):
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
             sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
             sal_k = sal_k.view(-1)
+            
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            k = torch.index_select(k, index=mask_indexes, dim=0) # pixels x dim 
+            reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*batch_size]
+            mask_indexes = mask_indexes[reducer_idx]
+          
+            k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
             
+          
             
-            reducer_idx = torch.randperm(k.shape[0])[:reducer]
-            k = k[reducer_idx].detach().cpu()
 
             if i_batch == 0:
                 print('Batch input size : {}'.format(list(img_k.shape)))
@@ -110,6 +108,9 @@ def run_mini_batch_kmeans(p, dataloader, model):
                 if num_batches == num_init_batches or num_batches == len(dataloader):
                     if first_batch:
                         featslist = torch.cat(featslist).cpu().numpy().astype('float32')
+
+                        print(featslist.shape)
+
                         centroids = get_init_centroids(in_dim=32, seed=2022, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
                         D, I = faiss_module.search(featslist, 1)
                         
@@ -146,75 +147,6 @@ def run_mini_batch_kmeans(p, dataloader, model):
     
     return centroids, kmeans_loss.avg
 
-def get_metric_as_conv(centroids, device):
-    N, C = centroids.size()
-
-    centroids_weight = centroids.unsqueeze(-1).unsqueeze(-1)
-    metric_function  = nn.Conv2d(C, N, 1, padding=0, stride=1, bias=False)
-    metric_function.weight.data = centroids_weight
-    metric_function = metric_function.to(device)
-    
-    return metric_function
-
-def compute_negative_euclidean(featmap, centroids, metric_function):
-    centroids = centroids.unsqueeze(-1).unsqueeze(-1)
-    return - (1 - 2*metric_function(featmap)\
-                + (centroids*centroids).sum(dim=1).unsqueeze(0)) # negative l2 squared 
-
-def postprocess_label(p, K, idx, idx_img, scores, n_dual):
-    out = scores[idx].topk(1, dim=0)[1].flatten().detach().cpu().numpy()
-
-    # Save labels. 
-    # if not os.path.exists(os.path.join(save_model_path, 'label_' + str(n_dual))):
-        # os.makedirs(os.path.join(args.save_model_path, 'label_' + str(n_dual)))
-    # torch.save(out, os.path.join(args.save_model_path, 'label_' + str(n_dual), '{}.pkl'.format(idx_img)))
-    
-    # Count for re-weighting. 
-    counts = torch.tensor(np.bincount(out, minlength=K)).float()
-
-    return counts
-
-def compute_labels(p, logger, dataloader, model, centroids, device):
-    """
-    Label all images for each view with the obtained cluster centroids. 
-    The distance is efficiently computed by setting centroids as convolution layer. 
-    """
-    K = centroids.size(0)
-
-    # Define metric function with conv layer. 
-    metric_function = get_metric_as_conv(centroids, device)
-
-    counts = torch.zeros(K, requires_grad=False).cpu()
-    model.eval()
-    with torch.no_grad():
-        for i, batch in enumerate(dataloader):
-            img = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
-            sal = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
-            indices = batch['query']['meta']['index']
-            
-            feats, _ = model.model_q(img) 
-
-            B, C, H, W = feats.shape
-            if i == 0:
-                print('Centroid size      : {}'.format(list(centroids.shape)))
-                print('Batch input size   : {}'.format(list(img.shape)))
-                print('Batch feature size : {}\n'.format(list(feats.shape)))
- 
-
-            # Compute distance and assign label. 
-            scores  = compute_negative_euclidean(feats, centroids, metric_function) 
-
-            # Save labels and count. 
-            for idx, idx_img in enumerate(indices):
-                counts += postprocess_label(K, idx, idx_img, scores, n_dual=view)
-
-            if (i % 200) == 0:
-                print('[Assigning labels] {} / {}'.format(i, len(dataloader)))
-    weight = counts / counts.sum()
-        
-    return weight
-            
-
 
 
 def train(p, N, train_loader, model, optimizer, epoch, amp):
@@ -244,7 +176,6 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        indices = batch['query']['meta']['index']
         
 
         logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
