@@ -64,11 +64,22 @@ def run_mini_batch_kmeans(p, dataloader, model):
 
 
     print('Start Kmeans clustering to {} clusters'.format(K_train))
-    kmeans = MiniBatchKMeans(n_clusters=K_train, batch_size=1000, random_state=2022)
-    prediction_kmeans = kmeans.fit_predict(featslist)
 
-    centroids = torch.tensor(kmeans.cluster_centers_, requires_grad=False).cuda()
+
+    pca = PCA(n_components = in_dim, whiten = True)
+    featslist_pca = pca.fit_transform(featslist)
+    kmeans = MiniBatchKMeans(n_clusters=K_train, batch_size=1000, random_state=2022)
+    preds = kmeans.fit_predict(featslist_pca)
     kmloss = kmeans.inertia_
+    centroids = np.zeros((K_train, in_dim))
+    for c in range(K_train):        
+        c_features = np.mean(featslist[preds==c], axis = 0)        
+        centroids[c,:] = c_features
+
+    centroids = torch.tensor(centroids, requires_grad=False).cuda()
+
+    # centroids = torch.tensor(kmeans.cluster_centers_, requires_grad=False).cuda()
+    
     
     return centroids, kmloss
 
@@ -101,7 +112,6 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-        indices = batch['query']['meta']['index']
         
 
         logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
