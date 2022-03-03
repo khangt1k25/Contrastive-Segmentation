@@ -115,8 +115,7 @@ class ContrastiveModel(nn.Module):
         
 
 
-
-
+        centroids = nn.functional.normalize(centroids, dim=1) 
         cluster_logits = torch.matmul(q, centroids.t()) # pixels x cluster
         pseudo_labels = torch.argmax(cluster_logits, dim=1).detach() # pixels  
 
@@ -132,7 +131,8 @@ class ContrastiveModel(nn.Module):
         
         logits  = torch.cat([cluster_logits, batch_logits, bank_logits], dim=1) # pixels x (cluster+ negatives)
         
-        
+        self._dequeue_and_enqueue(prototypes_obj) 
+
 
         logits /= self.T
         
