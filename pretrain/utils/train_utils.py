@@ -146,25 +146,34 @@ def run_mini_batch_kmeans(p, dataloader, model):
     
     return centroids, kmeans_loss.avg
 
-def compute_negative_euclidean(featmap, centroids, metric_function):
-    centroids = centroids.unsqueeze(-1).unsqueeze(-1)
-    return - (1 - 2*metric_function(featmap)\
-                + (centroids*centroids).sum(dim=1).unsqueeze(0)) # negative l2 squared 
+def compute_negative_euclidean(featmap, sal,  centroids, metric_function):
+    '''
+        featmap: BxdimxHxW
+        sal: BxHxW
+        centroids: Cxdim
+        metrics: conv1x1: dim->C
+    '''
+    predicted = metric_function(featmap)
+    predicted = predicted.permute((0, 2, 3, 1)) #BxHxWxC
+    predicted = predicted*sal # mask background
+
+     #
+    # centroids = centroids.unsqueeze(-1).unsqueeze(-1)
+    # return - (1 - 2*metric_function(featmap)\
+    #             + (centroids*centroids).sum(dim=1).unsqueeze(0)) # negative l2 squared 
         
 
 def get_metric_as_conv(centroids):
-    N, C = centroids.size()
+    C, dim = centroids.size()
 
     centroids_weight = centroids.unsqueeze(-1).unsqueeze(-1)
-    metric_function  = nn.Conv2d(C, N, 1, padding=0, stride=1, bias=False)
-    metric_function.weight.data = centroids_weight
-    metric_function = nn.DataParallel(metric_function)
-    
+    metric_function  = nn.Conv2d(dim, C, 1, padding=0, stride=1, bias=False)
+    metric_function.weight.data = centroids_weight  
     metric_function = metric_function.cuda()
     
     return metric_function
 
-def postprocess_label(args, K, idx, idx_img, scores, n_dual):
+def postprocess_label(args, K, idx, idx_img, scores):
     out = scores[idx].topk(1, dim=0)[1].flatten().detach().cpu().numpy()
 
     # Save labels. 
@@ -202,11 +211,11 @@ def compute_labels(p, dataloader, model, centroids):
             batch_size, dim = q.shape[0], q.shape[1]
  
             # Compute distance and assign label. 
-            scores  = compute_negative_euclidean(q, centroids, metric_function) 
+            scores  = compute_negative_euclidean(q, sal_q, centroids, metric_function) 
 
             # Save labels and count. 
             for idx, idx_img in enumerate(indices):
-                counts += postprocess_label(args, K, idx, idx_img, scores, n_dual=view)
+                counts += postprocess_label(p, K, idx, idx_img, scores)
 
             if (i % 200) == 0:
                 print('[Assigning labels] {} / {}'.format(i, len(dataloader)))
