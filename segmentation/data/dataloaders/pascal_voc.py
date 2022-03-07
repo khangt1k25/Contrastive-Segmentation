@@ -2,10 +2,11 @@
 # Authors: Wouter Van Gansbeke & Simon Vandenhende
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
+from logging import root
 import os
 import sys
 import errno
-import cv2
+# import cv2
 import hashlib
 import glob
 import tarfile
@@ -18,6 +19,8 @@ from PIL import Image
 from data.util.mypath import Path
 from data.util.google_drive import download_file_from_google_drive
 from utils.utils import mkdir_if_missing
+# from utils.utils import mkdir_if_missing
+# from util.google_drive import download_file_from_google_drive
 
 
 class VOC12(data.Dataset):
@@ -33,7 +36,7 @@ class VOC12(data.Dataset):
                           'pottedplant', 'sheep', 'sofa', 'train', 'tvmonitor']
 
     def __init__(self, root=Path.db_root_dir('VOCSegmentation'),
-                 split='val', transform=None, download=True, ignore_classes=[]):
+                 split='val', transform=None, download=False, ignore_classes=[]):
         # Set paths
         self.root = root
         valid_splits = ['trainaug', 'train', 'val']
@@ -100,7 +103,7 @@ class VOC12(data.Dataset):
         sample['meta'] = {'im_size': (_img.shape[0], _img.shape[1]),
                           'image_file': self.images[index],
                           'image': os.path.basename(self.semsegs[index]).split('.')[0]}
-            
+           
         if self.transform is not None:
             sample = self.transform(sample)
 
@@ -155,7 +158,7 @@ class VOC12(data.Dataset):
 if __name__ == '__main__':
     """ For purpose of debugging """
     from matplotlib import pyplot as plt
-    dataset = VOC12(split='train', transform=None)
+    dataset = VOC12(split='train', transform=None, root='PASCAL_VOC/VOCSegmentation')
 
     fig, axes = plt.subplots(2)
     sample = dataset.__getitem__(0)

@@ -102,7 +102,7 @@ def eval_kmeans(p, val_dataset, n_clusters=21, compute_metrics=False, verbose=Tr
     jac = [0] * n_classes
     for i_part in range(0, n_classes):
         jac[i_part] = float(tp[i_part]) / max(float(tp[i_part] + fp[i_part] + fn[i_part]), 1e-8)
-
+    
     # Write results
     eval_result = dict()
     eval_result['jaccards_all_categs'] = jac

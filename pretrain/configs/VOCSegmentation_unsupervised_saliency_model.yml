@@ -39,5 +39,10 @@ moco_kwargs:
    m: 0.999 # Momentum
    K: 128 # Negatives
 
-
-kernel_size: False
+# Clustering
+K_train: 20
+K_test:  20
+init_batches: 64
+update_batches: 64
+reduce: True
+reducer: 100 

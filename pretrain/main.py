@@ -86,6 +86,8 @@ def main_worker(gpu, args):
 
     amp = None
 
+
+
     # CUDNN
     print(colored('Set CuDNN benchmark', 'blue')) 
     torch.backends.cudnn.benchmark = True
@@ -111,12 +113,14 @@ def main_worker(gpu, args):
         optimizer.load_state_dict(checkpoint['optimizer'])
         model.load_state_dict(checkpoint['model'])
         start_epoch = checkpoint['epoch']
-
     else:
         print(colored('No checkpoint file at {}'.format(p['checkpoint']), 'blue'))
         start_epoch = 0
         model = model.cuda()
     
+
+
+
     # Main loop
     print(colored('Starting main loop', 'blue'))
     

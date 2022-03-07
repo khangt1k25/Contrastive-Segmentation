@@ -19,27 +19,32 @@ import torch.utils.data as data
 import faiss 
 
 
+def get_classifier(indim, outdim):
+    classifier = nn.Conv2d(indim, outdim, kernel_size=1, stride=1, padding=0, bias=True)
+    classifier.weight.data.normal_(0, 0.01)
+    classifier.bias.data.zero_()
+    return classifier
 
 
-def get_faiss_module(in_dim):
+def get_faiss_module(ndim):
     res = faiss.StandardGpuResources()
     cfg = faiss.GpuIndexFlatConfig()
     cfg.useFloat16 = False 
     cfg.device     = 0 #NOTE: Single GPU only. 
-    idx = faiss.GpuIndexFlatL2(res, in_dim, cfg)
+    idx = faiss.GpuIndexFlatL2(res, ndim, cfg)
 
     return idx
 
 
-def get_init_centroids(in_dim, seed, K, featlist, index):
+def get_init_centroids(ndim, seed, K, featlist, index):
 
-    clus = faiss.Clustering(in_dim, K)
+    clus = faiss.Clustering(ndim, K)
     clus.seed  = np.random.randint(seed)
     clus.niter = 30 #fix
     clus.max_points_per_centroid = 10000000
     clus.train(featlist, index)
 
-    return faiss.vector_float_to_array(clus.centroids).reshape(K, in_dim)
+    return faiss.vector_float_to_array(clus.centroids).reshape(K, ndim)
 
 def module_update_centroids(index, centroids):
 
@@ -48,51 +53,50 @@ def module_update_centroids(index, centroids):
 
     return index 
 
-def run_mini_batch_kmeans(p, dataloader, model):
+def run_mini_batch_kmeans(p, dataloader, model, seed):
     """
     num_init_batches: (int) The number of batches/iterations to accumulate before the initial k-means clustering.
     num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
     """
 
-    num_init_batches = 64  
-    arg_num_batches  = 64
-    reducer = 100 # no pixels per image
-    in_dim = 32
-    K_train = 20
-
+    num_init_batches = p['init_batches']  
+    arg_num_batches  = p['update_batches']
+    reducer = p['reducer'] # number of pixels per image
+    ndim = p['model_kwargs']['ndim']
+    K_train = p['K_train']
+    reduce = p['reduce']
 
     kmeans_loss  = AverageMeter("Kmeans loss")
-    faiss_module = get_faiss_module(in_dim=in_dim)
+    faiss_module = get_faiss_module(ndim=ndim)
     data_count   = np.zeros(K_train)
     featslist    = []
     num_batches  = 0
     first_batch  = True
-    
-    
-    for i_batch, batch in enumerate(dataloader):
-        with torch.no_grad():
+     
+    with torch.no_grad():
+        for i_batch, batch in enumerate(dataloader):    
             img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
             sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
             
-            indices = batch['key']['meta']['index'].long().cpu().numpy()
+            # indices = batch['key']['meta']['index'].long().cpu().numpy()
 
             k, _ = model.model_k(img_k) # Bx dim x H x W
             k = nn.functional.normalize(k, dim=1)
             batch_size, dim = k.shape[0], k.shape[1]
-
             k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
             k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
-
+            
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
             sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
             sal_k = sal_k.view(-1)
             
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*batch_size]
-            mask_indexes = mask_indexes[reducer_idx]
+            
+            if reduce:
+                reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*batch_size]
+                mask_indexes = mask_indexes[reducer_idx]
             
             k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
-            
             
             
 
@@ -111,7 +115,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
 
                         print(featslist.shape)
 
-                        centroids = get_init_centroids(in_dim=32, seed=2022, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
+                        centroids = get_init_centroids(ndim=ndim, seed=seed, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
                         D, I = faiss_module.search(featslist, 1)
                         
                         kmeans_loss.update(D.mean())
@@ -125,9 +129,7 @@ def run_mini_batch_kmeans(p, dataloader, model):
                         b_feat = torch.cat(featslist)
                         faiss_module = module_update_centroids(faiss_module, centroids)
                         D, I = faiss_module.search(b_feat.numpy().astype('float32'), 1)
-
                         kmeans_loss.update(D.mean())
-
                         # Update centroids. 
                         for k in np.unique(I):
                             idx_k = np.where(I == k)[0]
@@ -165,9 +167,18 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
     if p['freeze_layers']:
         model = freeze_layers(model)
     
-    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model)
 
+    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model)
+    
     kmeans_losses.update(kmloss)
+
+    # Classifier 
+    classifier = get_classifier(p['model_kwargs']['ndim'], p['K_train'])
+    classifier = classifier.cuda
+    classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
+    for param in classifier.parameters():
+        param.requires_grad = False
+
 
     for i, batch in enumerate(train_loader):
         # Forward pass
@@ -177,7 +188,7 @@ def train(p, N, train_loader, model, optimizer, epoch, amp):
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         
 
-        logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
+        logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
 
 
         # Use E-Net weighting for calculating the pixel-wise loss.
