@@ -6,14 +6,27 @@ import os
 import torch.nn as nn
 
 
-x = torch.rand(10, 32)
-perm = torch.randperm(x.shape[0])
-idx = perm[:3]
-samples = x[idx]
+# x = torch.rand(10, 32)
+# perm = torch.randperm(x.shape[0])
+# idx = perm[:3]
+# samples = x[idx]
+cluster = torch.rand(3, 5)
+# cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x cluster
+# pseudo_labels = torch.index_select(pseudo_labels, index=mask_indexes, dim=0)    # pixels
+# pseudo_labels = torch.Tensor([1, 2, 3]).long()
 
+print(cluster)
+# cluster = torch.index_select(cluster, index=pseudo_labels, dim=1)
+# cluster = cluster[:,pseudo_labels]
+print(torch.max(cluster, dim=1).values.shape)
 
-print(idx)
-print(samples.shape)
+# cluster = cluster.gather(1, pseudo_labels.view(-1,1))
+
+# print(pseudo_labels)
+print(cluster)
+print(cluster.shape)
+# print(idx)
+# print(samples.shape)
 
 # sal_q = torch.Tensor([0])
 
