@@ -217,7 +217,5 @@ def get_val_transformations(augmentation_strategy='pascal'):
         raise ValueError('Invalid strategy {}'.format(augmentation_strategy))
 
 
-def get_filter(kernel_size=3):
-    from models.models import Filter
-    return Filter(kernel_size)
+
 
