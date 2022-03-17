@@ -42,6 +42,7 @@ class VOCSegmentation(data.Dataset):
     
         self.images = []
         self.sal = []
+        self.names = []
 
         with open(os.path.join(self.root, 'sets/trainaug.txt'), 'r') as f:
             all_ = f.read().splitlines()
@@ -52,6 +53,8 @@ class VOCSegmentation(data.Dataset):
             if os.path.isfile(_image) and os.path.isfile(_sal):
                 self.images.append(_image)
                 self.sal.append(_sal)
+                self.names.append(f)
+
 
         assert (len(self.images) == len(self.sal))
 
@@ -59,6 +62,7 @@ class VOCSegmentation(data.Dataset):
             n_of = 32
             self.images = self.images[:n_of]
             self.sal = self.sal[:n_of]
+            self.names = self.names[:n_of]
 
         # Display stats
         print('Number of images: {:d}'.format(len(self.images)))
@@ -72,8 +76,8 @@ class VOCSegmentation(data.Dataset):
         if self.transform is not None:
             sample = self.transform(sample)
         
-        sample['meta'] = {'image': str(self.images[index]), 'index': index}
-
+        sample['meta'] = {'image': str(self.images[index]), 'index': index, 'name': str(self.names[index])}
+        
         return sample
 
     def __len__(self):

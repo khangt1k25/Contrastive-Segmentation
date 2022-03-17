@@ -40,4 +40,15 @@ moco_kwargs:
    K: 128 # Negatives
 
 
-kernel_size: False
+## Kmeans
+seed: 2022
+kmeans:
+   n_iter: 20
+   n_init: 64
+   n_update: 2
+
+
+## Loss
+
+loss_coeff:
+   cluster: 0.1

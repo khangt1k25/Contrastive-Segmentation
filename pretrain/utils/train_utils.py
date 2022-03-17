@@ -6,7 +6,7 @@ from audioop import cross
 from cv2 import reduce
 import torch
 from torch.nn.functional import cross_entropy
-from utils.utils import AverageMeter, ProgressMeter, freeze_layers
+from utils.utils import *
 from torch.utils.tensorboard import SummaryWriter, writer 
 import os
 import torch.nn as nn 
@@ -20,104 +20,67 @@ import faiss
 
 
 
+def run_mini_batch_kmeans(p, logger, dataloader, model, split='train'):
+    '''
+    Clustering for Key view
+    '''
+    kmeans_loss  = AverageMeter('kmean loss')
+    faiss_module = get_faiss_module(p)
+    
+    if split=='train':
+        K = p['kmeans']['K_train']
+    elif split == 'test':
+        K = p['kmeans']['K_test']
+    
 
-def get_faiss_module(in_dim):
-    res = faiss.StandardGpuResources()
-    cfg = faiss.GpuIndexFlatConfig()
-    cfg.useFloat16 = False 
-    cfg.device     = 0 #NOTE: Single GPU only. 
-    idx = faiss.GpuIndexFlatL2(res, in_dim, cfg)
-
-    return idx
-
-
-def get_init_centroids(in_dim, seed, K, featlist, index):
-
-    clus = faiss.Clustering(in_dim, K)
-    clus.seed  = np.random.randint(seed)
-    clus.niter = 30 #fix
-    clus.max_points_per_centroid = 10000000
-    clus.train(featlist, index)
-
-    return faiss.vector_float_to_array(clus.centroids).reshape(K, in_dim)
-
-def module_update_centroids(index, centroids):
-
-    index.reset()
-    index.add(centroids)
-
-    return index 
-
-def run_mini_batch_kmeans(p, dataloader, model):
-    """
-    num_init_batches: (int) The number of batches/iterations to accumulate before the initial k-means clustering.
-    num_batches     : (int) The number of batches/iterations to accumulate before the next update. 
-    """
-
-    num_init_batches = 64  
-    arg_num_batches  = 64
-    reducer = 100 # no pixels per image
-    in_dim = 32
-    K_train = 20
-
-
-    kmeans_loss  = AverageMeter("Kmeans loss")
-    faiss_module = get_faiss_module(in_dim=in_dim)
-    data_count   = np.zeros(K_train)
+    data_count   = np.zeros(K)
     featslist    = []
     num_batches  = 0
-    first_batch  = True
+    first_batch  = True    
+    isreduce = (p['kmeans']['reducer'] > 0)
     
-    
-    for i_batch, batch in enumerate(dataloader):
-        with torch.no_grad():
+    model.eval()
+    with torch.no_grad():
+        for i_batch, batch in enumerate(dataloader):
+            
             img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
             sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
-            
-            indices = batch['key']['meta']['index'].long().cpu().numpy()
 
             k, _ = model.model_k(img_k) # Bx dim x H x W
             k = nn.functional.normalize(k, dim=1)
-            batch_size, dim = k.shape[0], k.shape[1]
-
+            batch_size = k.shape[0]
             k = k.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
-            k = torch.reshape(k, [-1, dim]) # queries: BHW x dim
-
+            k = torch.reshape(k, [-1, p['model_kwargs']['ndim']]) # queries: BHW x dim
+            
+            # Drop background pixels
             offset = torch.arange(0, 2 * batch_size, 2).to(sal_k.device)
             sal_k = (sal_k + torch.reshape(offset, [-1, 1, 1]))*sal_k 
             sal_k = sal_k.view(-1)
-            
             mask_indexes = torch.nonzero((sal_k)).view(-1).squeeze()
-            reducer_idx = torch.randperm(mask_indexes.shape[0])[:reducer*batch_size]
-            mask_indexes = mask_indexes[reducer_idx]
+    
+            if isreduce:
+                reducer_idx = torch.randperm(mask_indexes.shape[0])[:p['kmeans']['reducer']*batch_size]
+                mask_indexes = mask_indexes[reducer_idx]
             
-            k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() # pixels x dim 
-            
-            
+            k = torch.index_select(k, index=mask_indexes, dim=0).detach().cpu() 
             
 
             if i_batch == 0:
-                print('Batch input size : {}'.format(list(img_k.shape)))
-                print('Batch feature : {}'.format(list(k.shape)))
-
-
-            if num_batches < num_init_batches:
+                logger.info('Batch feature : {}'.format(list(k.shape)))
+            
+            if num_batches < p['kmeans']['n_init']:
                 featslist.append(k)
                 num_batches += 1
-                
-                if num_batches == num_init_batches or num_batches == len(dataloader):
+                if num_batches == p['kmeans']['n_init'] or num_batches == len(dataloader):
                     if first_batch:
+                        # Compute initial centroids. 
+                        # By doing so, we avoid empty cluster problem from mini-batch K-Means. 
                         featslist = torch.cat(featslist).cpu().numpy().astype('float32')
-
-                        print(featslist.shape)
-
-                        centroids = get_init_centroids(in_dim=32, seed=2022, K=K_train, featlist=featslist, index=faiss_module).astype('float32')
+                        centroids = get_init_centroids(p, K, featslist, faiss_module).astype('float32')
                         D, I = faiss_module.search(featslist, 1)
-                        
                         kmeans_loss.update(D.mean())
-                        
-                        print('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
-                        
+                        logger.info('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
+                        # Compute counts for each cluster. 
                         for k in np.unique(I):
                             data_count[k] += len(np.where(I == k)[0])
                         first_batch = False
@@ -125,7 +88,6 @@ def run_mini_batch_kmeans(p, dataloader, model):
                         b_feat = torch.cat(featslist)
                         faiss_module = module_update_centroids(faiss_module, centroids)
                         D, I = faiss_module.search(b_feat.numpy().astype('float32'), 1)
-
                         kmeans_loss.update(D.mean())
 
                         # Update centroids. 
@@ -134,192 +96,173 @@ def run_mini_batch_kmeans(p, dataloader, model):
                             data_count[k] += len(idx_k)
                             centroid_lr    = len(idx_k) / (data_count[k] + 1e-6)
                             centroids[k]   = (1 - centroid_lr) * centroids[k] + centroid_lr * b_feat[idx_k].mean(0).numpy().astype('float32')
-
+                    
                     # Empty. 
                     featslist   = []
-                    num_batches = num_init_batches - arg_num_batches
+                    num_batches = p['kmeans']['n_init'] - p['kmeans']['n_update']
 
             if (i_batch % 100) == 0:
-                print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
-
-    centroids = torch.tensor(centroids, requires_grad=False).cuda()
+                logger.info('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
     
+    centroids = torch.tensor(centroids, requires_grad=False).cuda()
+
     return centroids, kmeans_loss.avg
 
-def compute_negative_euclidean(featmap, sal,  centroids, metric_function):
-    '''
-        featmap: BxdimxHxW
-        sal: BxHxW
-        centroids: Cxdim
-        metrics: conv1x1: dim->C
-    '''
-    predicted = metric_function(featmap)
-    predicted = predicted.permute((0, 2, 3, 1)) #BxHxWxC
-    predicted = predicted*sal # mask background
 
-     #
-    # centroids = centroids.unsqueeze(-1).unsqueeze(-1)
-    # return - (1 - 2*metric_function(featmap)\
-    #             + (centroids*centroids).sum(dim=1).unsqueeze(0)) # negative l2 squared 
-        
 
-def get_metric_as_conv(centroids):
-    C, dim = centroids.size()
-
-    centroids_weight = centroids.unsqueeze(-1).unsqueeze(-1)
-    metric_function  = nn.Conv2d(dim, C, 1, padding=0, stride=1, bias=False)
-    metric_function.weight.data = centroids_weight  
-    metric_function = metric_function.cuda()
-    
-    return metric_function
-
-def postprocess_label(args, K, idx, idx_img, scores):
-    out = scores[idx].topk(1, dim=0)[1].flatten().detach().cpu().numpy()
-
-    # Save labels. 
-    if not os.path.exists(os.path.join(args.save_model_path, 'label_' + str(n_dual))):
-        os.makedirs(os.path.join(args.save_model_path, 'label_' + str(n_dual)))
-    torch.save(out, os.path.join(args.save_model_path, 'label_' + str(n_dual), '{}.pkl'.format(idx_img)))
-    
-    # Count for re-weighting. 
-    counts = torch.tensor(np.bincount(out, minlength=K)).float()
-
-    return counts 
-def compute_labels(p, dataloader, model, centroids):
+def compute_labels(p, logger, dataloader, model, centroids, device):
     """
-    Label all images for each view with the obtained cluster centroids. 
+    Label for Query view using Key view: Eqv
     The distance is efficiently computed by setting centroids as convolution layer. 
     """
-    K = centroids.size(0)
-
-
+    K = centroids.size(0) + 1
 
     # Define metric function with conv layer. 
     metric_function = get_metric_as_conv(centroids)
-
+    metric_function = metric_function.to(device)
     counts = torch.zeros(K, requires_grad=False).cpu()
     model.eval()
     with torch.no_grad():
-        for i, batch in enumerate(dataloader):
+        for i_batch, batch in enumerate(dataloader):
             img_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
-            sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
-            
-            indices = batch['key']['meta']['index'].long().cpu().numpy()
+            # sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
+            indice = batch['query']['meta']['name']
 
-            q, _ = model.model_q(img_q) # Bx dim x H x W
+            
+            q, _ = model.model_k(img_q) # Bx dim x H x W
             q = nn.functional.normalize(q, dim=1)
-            batch_size, dim = q.shape[0], q.shape[1]
- 
+
+            if i_batch == 0:
+                logger.info('Centroid size      : {}'.format(list(centroids.shape)))
+                logger.info('Batch input size   : {}'.format(list(img_q.shape)))
+                logger.info('Batch feature size : {}\n'.format(list(q.shape)))
+
             # Compute distance and assign label. 
-            scores  = compute_negative_euclidean(q, sal_q, centroids, metric_function) 
+            scores  = compute_negative_euclidean(q, centroids, metric_function) #BxCxHxW: all bg 're 0 
+            
 
             # Save labels and count. 
-            for idx, idx_img in enumerate(indices):
-                counts += postprocess_label(p, K, idx, idx_img, scores)
-
-            if (i % 200) == 0:
-                print('[Assigning labels] {} / {}'.format(i, len(dataloader)))
+            for idx, idx_img in enumerate(indice):
+                counts += postprocess_label(p, K, idx, idx_img, scores, view='query')
+            
+            if (i_batch % 200) == 0:
+                logger.info('[Assigning labels] {} / {}'.format(i_batch, len(dataloader)))
+    
     weight = counts / counts.sum()
-        
+     
     return weight
+
+
+
+
+
+
+
 
 def train(p, N, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
-  
+    cluster_losses = AverageMeter('Cluster', ':.4e')
     kmeans_losses = AverageMeter('Kmeans', ':.4e')
 
-    top1 = AverageMeter('Acc@1', ':6.2f')
-    top5 = AverageMeter('Acc@5', ':6.2f')
+    top1contrast = AverageMeter('Acc1@contrastive', ':6.2f')
+    top1cluster = AverageMeter('Acc1@cluster', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, kmeans_losses, saliency_losses, top1, top5],
+                        [losses, contrastive_losses, cluster_losses, kmeans_losses, saliency_losses, top1contrast, top1cluster],
                         prefix="Epoch: [{}]".format(epoch))
-    model.train()
+    
 
     if p['freeze_layers']:
         model = freeze_layers(model)
     
-    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model)
+    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model, split='train')
     kmeans_losses.update(kmloss)
 
-    weight = compute_labels(p, train_loader, model, centroids) 
+    classifier = initialize_classifier(p, split='train')
+    classifier = classifier.cuda()
+    classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
+    freeze_all(classifier)
+    
+    # weight = compute_labels(p, train_loader, model, centroids) 
 
-
-
-#     for i, batch in enumerate(train_loader):
-#         # Forward pass
-#         im_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
-#         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
-#         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
-#         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+    model.train()
+    for i, batch in enumerate(train_loader):
+        # Forward pass
+        im_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
+        sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
+        im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
+        sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         
 
-#         logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, centroids=centroids)
+        logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
 
 
-#         # Use E-Net weighting for calculating the pixel-wise loss.
-#         # uniq, freq = torch.unique(labels, return_counts=True)
-#         # p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-#         # p_class_non_zero_classes = freq.float() / labels.numel()
-#         # p_class[uniq] = p_class_non_zero_classes
-#         # w_class = 1 / torch.log(1.02 + p_class)
-#         # contrastive_loss = cross_entropy(logits, labels, weight=w_class,
-#         #                                     reduction='mean')
+        #Use E-Net weighting for calculating the pixel-wise loss.
+        uniq, freq = torch.unique(labels, return_counts=True)
+        p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+        p_class_non_zero_classes = freq.float() / labels.numel()
+        p_class[uniq] = p_class_non_zero_classes
+        w_class = 1 / torch.log(1.02 + p_class)
+        contrastive_loss = cross_entropy(logits, labels, weight=w_class,
+                                            reduction='mean')
 
-#         contrastive_loss = cross_entropy(logits, labels,
-#                                             reduction='mean')
+        
+        cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
 
     
 
-#     #     # Calculate total loss and update meters
-#         loss = contrastive_loss + saliency_loss 
+        # Calculate total loss and update meters
+        loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss
         
-#         contrastive_losses.update(contrastive_loss.item())
-#         saliency_losses.update(saliency_loss.item())
-
-
-#         losses.update(loss.item())
+        contrastive_losses.update(contrastive_loss.item())
+        saliency_losses.update(saliency_loss.item())
+        cluster_losses.update(cluster_loss.item())
+        losses.update(loss.item())
         
-        
-
-
-#         acc1, acc5 = accuracy(logits, labels, topk=(1, 5))
-#         top1.update(acc1[0], im_q.size(0))
-#         top5.update(acc5[0], im_q.size(0))
         
 
-#         # Update model
-#         optimizer.zero_grad()
-#         if amp is not None: # Mixed precision
-#             with amp.scale_loss(loss, optimizer) as scaled_loss:
-#                 scaled_loss.backward()            
-#         else:
-#             loss.backward()
-#         optimizer.step()
 
-#         # Display progress
-#         if i % 25 == 0:
-#             progress.display(i)
+        acc1, _ = accuracy(logits, labels, topk=(1, 5))
+        bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
+        
+        top1contrast.update(acc1[0], im_q.size(0))
+        top1cluster.update(bcc1[0], im_q.size(0))
+        
+
+        # Update model
+        optimizer.zero_grad()
+        if amp is not None: # Mixed precision
+            with amp.scale_loss(loss, optimizer) as scaled_loss:
+                scaled_loss.backward()            
+        else:
+            loss.backward()
+        optimizer.step()
+
+        # Display progress
+        if i % 25 == 0:
+            progress.display(i)
     
-#     writer_path = os.path.join(p['output_dir'], "runs")
-#     writer = SummaryWriter(log_dir=writer_path)
-#     writer.add_scalar('total loss', losses.avg, epoch)
-#     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
-#     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
-#     writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
-#     writer.close()      
+    writer_path = os.path.join(p['output_dir'], "runs")
+    writer = SummaryWriter(log_dir=writer_path)
+    writer.add_scalar('total loss', losses.avg, epoch)
+    writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
+    writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
+    writer.add_scalar('cluster_loss', cluster_losses.avg, epoch)
+    writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
+
+    writer.close()      
 
 
-# @torch.no_grad()
-# def accuracy(output, target, topk=(1,)):
-#     maxk = max(topk)
-#     batch_size = target.size(0)
-#     _, pred = output.topk(maxk, 1, True, True)
-#     pred = pred.t()
-#     correct = pred.eq(target.view(1, -1).expand_as(pred))
-#     res = []
-#     for k in topk:
-#         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
-#         res.append(correct_k.mul_(100.0 / batch_size))
-#     return res
+@torch.no_grad()
+def accuracy(output, target, topk=(1,)):
+    maxk = max(topk)
+    batch_size = target.size(0)
+    _, pred = output.topk(maxk, 1, True, True)
+    pred = pred.t()
+    correct = pred.eq(target.view(1, -1).expand_as(pred))
+    res = []
+    for k in topk:
+        correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
+        res.append(correct_k.mul_(100.0 / batch_size))
+    return res

@@ -169,10 +169,3 @@ def adjust_learning_rate(p, optimizer, epoch):
 
 
 
-def get_filter(p):
-    from modules.models import Filter
-    return Filter(kernel_size=p['kernel_size'])
-
-def get_predictionHead(p):
-    from modules.models import PredictionHead
-    return PredictionHead(dim=p['model_kwargs']['ndim'])
