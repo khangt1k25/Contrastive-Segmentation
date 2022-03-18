@@ -159,7 +159,7 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
 
 
 
-def train(p, N, train_loader, model, optimizer, epoch, amp):
+def train(p, train_loader, model, optimizer, epoch, amp):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
