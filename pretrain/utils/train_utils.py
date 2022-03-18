@@ -20,7 +20,7 @@ import faiss
 
 
 
-def run_mini_batch_kmeans(p, logger, dataloader, model, split='train'):
+def run_mini_batch_kmeans(p, dataloader, model, split='train'):
     '''
     Clustering for Key view
     '''
@@ -66,7 +66,7 @@ def run_mini_batch_kmeans(p, logger, dataloader, model, split='train'):
             
 
             if i_batch == 0:
-                logger.info('Batch feature : {}'.format(list(k.shape)))
+                print('Batch feature : {}'.format(list(k.shape)))
             
             if num_batches < p['kmeans']['n_init']:
                 featslist.append(k)
@@ -79,7 +79,7 @@ def run_mini_batch_kmeans(p, logger, dataloader, model, split='train'):
                         centroids = get_init_centroids(p, K, featslist, faiss_module).astype('float32')
                         D, I = faiss_module.search(featslist, 1)
                         kmeans_loss.update(D.mean())
-                        logger.info('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
+                        print('Initial k-means loss: {:.4f} '.format(kmeans_loss.avg))
                         # Compute counts for each cluster. 
                         for k in np.unique(I):
                             data_count[k] += len(np.where(I == k)[0])
@@ -102,7 +102,7 @@ def run_mini_batch_kmeans(p, logger, dataloader, model, split='train'):
                     num_batches = p['kmeans']['n_init'] - p['kmeans']['n_update']
 
             if (i_batch % 100) == 0:
-                logger.info('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
+                print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda()
 
@@ -133,9 +133,9 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
             q = nn.functional.normalize(q, dim=1)
 
             if i_batch == 0:
-                logger.info('Centroid size      : {}'.format(list(centroids.shape)))
-                logger.info('Batch input size   : {}'.format(list(img_q.shape)))
-                logger.info('Batch feature size : {}\n'.format(list(q.shape)))
+                print('Centroid size      : {}'.format(list(centroids.shape)))
+                print('Batch input size   : {}'.format(list(img_q.shape)))
+                print('Batch feature size : {}\n'.format(list(q.shape)))
 
             # Compute distance and assign label. 
             scores  = compute_negative_euclidean(q, centroids, metric_function) #BxCxHxW: all bg 're 0 
@@ -146,7 +146,7 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
                 counts += postprocess_label(p, K, idx, idx_img, scores, view='query')
             
             if (i_batch % 200) == 0:
-                logger.info('[Assigning labels] {} / {}'.format(i_batch, len(dataloader)))
+                print('[Assigning labels] {} / {}'.format(i_batch, len(dataloader)))
     
     weight = counts / counts.sum()
      
@@ -159,7 +159,7 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
 
 
 
-def train(p, train_loader, model, optimizer, epoch, amp):
+def train(p, train_loader, model, optimizer, epoch):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
@@ -232,11 +232,7 @@ def train(p, train_loader, model, optimizer, epoch, amp):
 
         # Update model
         optimizer.zero_grad()
-        if amp is not None: # Mixed precision
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()            
-        else:
-            loss.backward()
+        loss.backward()
         optimizer.step()
 
         # Display progress
