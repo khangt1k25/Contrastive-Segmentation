@@ -91,7 +91,7 @@ class ContrastiveModel(nn.Module):
                 pseudo_label = classifier(pseudo_label)
                 pseudo_label = pseudo_label.topk(1, dim=1)[1].squeeze() #BxHxW
                 pseudo_label = torch.reshape(pseudo_label, [-1, ]) # BHW
-
+            
             
             cluster = classifier(q)
             cluster = cluster.permute((0, 2, 3, 1))
