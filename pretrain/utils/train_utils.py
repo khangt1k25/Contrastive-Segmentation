@@ -20,7 +20,7 @@ import faiss
 
 
 
-def run_mini_batch_kmeans(p, dataloader, model, split='train'):
+def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
     '''
     Clustering for Key view
     '''
@@ -155,10 +155,6 @@ def compute_labels(p, logger, dataloader, model, centroids, device):
 
 
 
-
-
-
-
 def train(p, train_loader, model, optimizer, epoch):
     losses = AverageMeter('Loss', ':.4e')
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
@@ -244,7 +240,7 @@ def train(p, train_loader, model, optimizer, epoch):
     writer.add_scalar('total loss', losses.avg, epoch)
     writer.add_scalar('contrastive loss', contrastive_losses.avg, epoch)
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
-    writer.add_scalar('cluster_loss', cluster_losses.avg, epoch)
+    writer.add_scalar('cluster loss', cluster_losses.avg, epoch)
     writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
 
     writer.close()      

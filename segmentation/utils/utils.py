@@ -6,7 +6,8 @@ import os
 import torch
 import numpy as np
 import errno
-
+import faiss
+import torch.nn as nn
 
 def mkdir_if_missing(directory):
     if not os.path.exists(directory):
@@ -98,3 +99,43 @@ class ProgressMeter(object):
         num_digits = len(str(num_batches // 1))
         fmt = '{:' + str(num_digits) + 'd}'
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
+
+
+
+
+def get_faiss_module(p):
+    res = faiss.StandardGpuResources()
+    cfg = faiss.GpuIndexFlatConfig()
+    cfg.useFloat16 = True
+    cfg.device     = 0 #NOTE: Single GPU only. 
+    idx = faiss.GpuIndexFlatL2(res, 32, cfg)
+    return idx
+
+def get_init_centroids(p, K, featlist, index, seed):
+    clus = faiss.Clustering(32, K)
+    clus.seed  = np.random.randint(seed)
+    clus.niter = 20
+    clus.max_points_per_centroid = 10000000
+    clus.train(featlist, index)
+    return faiss.vector_float_to_array(clus.centroids).reshape(K, 32)
+
+def module_update_centroids(index, centroids):
+    index.reset()
+    index.add(centroids)
+    return index 
+
+
+def freeze_all(model):
+    for param in model.parameters():
+        param.requires_grad = False 
+
+
+def initialize_classifier():
+    classifier = get_linear(32, 20)    
+    return classifier
+
+def get_linear(indim, outdim):
+    classifier = nn.Conv2d(indim, outdim, kernel_size=1, stride=1, padding=0, bias=True)
+    classifier.weight.data.normal_(0, 0.01)
+    classifier.bias.data.zero_()
+    return classifier
