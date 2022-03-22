@@ -246,25 +246,28 @@ class CutoutDefault(object):
         return img
 
 
-class RandAugment:
-    def __init__(self, N, k, m):
-        self.k = k
-        self.m = m      # [0, 30]
-        self.N = N
-        
+class RandAugment(object):
+    def __init__(self, m):
+        # self.k = k
+        # self.m = m      # [0, 30]
+        # self.N = N
+        self.m = m
         self.augment_list = augment_list() 
         self.total_ops = len(self.augment_list)
-        
-        self.rand_ops = [[random.random() for _ in range(self.total_ops)] for i in range(self.N)]
 
+        # self.rand_ops = [[] for i in range(self.N)]
+        
 
     def __call__(self, indice, img, sal):
         pair = img, sal
+
+        rand_ops = [random.random() for _ in range(self.total_ops)]
+
         for iop, (op, minval, maxval) in enumerate(self.augment_list):
-            p_seed = self.rand_ops[indice][iop]
-            if self.rand_ops[indice][iop] >= 0.5:
+            p_seed = rand_ops[indice][iop]
+            if p_seed >= 0.5:
                 val = (float(self.m) / 30) * float(maxval - minval) + minval
                 pair = op(pair, val, p_seed)
-        
+
         return pair
 

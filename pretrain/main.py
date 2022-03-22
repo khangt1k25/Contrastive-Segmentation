@@ -13,13 +13,13 @@ import torch.nn as nn
 import torch.multiprocessing as mp
 import torch.distributed as dist
 
-from data.dataloaders.dataset import DatasetKeyQuery
+from data.dataloaders.dataset import DatasetKeyQuery, DatasetKeyQueryRandAug
 
 from modules.moco.builder import ContrastiveModel
 
 from utils.config import create_config
 from utils.common_config import get_train_dataset, get_train_transformations,\
-                                get_train_dataloader, get_optimizer, adjust_learning_rate
+                                get_train_dataloader, get_optimizer, adjust_learning_rate, get_randaug_transformations
 
 from utils.train_utils import train
 from utils.logger import Logger
@@ -96,7 +96,11 @@ def main_worker(gpu, args):
     # Transforms 
     train_transform = get_train_transformations()
     print(train_transform)
-    train_dataset = DatasetKeyQuery(get_train_dataset(p, transform = None), train_transform, 
+
+    randaug_transform = get_randaug_transformations(m=10)
+    
+
+    train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), train_transform, randaug_transform,
                                 downsample_sal=not p['model_kwargs']['upsample'])
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=False,
                     num_workers=p['num_workers'], pin_memory=True, drop_last=True, collate_fn=collate_custom)

@@ -208,7 +208,7 @@ def train(p, train_loader, model, optimizer, epoch):
         w_class = 1 / torch.log(1.02 + p_class)
         contrastive_loss = cross_entropy(logits, labels, weight=w_class,
                                             reduction='mean')
-
+        
         
         if classifier:
             cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
