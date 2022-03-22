@@ -10,7 +10,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pretrain.utils.utils import compute_negative_euclidean
+from utils.utils import compute_negative_euclidean
 
 from utils.common_config import get_model
 from modules.losses import BalancedCrossEntropyLoss
