@@ -83,8 +83,8 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
 
         if classifier:
-            # cluster = classifier(q)  # cosine
-            cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
+            cluster = classifier(q)  # cosine
+            # cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             
@@ -104,7 +104,7 @@ class ContrastiveModel(nn.Module):
         if classifier:
             cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
             with torch.no_grad():
-                pseudo_label = cluster.topk(1, dim=1)[1].squeeeze().long().detach() # pixels
+                pseudo_label = cluster.topk(1, dim=1)[1].squeeze().long().detach() # pixels
             cluster /= 0.1
 
         with torch.no_grad():
@@ -142,6 +142,6 @@ class ContrastiveModel(nn.Module):
             return logits, sal_q, cluster, pseudo_label, sal_loss
         else:
             return logits, sal_q, sal_loss
-
+            
 
 

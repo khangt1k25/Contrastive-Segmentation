@@ -175,7 +175,6 @@ def train(p, train_loader, model, optimizer, epoch):
     if epoch % p['kmeans']['cluster_epochs'] == 0:
         centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model, split='train')
         kmeans_losses.update(kmloss)
-
         classifier = initialize_classifier(p, split='train')
         classifier = classifier.cuda()
         classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
@@ -195,7 +194,7 @@ def train(p, train_loader, model, optimizer, epoch):
         
 
         if classifier:
-            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, centroids=centroids)
+            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
         else:
             logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k)
 
@@ -224,7 +223,6 @@ def train(p, train_loader, model, optimizer, epoch):
         losses.update(loss.item())
         acc1, _ = accuracy(logits, labels, topk=(1, 5))
         top1contrast.update(acc1[0], im_q.size(0))
-        
         
 
         # Update model
@@ -259,3 +257,4 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
+    
