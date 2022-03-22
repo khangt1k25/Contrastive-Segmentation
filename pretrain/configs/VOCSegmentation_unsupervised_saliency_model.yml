@@ -44,11 +44,12 @@ moco_kwargs:
 seed: 2022
 kmeans:
    n_iter: 20
-   n_init: 48
+   n_init: 64
    n_update: 2
    K_train: 20
    K_test: 20
    reducer: 0
+   cluster_epochs: 1
 
 ## Loss
 loss_coeff:

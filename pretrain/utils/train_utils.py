@@ -105,7 +105,7 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
                 print('[Saving features]: {} / {} | [K-Means Loss]: {:.4f}'.format(i_batch, len(dataloader), kmeans_loss.avg))
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda()
-
+    centroids = F.normalize(centroids, dim=1)
     return centroids, kmeans_loss.avg
 
 
@@ -161,7 +161,6 @@ def train(p, train_loader, model, optimizer, epoch):
     saliency_losses = AverageMeter('CE', ':.4e')
     cluster_losses = AverageMeter('Cluster', ':.4e')
     kmeans_losses = AverageMeter('Kmeans', ':.4e')
-
     top1contrast = AverageMeter('Acc1@contrastive', ':6.2f')
     top1cluster = AverageMeter('Acc1@cluster', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
@@ -172,14 +171,18 @@ def train(p, train_loader, model, optimizer, epoch):
     if p['freeze_layers']:
         model = freeze_layers(model)
     
-    centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model, split='train')
-    kmeans_losses.update(kmloss)
-
-    classifier = initialize_classifier(p, split='train')
-    classifier = classifier.cuda()
-    classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
-    freeze_all(classifier)
     
+    if epoch % p['kmeans']['cluster_epochs'] == 0:
+        centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model, split='train')
+        kmeans_losses.update(kmloss)
+    
+        classifier = initialize_classifier(p, split='train')
+        classifier = classifier.cuda()
+        classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
+        freeze_all(classifier)
+    else:
+        classifier = None
+
     # weight = compute_labels(p, train_loader, model, centroids) 
 
     model.train()
@@ -191,7 +194,10 @@ def train(p, train_loader, model, optimizer, epoch):
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
         
 
-        logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
+        if classifier:
+            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
+        else:
+            logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
 
 
         #Use E-Net weighting for calculating the pixel-wise loss.
@@ -204,26 +210,21 @@ def train(p, train_loader, model, optimizer, epoch):
                                             reduction='mean')
 
         
-        cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+        if classifier:
+            cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            cluster_losses.update(cluster_loss.item())
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss
+            bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
+            top1cluster.update(bcc1[0], im_q.size(0))
+        else:
+            loss = contrastive_loss + saliency_loss
 
-    
-
-        # Calculate total loss and update meters
-        loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss
-        
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
-        cluster_losses.update(cluster_loss.item())
         losses.update(loss.item())
-        
-        
-
-
         acc1, _ = accuracy(logits, labels, topk=(1, 5))
-        bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
-        
         top1contrast.update(acc1[0], im_q.size(0))
-        top1cluster.update(bcc1[0], im_q.size(0))
+        
         
 
         # Update model

@@ -295,7 +295,7 @@ def _hungarian_match(flat_preds, flat_targets, preds_k, targets_k, metric='acc')
     res = []
     for out_c, gt_c in match:
         res.append((out_c, gt_c))
-
+        
     return res
 
 def _majority_vote(flat_preds, flat_targets, preds_k, targets_k):

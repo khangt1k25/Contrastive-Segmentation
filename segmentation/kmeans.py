@@ -67,7 +67,7 @@ def main():
     print(val_transforms)
     val_dataset = VOC12(split='val', transform=val_transforms)
     val_dataloader = get_val_dataloader(p, val_dataset)
-
+    
     true_val_dataset = VOC12(split='val', transform=None)
     print(colored('Val samples %d' %(len(true_val_dataset)), 'yellow'))
 
