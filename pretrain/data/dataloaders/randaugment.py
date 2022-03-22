@@ -258,16 +258,17 @@ class RandAugment(object):
         # self.rand_ops = [[] for i in range(self.N)]
         
 
-    def __call__(self, indice, img, sal):
-        pair = img, sal
+    def __call__(self, sample):
+        pair = sample['image'], sample['sal']
 
         rand_ops = [random.random() for _ in range(self.total_ops)]
 
         for iop, (op, minval, maxval) in enumerate(self.augment_list):
-            p_seed = rand_ops[indice][iop]
+            p_seed = rand_ops[iop]
             if p_seed >= 0.5:
                 val = (float(self.m) / 30) * float(maxval - minval) + minval
                 pair = op(pair, val, p_seed)
-
-        return pair
+        sample['image'] = pair[0]
+        sample['sal'] = pair[1]
+        return sample
 

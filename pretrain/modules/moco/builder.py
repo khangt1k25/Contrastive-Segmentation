@@ -73,7 +73,7 @@ class ContrastiveModel(nn.Module):
 
 
 
-    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None):
+    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None, im_randaug=None, sal_randaug=None):
             
         batch_size, dim, H, W = im_q.shape
         
@@ -88,6 +88,15 @@ class ContrastiveModel(nn.Module):
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             
+
+            randaug, _ = self.model_q(im_randaug)
+            randaug = nn.functional.normalize(randaug, dim=1)
+
+            randaug = compute_negative_euclidean(randaug, centroids, classifier)
+            randaug = randaug.permute((0, 2, 3, 1)) # BxCxHxW
+            randaug = torch.reshape(randaug, [-1, randaug.shape[-1]]) # BHW x C
+
+
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
 
@@ -99,13 +108,29 @@ class ContrastiveModel(nn.Module):
             mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
             sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
         
-        
+        with torch.no_grad():
+            offset2 = torch.arange(0, 2 * batch_size, 2).to(sal_randaug.device)
+            sal_randaug = (sal_randaug + torch.reshape(offset, [-1, 1, 1]))*sal_randaug # all bg's to 0
+            sal_randaug = sal_randaug.view(-1)
+            mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
+            # sal_randaug = torch.index_select(sal_randaug, index=mask_indexes, dim=0) // 2
+
+
         # compute cluster loss : Not use bg
         if classifier:
             cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
             with torch.no_grad():
-                pseudo_label = cluster.topk(1, dim=1)[1].squeeeze().long().detach() # pixels
+                pseudo_label = cluster.topk(1, dim=1)[1].squeeze().long().detach() # pixels
             cluster /= 0.1
+
+
+            randaug = torch.index_select(randaug, index=mask_indexes2, dim=0)
+            with torch.no_grad():
+                threshold = 0.9
+                maxval, randaug_label = randaug.topk(1, dim=1)
+                randaug_label = randaug_label.squeeze().long().detach()
+                mask = maxval.ge(threshold).squeeze().float()
+            randaug /= 0.1
 
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
@@ -139,7 +164,7 @@ class ContrastiveModel(nn.Module):
         logits /= self.T
         
         if classifier:
-            return logits, sal_q, cluster, pseudo_label, sal_loss
+            return logits, sal_q, cluster, pseudo_label, randaug, randaug_label, mask, sal_loss
         else:
             return logits, sal_q, sal_loss
 

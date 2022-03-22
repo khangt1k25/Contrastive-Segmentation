@@ -84,6 +84,8 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
                         for k in np.unique(I):
                             data_count[k] += len(np.where(I == k)[0])
                         first_batch = False
+
+                        break
                     else:
                         b_feat = torch.cat(featslist)
                         faiss_module = module_update_centroids(faiss_module, centroids)
@@ -160,11 +162,12 @@ def train(p, train_loader, model, optimizer, epoch):
     contrastive_losses = AverageMeter('Contrastive', ':.4e')
     saliency_losses = AverageMeter('CE', ':.4e')
     cluster_losses = AverageMeter('Cluster', ':.4e')
+    randaug_losses = AverageMeter('Randaug', ':.4e')
     kmeans_losses = AverageMeter('Kmeans', ':.4e')
     top1contrast = AverageMeter('Acc1@contrastive', ':6.2f')
     top1cluster = AverageMeter('Acc1@cluster', ':6.2f')
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, cluster_losses, kmeans_losses, saliency_losses, top1contrast, top1cluster],
+                        [losses, contrastive_losses, cluster_losses, randaug_losses, kmeans_losses, saliency_losses, top1contrast, top1cluster],
                         prefix="Epoch: [{}]".format(epoch))
     
 
@@ -192,10 +195,17 @@ def train(p, train_loader, model, optimizer, epoch):
         sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
         im_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
         sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
+
         
+        
+        # print(im_randaug.shape)
+        # print(sal_randaug.shape)
+
 
         if classifier:
-            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, centroids=centroids)
+            im_randaug = batch['randaug']['image'].cuda(p['gpu'], non_blocking=True)
+            sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
+            logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, centroids=centroids, im_randaug=im_randaug, sal_randaug=sal_randaug)
         else:
             logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k)
 
@@ -213,9 +223,16 @@ def train(p, train_loader, model, optimizer, epoch):
         if classifier:
             cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
             cluster_losses.update(cluster_loss.item())
-            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss
+            
             bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
             top1cluster.update(bcc1[0], im_q.size(0))
+
+
+            randaug_loss = (F.cross_entropy(randaug_logits, randaug_labels, reduction='none') * mask ).mean()
+            randaug_losses.update(randaug_loss.item())
+
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + 0.05 * randaug_loss
+            
         else:
             loss = contrastive_loss + saliency_loss
 
@@ -243,6 +260,7 @@ def train(p, train_loader, model, optimizer, epoch):
     writer.add_scalar('saliency loss', saliency_losses.avg, epoch)
     writer.add_scalar('cluster loss', cluster_losses.avg, epoch)
     writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
+    writer.add_scalar('randaug loss', randaug_losses.avg, epoch)
 
     writer.close()      
 

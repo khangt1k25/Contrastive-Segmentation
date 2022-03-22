@@ -7,13 +7,15 @@ import torch.nn as nn
 
 
 x = torch.rand(10, 32)
-perm = torch.randperm(x.shape[0])
-idx = perm[:3]
-samples = x[idx]
 
+maxval, label = x.topk(k=1, dim=1)
 
-print(idx)
-print(samples.shape)
+print(maxval.shape)
+print(label.shape)
+
+mask = maxval.ge(0.9).float()
+
+print(mask.shape)
 
 # sal_q = torch.Tensor([0])
 
