@@ -83,16 +83,16 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
 
         if classifier:
-            # cluster = classifier(q)  # cosine
-            cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
+            cluster = classifier(q)  # cosine
+            # cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             
 
             randaug, _ = self.model_q(im_randaug)
             randaug = nn.functional.normalize(randaug, dim=1)
-
-            randaug = compute_negative_euclidean(randaug, centroids, classifier)
+            randaug = classifier(randaug) #consine
+            # randaug = compute_negative_euclidean(randaug, centroids, classifier) #negative euclidean
             randaug = randaug.permute((0, 2, 3, 1)) # BxCxHxW
             randaug = torch.reshape(randaug, [-1, randaug.shape[-1]]) # BHW x C
 
@@ -110,10 +110,9 @@ class ContrastiveModel(nn.Module):
         
         with torch.no_grad():
             offset2 = torch.arange(0, 2 * batch_size, 2).to(sal_randaug.device)
-            sal_randaug = (sal_randaug + torch.reshape(offset, [-1, 1, 1]))*sal_randaug # all bg's to 0
+            sal_randaug = (sal_randaug + torch.reshape(offset2, [-1, 1, 1]))*sal_randaug # all bg's to 0
             sal_randaug = sal_randaug.view(-1)
             mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
-            # sal_randaug = torch.index_select(sal_randaug, index=mask_indexes, dim=0) // 2
 
 
         # compute cluster loss : Not use bg

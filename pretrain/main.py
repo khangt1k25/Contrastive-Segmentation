@@ -96,10 +96,9 @@ def main_worker(gpu, args):
     # Transforms 
     train_transform = get_train_transformations()
     print(train_transform)
-
     randaug_transform = get_randaug_transformations(m=10)
     
-
+    
     train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), train_transform, randaug_transform,
                                 downsample_sal=not p['model_kwargs']['upsample'])
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=False,
@@ -115,7 +114,6 @@ def main_worker(gpu, args):
         optimizer.load_state_dict(checkpoint['optimizer'])
         model.load_state_dict(checkpoint['model'])
         start_epoch = checkpoint['epoch']
-
     else:
         print(colored('No checkpoint file at {}'.format(p['checkpoint']), 'blue'))
         start_epoch = 0
