@@ -258,3 +258,43 @@ class Normalize(object):
     
     def __str__(self):
         return self.normalize.__str__()
+
+
+
+class RandomJiter(object):
+    def __init__(self):
+        self.colorJiter = torchvision.transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+    def __call__(self, sample):
+    
+        if random.random() < 0.5:
+            sample['image'] = self.colorJiter(sample['image'])
+                    
+        return sample
+
+    def __str__(self):
+        return 'RandomJiter'
+
+class RandomGray(object):
+
+    def __init__(self):
+        self.gray = torchvision.transforms.Grayscale()
+    def __call__(self, sample):
+    
+        if random.random() < 0.5:
+            sample['image'] = self.gray(sample['image'])
+                    
+        return sample
+
+    def __str__(self):
+        return 'RandomGray'
+
+
+
+class ToNumpy(object):
+    def __call__(self, sample):
+
+        sample['image'] = np.array(sample['image'])
+        return sample
+
+    def __str__(self):
+        return 'ToNumpy'

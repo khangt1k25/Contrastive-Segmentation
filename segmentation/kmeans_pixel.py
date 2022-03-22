@@ -3,6 +3,7 @@
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
 import argparse
+from random import seed
 import cv2
 import os
 import numpy as np
@@ -12,10 +13,9 @@ from utils.utils import *
 from utils.kmeans_utils import *
 from utils.config import create_config
 from utils.common_config import get_val_dataset, get_val_transformations,\
-                                get_val_dataloader,\
-                                get_model
+                                get_val_transformations_invariance ,get_val_dataloader,\
+                                get_model, get_val_transformations_invariance
 from termcolor import colored
-import torchvision.transforms as transforms
 from termcolor import colored
 
 # Parser
@@ -45,8 +45,8 @@ def main():
     # Load pre-trained weights
     state_dict = torch.load(p['pretraining'], map_location='cpu')
         # State dict follows our lay-out
-    if 'model' in state_dict.keys():
-        state_dict = state_dict['model']
+    if 'state_dict' in state_dict.keys():
+        state_dict = state_dict['state_dict']
     new_state = {}
     for k, v in state_dict.items():
         if k.startswith('model_q'):
@@ -63,29 +63,31 @@ def main():
     
     # Transforms 
     from data.dataloaders.pascal_voc import VOC12
-    val_transforms = get_val_transformations()
-    print(val_transforms)
-    val_dataset = VOC12(split='val', transform=val_transforms)
+    val_transforms_invariances = get_val_transformations_invariance()
+    print(val_transforms_invariances)
+    val_dataset = VOC12(split='val', transform=val_transforms_invariances)
+    # print(val_dataset[0])
     val_dataloader = get_val_dataloader(p, val_dataset)
 
-    true_val_dataset = VOC12(split='val', transform=None)
-    print(colored('Val samples %d' %(len(true_val_dataset)), 'yellow'))
+    val_transforms = get_val_transformations()
+    print(val_transforms)
+    true_val_dataset = VOC12(split='val', transform=val_transforms)
+    true_val_dataloader = get_val_dataloader(p, true_val_dataset)
+    
 
     # Kmeans Clustering
     n_clusters = 21
     results_miou = []
     best = 0.0
     for i in range(args.num_seeds):
-        # save_embeddings_to_disk(p, val_dataloader, model, )
-        save_embedding_to_disk_pixel(p, val_dataloader, model, n_clusters=n_clusters, seed=1234 + i)   
-        eval_stats, match = eval_kmeans(p, true_val_dataset, n_clusters=n_clusters, verbose=True)
-        results_miou.append(eval_stats['mIoU'])
-        if eval_stats['mIoU'] > best:
-          best = eval_stats['mIoU']
-          np.save(os.path.join(p['output_dir'], 'match.npy'), match)
-        
-    print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)*100), 'green'))
-    print(colored('STD mIoU is %2.1f' %(np.std(results_miou)*100), 'green'))
+        eval_result = eval_kmeans_pixel(p, val_dataloader, true_val_dataloader, model, n_clusters=n_clusters, seed=1234+i, verbose=True)
+        if eval_result['mean_iou'] > best:
+            best = eval_result['mean_iou']
+        results_miou.append(eval_result['mean_iou'])    
+    
+
+    print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)), 'green'))
+    print(colored('STD mIoU is %2.1f' %(np.std(results_miou)), 'green'))
     
 if __name__ == "__main__":
     main()

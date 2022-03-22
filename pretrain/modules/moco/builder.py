@@ -10,6 +10,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pretrain.utils.utils import compute_negative_euclidean
 
 from utils.common_config import get_model
 from modules.losses import BalancedCrossEntropyLoss
@@ -72,7 +73,7 @@ class ContrastiveModel(nn.Module):
 
 
 
-    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None):
+    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None):
             
         batch_size, dim, H, W = im_q.shape
         
@@ -82,7 +83,8 @@ class ContrastiveModel(nn.Module):
         q = nn.functional.normalize(q, dim=1)
 
         if classifier:
-            cluster = classifier(q)
+            # cluster = classifier(q)  # cosine
+            cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             

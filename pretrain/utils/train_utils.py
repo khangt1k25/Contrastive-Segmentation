@@ -175,7 +175,7 @@ def train(p, train_loader, model, optimizer, epoch):
     if epoch % p['kmeans']['cluster_epochs'] == 0:
         centroids, kmloss = run_mini_batch_kmeans(p, train_loader, model, split='train')
         kmeans_losses.update(kmloss)
-    
+
         classifier = initialize_classifier(p, split='train')
         classifier = classifier.cuda()
         classifier.weight.data = centroids.unsqueeze(-1).unsqueeze(-1)
@@ -184,7 +184,7 @@ def train(p, train_loader, model, optimizer, epoch):
         classifier = None
 
     # weight = compute_labels(p, train_loader, model, centroids) 
-
+    
     model.train()
     for i, batch in enumerate(train_loader):
         # Forward pass
@@ -195,9 +195,9 @@ def train(p, train_loader, model, optimizer, epoch):
         
 
         if classifier:
-            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
+            logits, labels, cluster_logits, cluster_labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, centroids=centroids)
         else:
-            logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier)
+            logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k)
 
 
         #Use E-Net weighting for calculating the pixel-wise loss.

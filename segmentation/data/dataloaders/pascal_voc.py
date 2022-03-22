@@ -93,11 +93,17 @@ class VOC12(data.Dataset):
 
         # Load pixel-level annotations
         _semseg = self._load_semseg(index)
-        if _semseg.shape != _img.shape[:2]:
-            _semseg = cv2.resize(_semseg, _img.shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
+        sizeofimage = _img.size
+        if _semseg.shape != sizeofimage:
+          _semseg = cv2.resize(_semseg, sizeofimage, interpolation=cv2.INTER_NEAREST)
+        # if _semseg.shape != _img.shape[:2]:
+            # _semseg = cv2.resize(_semseg, _img.shape[:2][::-1], interpolation=cv2.INTER_NEAREST)
+
         sample['semseg'] = _semseg
+
+        print()
 	
-        sample['meta'] = {'im_size': (_img.shape[0], _img.shape[1]),
+        sample['meta'] = {'im_size': sizeofimage,
                           'image_file': self.images[index],
                           'image': os.path.basename(self.semsegs[index]).split('.')[0]}
             
@@ -110,7 +116,8 @@ class VOC12(data.Dataset):
         return len(self.images)
 
     def _load_img(self, index):
-        _img = np.array(Image.open(self.images[index]).convert('RGB'))
+        # _img = np.array(Image.open(self.images[index]).convert('RGB'))
+        _img = Image.open(self.images[index]).convert('RGB')
         return _img
 
     def _load_semseg(self, index):
