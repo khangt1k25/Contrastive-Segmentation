@@ -8,7 +8,7 @@ import cv2
 import math
 import data.util.helpers as helpers
 import torchvision
-
+import torchvision.transforms.functional as F
 
 class ScaleNRotate(object):
     """Scale (zoom-in, zoom-out) and Rotate the image and the ground truth.
@@ -262,11 +262,12 @@ class Normalize(object):
 
 
 class RandomJiter(object):
-    def __init__(self):
-        self.colorJiter = torchvision.transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)
+    def __init__(self, jiter=(0.4, 0.4, 0.4, 0.1), p=0.8):
+        self.p = p
+        self.colorJiter = torchvision.transforms.ColorJitter(*jiter)
     def __call__(self, sample):
     
-        if random.random() < 0.5:
+        if random.random() <= self.p:
             sample['image'] = self.colorJiter(sample['image'])
                     
         return sample
@@ -275,16 +276,12 @@ class RandomJiter(object):
         return 'RandomJiter'
 
 class RandomGray(object):
-
-    def __init__(self):
-        self.gray = torchvision.transforms.Grayscale()
-    def __call__(self, sample):
-    
-        if random.random() < 0.5:
-            sample['image'] = self.gray(sample['image'])
-                    
+    def __init__(self, p=0.2):
+        self.p = p
+    def __call__(self, sample):   
+        if random.random() <= self.p:
+            sample['image'] = F.to_grayscale(sample['image'], num_output_channels=3)       
         return sample
-
     def __str__(self):
         return 'RandomGray'
 

@@ -3,36 +3,37 @@
 # Licensed under the CC BY-NC 4.0 license (https://creativecommons.org/licenses/by-nc/4.0/)
 
 import argparse
-from random import seed
 import cv2
 import os
 import numpy as np
+import sys
 import torch
 import torch.nn as nn
-from utils.utils import *
-from utils.kmeans_utils import *
+
 from utils.config import create_config
 from utils.common_config import get_val_dataset, get_val_transformations,\
-                                get_val_transformations_invariance ,get_val_dataloader,\
-                                get_model, get_val_transformations_invariance
-from termcolor import colored
+                                get_val_dataloader,\
+                                get_model
+from utils.logger import Logger
+from utils.retrieval_utils import build_memory_bank_pixel, retrieval_pixel
 from termcolor import colored
 
+
 # Parser
-parser = argparse.ArgumentParser(description='Fully-unsupervised segmentation')
+parser = argparse.ArgumentParser(description='Retrieval')
 parser.add_argument('--config_env',
                     help='Config file for the environment')
 parser.add_argument('--config_exp',
                     help='Config file for the experiment')
-parser.add_argument('--num_seeds', default=5, type=int,
-                    help='number of seeds during kmeans')
 args = parser.parse_args()
+
 
 def main():
     cv2.setNumThreads(1)
 
     # Retrieve config file
     p = create_config(args.config_env, args.config_exp)
+    sys.stdout = Logger(os.path.join(p['retrieval_dir'], 'log_file.txt'))
     print('Python script is {}'.format(os.path.abspath(__file__)))
     print(colored(p, 'red'))
 
@@ -41,7 +42,7 @@ def main():
     model = get_model(p)
     print(model)
     model = model.cuda()
-    
+
     # Load pre-trained weights
     state_dict = torch.load(p['pretraining'], map_location='cpu')
         # State dict follows our lay-out
@@ -53,7 +54,7 @@ def main():
             new_state[k.rsplit('model_q.')[1]] = v
     msg = model.load_state_dict(new_state, strict=False)
     print(msg)
-
+    
     # CUDNN
     print(colored('Set CuDNN benchmark', 'blue')) 
     torch.backends.cudnn.benchmark = True
@@ -63,31 +64,21 @@ def main():
     
     # Transforms 
     from data.dataloaders.pascal_voc import VOC12
-    val_transforms_invariances = get_val_transformations_invariance()
-    print(val_transforms_invariances)
-    val_dataset = VOC12(split='val', transform=val_transforms_invariances)
-    # print(val_dataset[0])
-    val_dataloader = get_val_dataloader(p, val_dataset)
-
     val_transforms = get_val_transformations()
     print(val_transforms)
-    true_val_dataset = VOC12(split='val', transform=val_transforms)
-    true_val_dataloader = get_val_dataloader(p, true_val_dataset)
-    
+    train_dataset = VOC12(split='train', transform=val_transforms, ignore_classes=p['retrieval_kwargs']['ignore_classes'])
+    val_dataset = VOC12(split='val', transform=val_transforms, ignore_classes=p['retrieval_kwargs']['ignore_classes'])
+    train_dataloader = get_val_dataloader(p, train_dataset)
+    val_dataloader = get_val_dataloader(p, val_dataset)
+    print('Train dataset {} - Val dataset {}'.format(str(train_dataset), str(val_dataset)))
+    print('Train samples {} - Val samples {}' .format(len(train_dataset), len(val_dataset)))
 
-    # Kmeans Clustering
-    n_clusters = 21
-    results_miou = []
-    best = 0.0
-    for i in range(args.num_seeds):
-        eval_result = eval_kmeans_pixel(p, val_dataloader, true_val_dataloader, model, n_clusters=n_clusters, seed=1234+i, verbose=True)
-        if eval_result['mean_iou'] > best:
-            best = eval_result['mean_iou']
-        results_miou.append(eval_result['mean_iou'])    
-    
+    # Build memory bank
+    print(colored('Perform retrieval ...', 'blue'))
+    memory_bank = build_memory_bank_pixel(p, train_dataset, train_dataloader, model)
+    results = retrieval_pixel(p, memory_bank, val_dataset, val_dataloader, model)
 
-    print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)), 'green'))
-    print(colored('STD mIoU is %2.1f' %(np.std(results_miou)), 'green'))
-    
+
 if __name__ == "__main__":
     main()
+

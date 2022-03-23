@@ -187,15 +187,15 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
     n_clusters = n_clusters - 1
     isreduce = False
     reduce = 100 #100
-    n_init = 32 #16
+    n_init = 16 #16
     n_update = 1 #1
     num_batches = 0
 
     featslist = []  
     data_count   = np.zeros(n_clusters)
     first_batch = True
-    model.eval()
     
+    model.eval()
     for i_batch, batch in enumerate(val_loader):
         output, sal = model(batch['image'].cuda(non_blocking=True))
         meta = batch['meta'] 
@@ -218,7 +218,7 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
             mask_indexes = mask_indexes[reducer_idx]
         
         output = torch.index_select(output, index=mask_indexes, dim=0).detach().cpu()
-
+        
         
         if num_batches < n_init:
             featslist.append(output)
@@ -256,6 +256,7 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
 
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda() # Cluster x dim
+    centroids = nn.functional.normalize(centroids, dim=1)
 
     classifier = initialize_classifier()
     classifier = classifier.cuda()
@@ -270,8 +271,8 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
         meta = batch['meta'] 
         sal = (sal > 0.5).float()
         
-        # preds = classifier(output) # Bx Cluster x H x W
-        preds =  compute_negative_euclidean(output, centroids, classifier)
+        preds = classifier(output) # Bx Cluster x H x W
+        # preds =  compute_negative_euclidean(output, centroids, classifier)
 
 
         preds = preds.topk(1, dim=1)[1].squeeze() # BxHxW
@@ -358,10 +359,8 @@ def get_iou(flat_preds, flat_targets, c1, c2):
 def _fast_hist(label_true, label_pred, n_class):
         mask = (label_true >= 0) & (label_true < n_class) # Exclude unlabelled data.
         hist = np.bincount(n_class * label_true[mask] + label_pred[mask],\
-                    minlength=n_class ** 2).reshape(n_class, n_class)
-    
+                    minlength=n_class ** 2).reshape(n_class, n_class)    
         return hist
-
 
 def scores(label_trues, label_preds, n_class):
     hist = np.zeros((n_class, n_class))
