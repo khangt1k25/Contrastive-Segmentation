@@ -44,9 +44,9 @@ def main():
     
     # Load pre-trained weights
     state_dict = torch.load(p['pretraining'], map_location='cpu')
-        # State dict follows our lay-out
-    if 'state_dict' in state_dict.keys():
-        state_dict = state_dict['state_dict']
+    # State dict follows our lay-out
+    if 'model' in state_dict.keys():
+        state_dict = state_dict['model']
     new_state = {}
     for k, v in state_dict.items():
         if k.startswith('model_q'):
