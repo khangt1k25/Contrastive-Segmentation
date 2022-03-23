@@ -383,7 +383,7 @@ def get_result_metrics(histogram):
             "precision_per_class (per class accuracy)": prc,
             "mean_precision (class-avg accuracy)": np.nanmean(prc),
             "overall_precision (pixel accuracy)": opc}
-
+    
     result = {k: 100*v for k, v in result.items()}
     
     return result

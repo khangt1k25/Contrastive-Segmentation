@@ -252,7 +252,7 @@ def train(p, train_loader, model, optimizer, epoch):
 
     writer.close()      
 
-
+        
 @torch.no_grad()
 def accuracy(output, target, topk=(1,)):
     maxk = max(topk)
