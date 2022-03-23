@@ -130,9 +130,6 @@ class ContrastiveModel(nn.Module):
         logits = torch.cat([l_batch, l_bank], dim=1) # pixels x (B+K)
 
         
-
-        
-
         self._dequeue_and_enqueue(prototypes_obj) 
 
 

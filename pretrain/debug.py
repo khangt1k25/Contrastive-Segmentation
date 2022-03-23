@@ -4,17 +4,22 @@ import torch
 from PIL import Image
 import os
 import torch.nn as nn
+from modules.losses import FocalLoss
 
 
-x = torch.rand(10, 32)
-perm = torch.randperm(x.shape[0])
-idx = perm[:3]
-samples = x[idx]
 
+predicted = torch.randn((16, 20))
+predicted = torch.softmax(predicted, dim=1)
 
-print(idx)
-print(samples.shape)
+target  = torch.randint(low=0, high=19, size=(16,))
 
+fc_loss = FocalLoss(gamma=2)
+
+loss = fc_loss(predicted, target)
+ce_loss = nn.functional.cross_entropy(predicted, target, reduction='mean')
+
+print(loss)
+print(ce_loss)
 # sal_q = torch.Tensor([0])
 
 # cluster_logits = torch.randint(low=0, high=5, size=(1,3))

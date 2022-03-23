@@ -85,7 +85,7 @@ def main():
             best = eval_result['mean_iou']
         results_miou.append(eval_result['mean_iou'])    
     
-
+    
     print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)), 'green'))
     print(colored('STD mIoU is %2.1f' %(np.std(results_miou)), 'green'))
     

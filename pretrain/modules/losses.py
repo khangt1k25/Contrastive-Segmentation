@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.modules.module import Module
-
+from torch.autograd import Variable
 
 class BalancedCrossEntropyLoss(Module):
     """
@@ -64,3 +64,26 @@ class Regression_loss(Module):
         # x = F.normalize(output, dim=1)
         # y = F.normalize(labels, dim=1)
         return (2 - 2 * (output * labels).sum(dim=-1)).mean()
+
+
+
+
+class FocalLoss(nn.Module):
+    '''Multi-class Focal loss implementation'''
+    def __init__(self, gamma=2, reduction='none', weight=None):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.weight = weight
+        self.reduction = reduction
+
+    def forward(self, input, target):
+        """
+        input: [N, C]
+        target: [N, ]
+        """
+        logpt = F.log_softmax(input, dim=1)
+        pt = torch.exp(logpt)
+        logpt = (1-pt)**self.gamma * logpt
+        loss = F.nll_loss(logpt, target, self.weight, reduction=self.reduction)
+        
+        return loss

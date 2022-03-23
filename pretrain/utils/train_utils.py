@@ -17,7 +17,7 @@ from sklearn.decomposition import PCA
 from sklearn.cluster import MiniBatchKMeans, KMeans 
 import torch.utils.data as data
 import faiss 
-
+from modules.losses import FocalLoss
 
 
 def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
@@ -210,7 +210,15 @@ def train(p, train_loader, model, optimizer, epoch):
 
         
         if classifier:
-            cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            
+            focal = False
+            if focal:
+                focal_loss = FocalLoss(gamma=3, reduction='mean')
+                cluster_loss  = focal_loss(cluster_logits, cluster_labels)
+            else:
+                cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            
+            
             cluster_losses.update(cluster_loss.item())
             loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss
             bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
