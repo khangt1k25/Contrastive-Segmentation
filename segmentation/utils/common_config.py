@@ -231,7 +231,7 @@ def get_val_transformations_invariance(augmentation_strategy='pascal'):
     if augmentation_strategy == 'pascal':
         return transforms.Compose([
                                     custom_tr.RandomJiter(),
-                                    custom_tr.RandomGray(),
+                                    # custom_tr.RandomGray(),
                                     custom_tr.ToNumpy(),
                                     custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
                                                             'semseg': tuple((512,512))},
@@ -240,7 +240,7 @@ def get_val_transformations_invariance(augmentation_strategy='pascal'):
                                     custom_tr.Normalize([0.485,0.456,0.406],[0.229,0.224,0.225])])
     elif augmentation_strategy == 'msrc':
         return transforms.Compose([ custom_tr.RandomJiter(),
-                                    custom_tr.RandomGray(),
+                                    # custom_tr.RandomGray(),
                                     custom_tr.ToNumpy(),
                                     custom_tr.FixedResize(resolutions={'image': tuple((512,512)), 
                                                             'semseg': tuple((512,512))},
