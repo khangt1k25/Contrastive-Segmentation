@@ -71,7 +71,52 @@ class ContrastiveModel(nn.Module):
         self.queue_ptr[0] = ptr
 
 
+    def mc_forward(self, im_q, im_k, sal_q, sal_k):
 
+        batch_size = im_q.size(0)
+
+        q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
+        q = nn.functional.normalize(q, dim=1)
+        q = q.permute((0, 2, 3, 1))          # queries: B x H x W x dim 
+        q = torch.reshape(q, [-1, self.dim]) # queries: pixels x dim
+
+        # compute saliency loss
+        sal_loss = self.bce(q_bg, sal_q)
+   
+        with torch.no_grad():
+            offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
+            sal_q = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
+            sal_q = sal_q.view(-1)
+            mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
+            sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
+
+        # compute key prototypes
+        with torch.no_grad():  # no gradient to keys
+            self._momentum_update_key_encoder()  # update the key encoder
+            k, _ = self.model_k(im_k)  # keys: N x C x H x W
+            k = nn.functional.normalize(k, dim=1)
+            # prototypes k
+            k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+            sal_k = sal_k.reshape(batch_size, -1, 1).type(k.dtype) # B x H.W x 1
+            prototypes_foreground = torch.bmm(k, sal_k).squeeze() # B x dim
+            prototypes = nn.functional.normalize(prototypes_foreground, dim=1)        
+
+        # q: pixels x dim
+        # k: pixels x dim
+        # prototypes_k: proto x dim
+        q = torch.index_select(q, index=mask_indexes, dim=0)
+        l_batch = torch.matmul(q, prototypes.t())   # shape: pixels x proto
+        negatives = self.obj_queue.clone().detach()     # shape: dim x negatives
+        l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
+        logits = torch.cat([l_batch, l_mem], dim=1) # pixels x (proto + negatives)
+
+        # apply temperature
+        logits /= self.T
+        
+        # dequeue and enqueue
+        self._dequeue_and_enqueue(prototypes) 
+
+        return logits, sal_q, sal_loss
 
     def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None, im_randaug=None, sal_randaug=None):
             

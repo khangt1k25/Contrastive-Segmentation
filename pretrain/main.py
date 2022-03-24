@@ -5,6 +5,7 @@
 import argparse
 import builtins
 import os
+from pickletools import optimize
 import sys
 from termcolor import colored
 
@@ -133,6 +134,9 @@ def main_worker(gpu, args):
         # Train 
         print('Train ...')
         eval_train = train(p, train_dataloader, model, 
+                                    optimizer, epoch)
+
+        eval_train = train_mc(p, train_dataloader, model,
                                     optimizer, epoch)
         torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
                     'epoch': epoch + 1}, 

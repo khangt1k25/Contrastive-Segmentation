@@ -101,8 +101,7 @@ class VOC12(data.Dataset):
 
         sample['semseg'] = _semseg
 
-        print()
-	
+        
         sample['meta'] = {'im_size': sizeofimage,
                           'image_file': self.images[index],
                           'image': os.path.basename(self.semsegs[index]).split('.')[0]}
