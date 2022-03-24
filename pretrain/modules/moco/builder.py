@@ -132,7 +132,7 @@ class ContrastiveModel(nn.Module):
         
         self._dequeue_and_enqueue(prototypes_obj) 
 
-
+        
         logits /= self.T
         
         if classifier:
