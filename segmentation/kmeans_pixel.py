@@ -78,16 +78,19 @@ def main():
     # Kmeans Clustering
     n_clusters = 21
     results_miou = []
+    results_acc = []
     best = 0.0
     for i in range(args.num_seeds):
         eval_result = eval_kmeans_pixel(p, val_dataloader, true_val_dataloader, model, n_clusters=n_clusters, seed=1234+i, verbose=True)
         if eval_result['mean_iou'] > best:
             best = eval_result['mean_iou']
         results_miou.append(eval_result['mean_iou'])    
-    
+        results_acc.append(eval_result['overall_precision (pixel accuracy)'])
 
     print(colored('Average mIoU is %2.1f' %(np.mean(results_miou)), 'green'))
     print(colored('STD mIoU is %2.1f' %(np.std(results_miou)), 'green'))
+    print(colored('Average Acc is %2.1f' %(np.mean(results_acc)), 'green'))
+    print(colored('STD Acc is %2.1f' %(np.std(results_acc)), 'green'))
     
 if __name__ == "__main__":
     main()

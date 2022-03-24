@@ -30,7 +30,7 @@ class ContrastiveModel(nn.Module):
         self.model_q = get_model(p)
         self.model_k = get_model(p)
         
-
+        
 
         for param_q, param_k in zip(self.model_q.parameters(), self.model_k.parameters()):
             param_k.data.copy_(param_q.data)  # initialize

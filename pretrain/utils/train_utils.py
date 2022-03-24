@@ -85,7 +85,7 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
                             data_count[k] += len(np.where(I == k)[0])
                         first_batch = False
 
-                        break
+                        
                     else:
                         b_feat = torch.cat(featslist)
                         faiss_module = module_update_centroids(faiss_module, centroids)
@@ -108,6 +108,7 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda()
     centroids = F.normalize(centroids, dim=1)
+    
     return centroids, kmeans_loss.avg
 
 
@@ -198,8 +199,7 @@ def train(p, train_loader, model, optimizer, epoch):
 
         
         
-        # print(im_randaug.shape)
-        # print(sal_randaug.shape)
+
 
 
         if classifier:

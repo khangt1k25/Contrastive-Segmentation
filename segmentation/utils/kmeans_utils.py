@@ -256,6 +256,7 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
 
     
     centroids = torch.tensor(centroids, requires_grad=False).cuda() # Cluster x dim
+    centroids =  nn.functional.normalize(centroids, dim=1)
 
     classifier = initialize_classifier()
     classifier = classifier.cuda()
@@ -270,9 +271,9 @@ def eval_kmeans_pixel(p, val_loader, true_val_loader, model, n_clusters=21, seed
         meta = batch['meta'] 
         sal = (sal > 0.5).float()
         
-        # preds = classifier(output) # Bx Cluster x H x W
-        preds =  compute_negative_euclidean(output, centroids, classifier)
-
+        preds = classifier(output) # Bx Cluster x H x W
+        # preds =  compute_negative_euclidean(output, centroids, classifier)
+        
 
         preds = preds.topk(1, dim=1)[1].squeeze() # BxHxW
         preds = ((preds + 1) * sal).long().cpu().numpy() # BxHxW
