@@ -8,7 +8,8 @@ import warnings
 
 from copy import deepcopy
 from torch.nn.functional import interpolate
-
+from custom_transforms import *
+from randaugment import RandAugment
 
 class Dataset(data.Dataset):
     def __init__(self, base_dataset, train_transform, downsample_sal=False,
@@ -55,66 +56,6 @@ class Dataset(data.Dataset):
 
             else:
                 count += 1 # Try again. Areas of foreground/background to small.
-
-
-class DatasetKeyQueryRandAug(data.Dataset):
-    def __init__(self, base_dataset, transform, randaugmenter, downsample_sal=False,
-                    scale_factor_sal=0.125, min_area=0.1, max_area=0.99):
-        super(DatasetKeyQueryRandAug, self).__init__()
-        self.base_dataset = base_dataset
-        self.transform = transform
-        self.randaugmenter = randaugmenter
-        self.downsample_sal = downsample_sal
-        
-        if isinstance(scale_factor_sal, float):
-            self.scale_factor_sal = (scale_factor_sal, scale_factor_sal)
-        else:
-            self.scale_factor_sal = scale_factor_sal
-
-        self.min_area = min_area
-        self.max_area = max_area
-
-    def __len__(self):
-        return len(self.base_dataset) 
-
-    def __getitem__(self, index):
-        sample_ = self.base_dataset.__getitem__(index)
-        count = 0
-        
-        while True:
-            if count > 1: # Warning
-                #warnings.warn('Need to re-apply transform for image {}'.format(sample['meta']['image']))
-                pass
-
-            if count > 2: # Failed to load image two times in a row. Try a different one.
-                #warnings.warn('Try loading a different image. Failed to load {}'.format(sample['meta']['image']))
-                sample_ = self.base_dataset.__getitem__(random.randint(0, self.__len__()-1))
-                count = 100
- 
-            key_sample = self.transform(deepcopy(sample_))
-            query_sample = self.transform(deepcopy(sample_))
-            randaug_sample = self.randaugmenter(deepcopy(sample_))
-
-            if self.downsample_sal: # Downsample
-                key_sample['sal'] = interpolate(key_sample['sal'][None,None,:,:].float(),
-                                            scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()
-                query_sample['sal'] = interpolate(query_sample['sal'][None,None,:,:].float(),
-                                            scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()
-                
-                randaug_sample['sal'] = interpolate(randaug_sample['sal'][None,None,:,:].float(),
-                                            scale_factor=self.scale_factor_sal, mode='nearest').squeeze().long()
-
-            key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
-            query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
-            randaug_area = randaug_sample['sal'].float().sum() / randaug_sample['sal'].numel()
-            
-            if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
-                return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample}
-
-            else:
-                count += 1 # Try again. Areas of foreground/background to small.
-
-
 class DatasetKeyQuery(data.Dataset):
     def __init__(self, base_dataset, transform, downsample_sal=False,
                     scale_factor_sal=0.125, min_area=0.1, max_area=0.99):
@@ -166,14 +107,131 @@ class DatasetKeyQuery(data.Dataset):
                 count += 1 # Try again. Areas of foreground/background to small.
 
 
+class DatasetKeyQueryRandAug(data.Dataset):
+    def __init__(self, base_dataset, res=224, min_area=0.1, max_area=0.99, inv_list=[], eqv_list=[]):
+        super(DatasetKeyQueryRandAug, self).__init__()
+        self.base_dataset = base_dataset
+        self.res = res
+        self.min_area = min_area
+        self.max_area = max_area
+        self.N = len(self.base_dataset)
+        self.init_transforms()
+
+    def __len__(self):
+        return len(self.base_dataset) 
+
+    def init_transforms(self):
+        self.transform_base = RandomResizedCrop(size=self.res, scale=(0.2, 1)) 
+        
+        # Transforms for invariance. 
+        # Color jitter (4), gray scale, blur. 
+        self.random_color_brightness = [RandomColorBrightness(x=0.4, p=0.8, N=self.N) for _ in range(2)] # Control this later (NOTE)]
+        self.random_color_contrast   = [RandomColorContrast(x=0.4, p=0.8, N=self.N) for _ in range(2)] # Control this later (NOTE)
+        self.random_color_saturation = [RandomColorSaturation(x=0.4, p=0.8, N=self.N) for _ in range(2)] # Control this later (NOTE)
+        self.random_color_hue        = [RandomColorHue(x=0.1, p=0.8, N=self.N) for _ in range(2)]      # Control this later (NOTE)   
+        self.random_gray_scale    = [RandomGrayScale(p=0.2, N=self.N) for _ in range(2)]
+        self.random_gaussian_blur = [RandomGaussianBlur(sigma=[.1, 2.], p=0.5, N=self.N) for _ in range(2)]
+        
+        # Transforms for equivariance
+        self.random_horizontal_flip = RandomHorizontalFlip(N=self.N)
+        self.random_vertical_flip   = RandomVerticalFlip(N=self.N)
+        self.horizontal_tensor_flip = RandomHorizontalTensorFlip(N=self.N, p_ref=self.random_horizontal_flip.p_ref, plist=self.random_horizontal_flip.plist)
+        self.vertical_tensor_flip = RandomVerticalTensorFlip(N=self.N, p_ref=self.random_vertical_flip.p_ref, plist=self.random_vertical_flip.plist)
+
+
+        # RandAugment
+        self.randAugment = RandAugment(N=self.N, m=10) 
+        # Tensor and normalize transform. 
+        self.transform_tensor = TensorTransform(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    
+    def transform_inv(self, index, image, ver):
+        if 'brightness' in self.inv_list:
+            image = self.random_color_brightness[ver](index, image)
+        if 'contrast' in self.inv_list:
+            image = self.random_color_contrast[ver](index, image)
+        if 'saturation' in self.inv_list:
+            image = self.random_color_saturation[ver](index, image)
+        if 'hue' in self.inv_list:
+            image = self.random_color_hue[ver](index, image)
+        if 'gray' in self.inv_list:
+            image = self.random_gray_scale[ver](index, image)
+        if 'blur' in self.inv_list:
+            image = self.random_gaussian_blur[ver](index, image)
+        
+        return image
+
+    def transform_eqv(self, index, sample):
+        
+        if 'h_flip' in self.eqv_list:
+            sample  = self.random_horizontal_flip(index, sample)
+        if 'v_flip' in self.eqv_list:
+            sample = self.random_vertical_flip(index, sample)
+
+        return sample
+
+
+    def __getitem__(self, index):
+        sample_ = self.base_dataset.__getitem__(index)
+        count = 0
+        while True:
+            sample_ = self.transform_base(sample_)
+
+            # Key 
+            key_sample = deepcopy(sample_)
+            key_sample['image'] = self.transform_inv(index, key_sample['image'], ver=0)
+
+            # Query
+            query_sample = deepcopy(sample_)
+            query_sample['image'] = self.transform_inv(index, query_sample['image'], ver=1)
+            query_sample = self.transform_eqv(index, query_sample)
+
+
+            # Randaug
+            randaug_sample = deepcopy(sample_)
+            randaug_sample = self.randAugment(index, sample)
+            
+
+            key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
+            query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
+            randaug_area = randaug_sample['sal'].float().sum() / randaug_sample['sal'].numel()
+            
+            if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
+                return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample}
+
+
+
+
+
+
 if __name__=='__main__':
     import numpy as np
     from matplotlib import pyplot as plt
-    from utils.common_config import get_train_dataset, get_train_transformations
+    class Path(object):
+        @staticmethod
+        def db_root_dir(database=''):
+            db_root = '/home/khangt1k25/Code/Contrastive Segmentation/PASCAL_VOC' # VOC will be automatically downloaded
+            db_names = ['VOCSegmentation']
+
+            if database == '':
+                return db_root
+
+            if database in db_names:
+                return os.path.join(db_root, database)
+
+            else:
+                raise ValueError('Invalid database {}'.format(database))
+
     p = {'train_db_name': 'VOCSegmentation', 'overfit': False}
-    transform = get_train_transformations('strong')
-    base_dataset = get_train_dataset(p, transform=None) 
-    dataset = DatasetKeyQuery(base_dataset, transform, downsample_sal=False)
+    from pascal_voc import VOCSegmentation
+    base_dataset = VOCSegmentation(root=Path.db_root_dir(p['train_db_name']),
+                            saliency=p['train_db_kwargs']['saliency'],
+                            transform=None)
+    
+
+    dataset = DatasetKeyQueryRandAug(
+                                    base_dataset, res=224, 
+                                    inv_list=['brightness', 'contrast', 'saturation', 'hue' 'blur'],
+                                    eqv_list=['h_flip', 'v_flip'])
 
     for i, sample in enumerate(dataset):
         fig, axes = plt.subplots(4)

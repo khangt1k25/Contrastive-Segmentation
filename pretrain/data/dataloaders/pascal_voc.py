@@ -119,28 +119,6 @@ class VOCSegmentation(data.Dataset):
         os.chdir(cwd)
         print('Done!')
 
-class PseudoDataset(data.Dataset):
-
-    def __init__(self, indices, assigments):
-        super(PseudoDataset, self).__init__()
-
-        self.indices = indices
-        self.assigments = assigments
-        
-        assert(len(self.indices) == len(self.assigments))
-
-        print('Number of samples {}'.format(len(indices)))
-
-    def __getitem__(self, index):
-        return self.assigments(index)
-        
-    def __len__(self):
-            return len(self.indices)
-
-
-    def __str__(self):
-        return 'Pseudo dataset'
-
 
 
 if __name__ == '__main__':
