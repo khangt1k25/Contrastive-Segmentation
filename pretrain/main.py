@@ -136,8 +136,8 @@ def main_worker(gpu, args):
         eval_train = train(p, train_dataloader, model, 
                                     optimizer, epoch)
 
-        eval_train = train_mc(p, train_dataloader, model,
-                                    optimizer, epoch)
+        # eval_train = train_mc(p, train_dataloader, model,
+        #                             optimizer, epoch)
         torch.save({'optimizer': optimizer.state_dict(), 'model': model.state_dict(), 
                     'epoch': epoch + 1}, 
                     p['checkpoint'])

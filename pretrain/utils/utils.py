@@ -4,7 +4,7 @@
 
 import os
 import errno
-import faiss 
+# import faiss 
 import numpy as np
 import torch
 import torch.nn as nn

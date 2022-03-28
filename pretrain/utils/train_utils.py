@@ -205,7 +205,10 @@ def train(p, train_loader, model, optimizer, epoch):
         if classifier:
             im_randaug = batch['randaug']['image'].cuda(p['gpu'], non_blocking=True)
             sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
-            logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug)
+            index = batch['index'].cuda(p['gpu'], non_blocking=True)
+            
+            logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
+        
         else:
             logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k)
 

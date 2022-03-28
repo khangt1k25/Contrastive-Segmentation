@@ -7,6 +7,7 @@
 # Pixel-wise contrastive loss based upon our paper
 
 
+from copy import deepcopy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -118,7 +119,7 @@ class ContrastiveModel(nn.Module):
 
         return logits, sal_q, sal_loss
 
-    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None, im_randaug=None, sal_randaug=None):
+    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None, im_randaug=None, sal_randaug=None, loader=None, index=None):
             
         batch_size, dim, H, W = im_q.shape
         
@@ -160,28 +161,26 @@ class ContrastiveModel(nn.Module):
             mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
 
 
-        # compute cluster loss : Not use bg
-        if classifier:
-            cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
-            with torch.no_grad():
-                pseudo_label = cluster.topk(1, dim=1)[1].squeeze().long().detach() # pixels
-            cluster /= 0.1
-
-
-            randaug = torch.index_select(randaug, index=mask_indexes2, dim=0)
-            with torch.no_grad():
-                threshold = 0.9
-                maxval, randaug_label = randaug.topk(1, dim=1)
-                randaug_label = randaug_label.squeeze().long().detach()
-                mask = maxval.ge(threshold).squeeze().float()
-            randaug /= 0.1
+       
 
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
             k, _ = self.model_k(im_k)  # keys: N x C x H x W
             k = nn.functional.normalize(k, dim=1)
-            k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
+
+            pseudo_label = classifier(k) # B x C x H x W
+            pseudo_maxval ,pseudo_label = pseudo_label.topk(1, dim=1) 
+            pseudo_label = pseudo_label.squeeze().long().detach()  # B x H x W
+            pseudo_maxval = pseudo_maxval.squeeze().detach()     # B x H x W
+
+            pseudo_label_query = loader.dataset.apply_eqv(index, deepcopy(pseudo_label)).flatten()  # BHW
+            pseudo_label_randaug = loader.dataset.apply_randaug(index, deepcopy(pseudo_label)).flatten() # BHW
+            pseudo_maxval = loader.dataset.apply_randaug(index, pseudo_maxval).flatten()# BHW
+
             
+
+
+            k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
             
             prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
@@ -200,7 +199,21 @@ class ContrastiveModel(nn.Module):
 
         
 
-        
+         # compute cluster loss : Not use bg
+        if classifier:
+            cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
+            with torch.no_grad():
+                pseudo_label_query =  torch.index_select(pseudo_label_query, index=mask_indexes, dim=0).long().detach() # pixels
+            cluster /= 0.1
+
+
+            randaug = torch.index_select(randaug, index=mask_indexes2, dim=0)
+            with torch.no_grad():
+                threshold = 0.9
+                pseudo_label_randaug = torch.index_select(pseudo_label_randaug, index=mask_indexes, dim=0).long().detach()
+                pseudo_maxval = torch.index_select(pseudo_maxval, index=mask_indexes, dim=0).long().detach()
+                mask = pseudo_maxval.ge(threshold).squeeze().float()
+            randaug /= 0.1
 
         self._dequeue_and_enqueue(prototypes_obj) 
 
@@ -208,9 +221,9 @@ class ContrastiveModel(nn.Module):
         logits /= self.T
         
         if classifier:
-            return logits, sal_q, cluster, pseudo_label, randaug, randaug_label, mask, sal_loss
+            return logits, sal_q, cluster, pseudo_label_query, randaug, pseudo_label_randaug, mask, sal_loss
         else:
             return logits, sal_q, sal_loss
 
-
+        
 

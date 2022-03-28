@@ -27,8 +27,12 @@ class BaseTransform(object):
 
         return sample
 
+
+
+
+
 class RandomResizedCrop(torchvision.transforms.RandomResizedCrop):
-    def __init__(self, size, scale=(0.08, 1.0), ratio=(3. / 4., 4. / 3.)):
+    def __init__(self, size, scale=(0.2, 1), ratio=(3. / 4., 4. / 3.)):
         super(RandomResizedCrop, self).__init__(size, scale=scale, ratio=ratio)
         self.interpolation_img = Image.BILINEAR
         self.interpolation_sal = Image.NEAREST
@@ -39,7 +43,7 @@ class RandomResizedCrop(torchvision.transforms.RandomResizedCrop):
         sample['image'] = TF.resized_crop(sample['image'], i, j, h, w, self.size, self.interpolation_img)
         sample['sal'] = TF.resized_crop(sample['sal'], i, j, h, w, self.size, self.interpolation_sal)
         
-        return sample['image'], sample['sal']
+        return sample
     
     
 
@@ -80,12 +84,12 @@ class TensorTransform(object):
         self.to_tensor = transforms.ToTensor()
         self.normalize = transforms.Normalize(mean=mean, std=std)
         
-    def __call__(self, image, sal):
-        image = self.to_tensor(image)
-        sal = self.to_tensor(sal)
-        image = self.normalize(image)
-    
-        return image, sal
+    def __call__(self, sample):
+        sample['image'] = self.to_tensor(sample['image'])
+        sample['image'] = self.normalize(sample['image'])
+        sample['sal'] = self.to_tensor(sample['sal'])
+        sample['sal'] = sample['sal'].squeeze()
+        return sample
                
 class RandomGaussianBlur(object):
     def __init__(self, sigma, p, N):

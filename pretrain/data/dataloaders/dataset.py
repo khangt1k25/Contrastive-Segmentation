@@ -8,8 +8,10 @@ import warnings
 
 from copy import deepcopy
 from torch.nn.functional import interpolate
-from custom_transforms import *
-from randaugment import RandAugment
+from data.dataloaders.custom_transforms import *
+from data.dataloaders.randaugment import RandAugment
+
+
 
 class Dataset(data.Dataset):
     def __init__(self, base_dataset, train_transform, downsample_sal=False,
@@ -108,12 +110,14 @@ class DatasetKeyQuery(data.Dataset):
 
 
 class DatasetKeyQueryRandAug(data.Dataset):
-    def __init__(self, base_dataset, res=224, min_area=0.1, max_area=0.99, inv_list=[], eqv_list=[]):
+    def __init__(self, base_dataset, res=224, min_area=0.01, max_area=0.99, inv_list=[], eqv_list=[]):
         super(DatasetKeyQueryRandAug, self).__init__()
         self.base_dataset = base_dataset
         self.res = res
         self.min_area = min_area
         self.max_area = max_area
+        self.inv_list = inv_list
+        self.eqv_list = eqv_list
         self.N = len(self.base_dataset)
         self.init_transforms()
 
@@ -121,7 +125,8 @@ class DatasetKeyQueryRandAug(data.Dataset):
         return len(self.base_dataset) 
 
     def init_transforms(self):
-        self.transform_base = RandomResizedCrop(size=self.res, scale=(0.2, 1)) 
+        # self.transform_base = RandomResizedCrop(size=self.res, scale=(0.2, 1)) 
+        self.transform_base = RandomResizedCrop(size=self.res, scale=(0.2, 1))
         
         # Transforms for invariance. 
         # Color jitter (4), gray scale, blur. 
@@ -140,7 +145,7 @@ class DatasetKeyQueryRandAug(data.Dataset):
 
 
         # RandAugment
-        self.randAugment = RandAugment(N=self.N, m=10) 
+        self.randAugment = RandAugment(N=self.N) 
         # Tensor and normalize transform. 
         self.transform_tensor = TensorTransform(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     
@@ -172,32 +177,49 @@ class DatasetKeyQueryRandAug(data.Dataset):
 
     def __getitem__(self, index):
         sample_ = self.base_dataset.__getitem__(index)
-        count = 0
+        # count = 0
         while True:
-            sample_ = self.transform_base(sample_)
+                        
+
+            sample = self.transform_base(index, deepcopy(sample_))
 
             # Key 
-            key_sample = deepcopy(sample_)
+            key_sample = deepcopy(sample)
             key_sample['image'] = self.transform_inv(index, key_sample['image'], ver=0)
+            key_sample = self.transform_tensor(key_sample)
 
             # Query
-            query_sample = deepcopy(sample_)
+            query_sample = deepcopy(sample)
             query_sample['image'] = self.transform_inv(index, query_sample['image'], ver=1)
             query_sample = self.transform_eqv(index, query_sample)
-
+            query_sample = self.transform_tensor(query_sample)
 
             # Randaug
-            randaug_sample = deepcopy(sample_)
-            randaug_sample = self.randAugment(index, sample)
-            
+            randaug_sample = deepcopy(sample)
+            randaug_sample = self.randAugment(index, randaug_sample)
+            randaug_sample = self.transform_tensor(randaug_sample)
+
 
             key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
             query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
             randaug_area = randaug_sample['sal'].float().sum() / randaug_sample['sal'].numel()
-            
-            if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
-                return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample}
 
+            # print(key_area, query_area, randaug_area)
+            # return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample}
+
+            if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
+                return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample, 'index': index}
+            
+    def apply_eqv(self, index, feat):
+        if 'h_flip' in self.eqv_list:
+            sample  = self.horizontal_tensor_flip(index, feat)
+        if 'v_flip' in self.eqv_list:
+            sample = self.vertical_tensor_flip(index, feat)
+        return sample
+
+    def apply_randaug(self, index, feat):
+        feat = self.randAugment.apply(index, feat)
+        
 
 
 
@@ -206,20 +228,7 @@ class DatasetKeyQueryRandAug(data.Dataset):
 if __name__=='__main__':
     import numpy as np
     from matplotlib import pyplot as plt
-    class Path(object):
-        @staticmethod
-        def db_root_dir(database=''):
-            db_root = '/home/khangt1k25/Code/Contrastive Segmentation/PASCAL_VOC' # VOC will be automatically downloaded
-            db_names = ['VOCSegmentation']
-
-            if database == '':
-                return db_root
-
-            if database in db_names:
-                return os.path.join(db_root, database)
-
-            else:
-                raise ValueError('Invalid database {}'.format(database))
+   
 
     p = {'train_db_name': 'VOCSegmentation', 'overfit': False}
     from pascal_voc import VOCSegmentation
@@ -234,15 +243,24 @@ if __name__=='__main__':
                                     eqv_list=['h_flip', 'v_flip'])
 
     for i, sample in enumerate(dataset):
-        fig, axes = plt.subplots(4)
+        fig, axes = plt.subplots(6)
         key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
         key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+        
         query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
         query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+        
+        randaug = np.transpose(sample['randaug']['image'].numpy(), (1,2,0))
+        randaug = 255*(randaug * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
         sal_query = sample['query']['sal']
         sal_key = sample['key']['sal']
+        sal_randaug = sample['randaug']['sal']
+
         axes[0].imshow(key.astype(np.uint8))
         axes[1].imshow(query.astype(np.uint8))
-        axes[2].imshow(sal_key)
-        axes[3].imshow(sal_query)
+        axes[2].imshow(randaug.astype(np.uint8))
+        axes[3].imshow(sal_key)
+        axes[4].imshow(sal_query)
+        axes[5].imshow(sal_randaug)
         plt.show()

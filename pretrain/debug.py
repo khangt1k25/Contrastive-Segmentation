@@ -1,21 +1,83 @@
-from select import select
-from numpy import indices
-import torch
-from PIL import Image
-import os
-import torch.nn as nn
+
+from copy import deepcopy
+from utils.common_config import get_train_dataset
+import numpy as np
+from matplotlib import pyplot as plt
+from data.dataloaders.dataset import DatasetKeyQuery, DatasetKeyQueryRandAug
+# p['train_db_kwargs']['saliency']
+p = {'train_db_name': 'VOCSegmentation', 'overfit': False , 'train_db_kwargs': {'saliency': 'unsupervised_model'}}
+base_dataset = get_train_dataset(p, transform=None)
 
 
-x = torch.rand(10, 32)
+dataset = DatasetKeyQueryRandAug(
+                                base_dataset, res=224, 
+                                inv_list=['brightness', 'contrast', 'saturation', 'hue' 'blur'],
+                                eqv_list=['h_flip', 'v_flip'])
 
-maxval, label = x.topk(k=1, dim=1)
+import random
+i = random.randint(0, 100)
+sample = dataset[i]
+fig, axes = plt.subplots(6)
+key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
+key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
-print(maxval.shape)
-print(label.shape)
+query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
+query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
-mask = maxval.ge(0.9).float()
+randaug = np.transpose(sample['randaug']['image'].numpy(), (1,2,0))
+randaug = 255*(randaug * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
-print(mask.shape)
+sal_query = sample['query']['sal']
+sal_key = sample['key']['sal']
+sal_randaug = sample['randaug']['sal']
+
+# print(np.unique(sal_randaug))
+# print(np.unique(sal_query))
+# print(np.unique(sal_query))
+
+# ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
+# ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
+import torchvision.transforms.functional as TF
+import torch 
+
+ok2 = dataset.apply_randaug(i, deepcopy(sal_key))
+
+print(torch.unique(ok2))
+print(torch.unique(sal_key))
+print(torch.unique(sal_randaug))
+
+
+TF.to_pil_image(sal_key).show()
+TF.to_pil_image(ok2).show()
+
+
+TF.to_pil_image(sal_randaug).show()
+
+# axes[0].imshow(key.astype(np.uint8))
+# # axes[1].imshow(query.astype(np.uint8))
+# axes[2].imshow(ok2.astype(np.uint8))
+
+# axes[2].imshow(randaug.astype(np.uint8))
+# # axes[3].imshow(sal_key)
+# # axes[4].imshow(sal_query)
+# # axes[5].imshow(sal_randaug)
+# plt.show()
+
+# for i, sample in enumerate(dataset):
+#     fig, axes = plt.subplots(4)
+#     key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
+#     key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+#     query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
+#     query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+#     sal_query = sample['query']['sal']
+#     sal_key = sample['key']['sal']
+#     axes[0].imshow(key.astype(np.uint8))
+#     axes[1].imshow(query.astype(np.uint8))
+#     axes[2].imshow(sal_key)
+#     axes[3].imshow(sal_query)
+#     plt.show()
+#     break
 
 # sal_q = torch.Tensor([0])
 
