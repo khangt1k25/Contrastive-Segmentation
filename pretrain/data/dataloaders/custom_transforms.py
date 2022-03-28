@@ -36,7 +36,7 @@ class RandomResizedCrop(torchvision.transforms.RandomResizedCrop):
         super(RandomResizedCrop, self).__init__(size, scale=scale, ratio=ratio)
         self.interpolation_img = Image.BILINEAR
         self.interpolation_sal = Image.NEAREST
-    
+
     def __call__(self, index, sample):
 
         i, j, h, w = self.get_params(sample['image'], self.scale, self.ratio)

@@ -85,6 +85,7 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
                             data_count[k] += len(np.where(I == k)[0])
                         first_batch = False
 
+                        break 
                         
                     else:
                         b_feat = torch.cat(featslist)

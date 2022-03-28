@@ -211,16 +211,21 @@ class DatasetKeyQueryRandAug(data.Dataset):
                 return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample, 'index': index}
             
     def apply_eqv(self, index, feat):
+        
+        # index = index.cpu().numpy()
         if 'h_flip' in self.eqv_list:
             sample  = self.horizontal_tensor_flip(index, feat)
         if 'v_flip' in self.eqv_list:
             sample = self.vertical_tensor_flip(index, feat)
         return sample
 
-    def apply_randaug(self, index, feat):
-        feat = self.randAugment.apply(index, feat)
+    def apply_randaug(self, index, feat, is_feat=1):
         
-
+        # index = index.cpu().numpy()
+        
+        feat = self.randAugment.apply(index, feat, is_feat=is_feat)
+        
+        return feat
 
 
 

@@ -41,19 +41,25 @@ sal_randaug = sample['randaug']['sal']
 import torchvision.transforms.functional as TF
 import torch 
 
-ok2 = dataset.apply_randaug(i, deepcopy(sal_key))
-
-print(torch.unique(ok2))
-print(torch.unique(sal_key))
-print(torch.unique(sal_randaug))
 
 
-TF.to_pil_image(sal_key).show()
+ok2 = dataset.apply_randaug(i, deepcopy(sal_key.unsqueeze(0)), is_feat=1)
+
+ok3 = dataset.apply_randaug(i, torch.randn(size=(3, 32, 224, 224)), is_feat=2)
+# print(torch.unique(ok2))
+# print(torch.unique(sal_key))
+# print(torch.unique(sal_randaug))
+
+
+
+# print(sal_randaug.shape)
+# print(randaug.shape)
+
+# TF.to_pil_image(randaug).show()
+TF.to_pil_image(sal_randaug).show()
 TF.to_pil_image(ok2).show()
 
-
-TF.to_pil_image(sal_randaug).show()
-
+# TF.to_pil_image(sample['randaug']['image']).show()
 # axes[0].imshow(key.astype(np.uint8))
 # # axes[1].imshow(query.astype(np.uint8))
 # axes[2].imshow(ok2.astype(np.uint8))

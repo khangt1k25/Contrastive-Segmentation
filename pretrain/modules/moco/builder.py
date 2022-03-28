@@ -173,9 +173,17 @@ class ContrastiveModel(nn.Module):
             pseudo_label = pseudo_label.squeeze().long().detach()  # B x H x W
             pseudo_maxval = pseudo_maxval.squeeze().detach()     # B x H x W
 
-            pseudo_label_query = loader.dataset.apply_eqv(index, deepcopy(pseudo_label)).flatten()  # BHW
-            pseudo_label_randaug = loader.dataset.apply_randaug(index, deepcopy(pseudo_label)).flatten() # BHW
-            pseudo_maxval = loader.dataset.apply_randaug(index, pseudo_maxval).flatten()# BHW
+            print(pseudo_label.shape)
+            print(pseudo_maxval.shape)
+            print(index.shape)
+
+
+            pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
+
+            print(pseudo_label_query.shape)
+
+            pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label)).flatten() # BHW
+            pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval).flatten()# BHW
 
             
 
