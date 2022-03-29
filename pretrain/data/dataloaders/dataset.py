@@ -199,16 +199,16 @@ class DatasetKeyQueryRandAug(data.Dataset):
             randaug_sample = self.randAugment(index, randaug_sample)
             randaug_sample = self.transform_tensor(randaug_sample)
 
+            return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample, 'index': index}
 
-            key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
-            query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
-            randaug_area = randaug_sample['sal'].float().sum() / randaug_sample['sal'].numel()
+            # key_area = key_sample['sal'].float().sum() / key_sample['sal'].numel()
+            # query_area = query_sample['sal'].float().sum() / query_sample['sal'].numel()
+            # randaug_area = randaug_sample['sal'].float().sum() / randaug_sample['sal'].numel()
 
             # print(key_area, query_area, randaug_area)
-            # return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample}
-
-            if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
-                return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample, 'index': index}
+        
+            # if key_area < self.max_area and key_area > self.min_area and query_area < self.max_area and query_area > self.min_area and randaug_area < self.max_area and randaug_area > self.min_area: # Ok. Foreground/Background has proper ratio.
+            #     return {'key': key_sample, 'query': query_sample, 'randaug': randaug_sample, 'index': index}
             
     def apply_eqv(self, index, feat):
         
