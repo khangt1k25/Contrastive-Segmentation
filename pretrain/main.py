@@ -95,13 +95,17 @@ def main_worker(gpu, args):
     print(colored('Retrieve dataset', 'blue'))
     
     # Transforms 
-    train_transform = get_train_transformations()
-    print(train_transform)
-    randaug_transform = get_randaug_transformations(m=10)
+    # train_transform = get_train_transformations()
+    # print(train_transform)
+    # randaug_transform = get_randaug_transformations(m=10)
     
-    
-    train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), train_transform, randaug_transform,
-                                downsample_sal=not p['model_kwargs']['upsample'])
+    # base_dataset, res=224, min_area=0.01, max_area=0.99, inv_list=[], eqv_list=[])
+    # train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), train_transform, randaug_transform,
+    #                             downsample_sal=not p['model_kwargs']['upsample'])
+    train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), res=224, inv_list=['brightness', 'contrast', 'saturation', 'hue' 'gray'],
+                                            eqv_list=['h_flip'])
+    #                             downsample_sal=not p['model_kwargs']['upsample'])
+
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=False,
                     num_workers=p['num_workers'], pin_memory=True, drop_last=True, collate_fn=collate_custom)
     print(colored('Train samples %d' %(len(train_dataset)), 'yellow'))

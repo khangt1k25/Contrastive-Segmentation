@@ -173,19 +173,18 @@ class ContrastiveModel(nn.Module):
             pseudo_label = pseudo_label.squeeze().long().detach()  # B x H x W
             pseudo_maxval = pseudo_maxval.squeeze().detach()     # B x H x W
 
-            print(pseudo_label.shape)
-            print(pseudo_maxval.shape)
-            print(index.shape)
 
 
             pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
 
-            print(pseudo_label_query.shape)
-
-            pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label)).flatten() # BHW
-            pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval).flatten()# BHW
-
             
+
+            pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label), is_feat=1).flatten() # BHW
+            pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval, is_feat=2).flatten()# BHW
+
+            # print(pseudo_label_query.shape)
+            # print(pseudo_label_randaug.shape)
+            # print(pseudo_maxval.shape)
 
 
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
@@ -218,14 +217,14 @@ class ContrastiveModel(nn.Module):
             randaug = torch.index_select(randaug, index=mask_indexes2, dim=0)
             with torch.no_grad():
                 threshold = 0.9
-                pseudo_label_randaug = torch.index_select(pseudo_label_randaug, index=mask_indexes, dim=0).long().detach()
-                pseudo_maxval = torch.index_select(pseudo_maxval, index=mask_indexes, dim=0).long().detach()
+                pseudo_label_randaug = torch.index_select(pseudo_label_randaug, index=mask_indexes2, dim=0).long().detach()
+                pseudo_maxval = torch.index_select(pseudo_maxval, index=mask_indexes2, dim=0).long().detach()
                 mask = pseudo_maxval.ge(threshold).squeeze().float()
             randaug /= 0.1
 
         self._dequeue_and_enqueue(prototypes_obj) 
 
-
+        
         logits /= self.T
         
         if classifier:

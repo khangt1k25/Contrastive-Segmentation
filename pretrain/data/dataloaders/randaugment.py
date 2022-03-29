@@ -26,7 +26,7 @@ def ShearX(pair, v, is_feat=0):  # [-0.3, 0.3]
                 shear=[math.degrees(math.atan(v)), 0.0],
                 resample=Image.BILINEAR,
                 fill=fillcolor,
-                center=[0, 0],
+                # center=[0, 0],
             )
         mask = TF.affine(
                 mask,
@@ -36,7 +36,7 @@ def ShearX(pair, v, is_feat=0):  # [-0.3, 0.3]
                 shear=[math.degrees(math.atan(v)), 0.0],
                 resample=Image.NEAREST,
                 fill=fillmask,
-                center=[0, 0],
+                # center=[0, 0],
             )
         return img, mask     
     elif is_feat == 1:
@@ -48,7 +48,7 @@ def ShearX(pair, v, is_feat=0):  # [-0.3, 0.3]
             shear=[math.degrees(math.atan(v)), 0.0],
             resample=Image.NEAREST,
             fill=fillmask,
-            center=[0, 0],
+            # center=[0, 0],
         )
     else:
         return TF.affine(
@@ -58,7 +58,7 @@ def ShearX(pair, v, is_feat=0):  # [-0.3, 0.3]
             scale=1.0,
             shear=[math.degrees(math.atan(v)), 0.0],
             resample=Image.BILINEAR,
-            center=[0, 0],
+            # center=[0, 0],
         )
         
 
@@ -74,7 +74,7 @@ def ShearY(pair, v, is_feat=0):  # [-0.3, 0.3]
                 shear=[0.0, math.degrees(math.atan(v)),],
                 resample=Image.BILINEAR,
                 fill=fillcolor,
-                center=[0, 0],
+                # center=[0, 0],
             )
         mask = TF.affine(
                 mask,
@@ -84,7 +84,7 @@ def ShearY(pair, v, is_feat=0):  # [-0.3, 0.3]
                 shear=[0.0, math.degrees(math.atan(v))],
                 resample=Image.NEAREST,
                 fill=fillmask,
-                center=[0, 0],
+                # center=[0, 0],
             )
         return img, mask     
     elif is_feat == 1:
@@ -96,7 +96,7 @@ def ShearY(pair, v, is_feat=0):  # [-0.3, 0.3]
             shear=[0.0, math.degrees(math.atan(v)),],
             resample=Image.NEAREST,
             fill=fillmask,
-            center=[0, 0],
+            # center=[0, 0],
         )
     else:
         return TF.affine(
@@ -106,7 +106,7 @@ def ShearY(pair, v, is_feat=0):  # [-0.3, 0.3]
             scale=1.0,
             shear=[0.0, math.degrees(math.atan(v))],
             resample=Image.BILINEAR,
-            center=[0, 0],
+            # center=[0, 0],
         )
         
 
@@ -342,17 +342,27 @@ class RandAugment(object):
 
     def apply(self, index, feat, is_feat=2):
         
+        feat_t = []
+        for k, i in enumerate(index):
+            m = self.m[i]
+            x = feat[k].unsqueeze(0)
+            # print(x.shape)
 
-        m = self.m[index]
+            for iop, (op, minval, maxval, geo, signed) in enumerate(self.augment_list):
+                
+                if not geo:
+                    continue
+                
+                p_seed = self.rand_ops[i][iop]
+                if p_seed >= 0.5:
+                    val = (float(m)/ self.magnitude) * float(maxval - minval) + minval 
+                    if p_seed >= 0.75 and signed:
+                        val *= -1.0
+                    x = op(x, val, is_feat=is_feat)
+                
+            feat_t.append(x)
+        feat_t = torch.stack(feat_t)
+        return feat_t
 
-        for iop, (op, minval, maxval, geo, signed) in enumerate(self.augment_list):
-            if not geo:
-                continue
-            p_seed = self.rand_ops[index][iop]
-            if p_seed >= 0.5:
-                val = (float(m) / self.magnitude) * float(maxval - minval) + minval
-                if p_seed >= 0.75 and signed:
-                    val *= -1.0
-                feat = op(feat, val, is_feat=is_feat)
 
-        return feat
+        

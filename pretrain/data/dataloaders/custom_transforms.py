@@ -88,7 +88,7 @@ class TensorTransform(object):
         sample['image'] = self.to_tensor(sample['image'])
         sample['image'] = self.normalize(sample['image'])
         sample['sal'] = self.to_tensor(sample['sal'])
-        sample['sal'] = sample['sal'].squeeze()
+        sample['sal'] = sample['sal'].squeeze().long()
         return sample
                
 class RandomGaussianBlur(object):

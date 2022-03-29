@@ -120,7 +120,7 @@ def get_randaug_transformations(m):
     from data.dataloaders.randaugment import RandAugment
     augmenter =  [
         transforms.RandomResizedCrop(224, scale=(0.2, 1.)),
-        RandAugment(m=m),
+        RandAugment(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
