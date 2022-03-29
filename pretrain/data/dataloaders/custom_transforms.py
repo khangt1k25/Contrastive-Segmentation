@@ -89,6 +89,9 @@ class TensorTransform(object):
         sample['image'] = self.normalize(sample['image'])
         sample['sal'] = self.to_tensor(sample['sal'])
         sample['sal'] = sample['sal'].squeeze().long()
+        if len(sample['sal'].shape) == 3:
+            sample['sal'] = sample['sal'][0]
+        
         return sample
                
 class RandomGaussianBlur(object):
@@ -113,13 +116,13 @@ class RandomGaussianBlur(object):
 
 class RandomGrayScale(object):
     def __init__(self, p, N):
-        self.grayscale = transforms.RandomGrayscale(p=1.) # Deterministic (We still want flexible out_dim).
         self.p_ref = p
         self.plist = np.random.random_sample(N)
 
     def __call__(self, index, image):
         if self.plist[index] < self.p_ref:
-            return self.grayscale(image)
+            # return self.grayscale(image)
+            return TF.to_grayscale(image, num_output_channels=3)
         else:
             return image
 

@@ -41,7 +41,7 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
     
     model.eval()
     with torch.no_grad():
-        for i_batch, batch in enumerate(dataloader):
+        for i_batch, batch in tqdm(enumerate(dataloader), leave=False):
             
             img_k = batch['key']['image'].cuda(p['gpu'], non_blocking=True)
             sal_k = batch['key']['sal'].cuda(p['gpu'], non_blocking=True)
@@ -206,6 +206,7 @@ def train(p, train_loader, model, optimizer, epoch):
         if classifier:
             im_randaug = batch['randaug']['image'].cuda(p['gpu'], non_blocking=True)
             sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
+            # index = batch['index'].cuda(p['gpu'], non_blocking=True)
             index = batch['index']
             
             logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
