@@ -63,7 +63,7 @@ def eval_segmentation_supervised_offline(p, val_dataset, verbose=True):
         valid = (gt != 255)
 
         if mask.shape != gt.shape:
-            warning.warn('Prediction and ground truth have different size. Resizing Prediction ..')
+            # warning.warn('Prediction and ground truth have different size. Resizing Prediction ..')
             mask = cv2.resize(mask, gt.shape[::-1], interpolation=cv2.INTER_NEAREST)
 
         # TP, FP, and FN evaluation
@@ -73,7 +73,7 @@ def eval_segmentation_supervised_offline(p, val_dataset, verbose=True):
             tp[i_part] += np.sum(tmp_gt & tmp_pred & valid)
             fp[i_part] += np.sum(~tmp_gt & tmp_pred & valid)
             fn[i_part] += np.sum(tmp_gt & ~tmp_pred & valid)
-
+    
     jac = [0] * n_classes
     for i_part in range(0, n_classes):
         jac[i_part] = float(tp[i_part]) / max(float(tp[i_part] + fp[i_part] + fn[i_part]), 1e-8)

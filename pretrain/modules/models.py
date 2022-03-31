@@ -53,35 +53,3 @@ class ContrastiveSegmentationModel(nn.Module):
             return x, sal.squeeze()
         else:
             return x
-
-class Filter(nn.Module):
-    def __init__(self, kernel_size=3):
-  
-        super(Filter, self).__init__()
-        
-        padd = (kernel_size-1)//2
-
-        self.filter = nn.Sequential(
-            nn.AvgPool2d(kernel_size=kernel_size, stride=1, padding=padd)
-        )
-
-    def forward(self, x):
-        output = self.filter(x.float())
-        
-        return output
-
-
-class PredictionHead(nn.Module):
-    def __init__(self, dim=32):
-      
-        super(PredictionHead, self).__init__()
-        
-        self.net = nn.Sequential(
-            nn.Linear(dim, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(inplace=True),
-            nn.Linear(64, 32)
-        )
-    def forward(self, x):
-        output = self.net(x)
-        return output

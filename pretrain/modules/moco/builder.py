@@ -160,7 +160,7 @@ class ContrastiveModel(nn.Module):
             sal_randaug = sal_randaug.view(-1)
             mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
 
-
+        
        
 
         with torch.no_grad():
@@ -172,16 +172,22 @@ class ContrastiveModel(nn.Module):
             pseudo_maxval ,pseudo_label = pseudo_label.topk(1, dim=1) 
             pseudo_label = pseudo_label.squeeze().long().detach()  # B x H x W
             pseudo_maxval = pseudo_maxval.squeeze().detach()     # B x H x W
-
-
-
-            pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
+            
+            pseudo_maxval = (pseudo_maxval > 0.9).float()
 
             
 
-            pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label), is_feat=1).flatten() # BHW
-            pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval, is_feat=2).flatten()# BHW
+            pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
 
+            pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label), is_feat=1).flatten() # BHW
+            
+            # print(torch.max(pseudo_maxval))
+
+            pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval, is_feat=1).flatten()# BHW
+
+            
+
+            # print(torch.max(pseudo_maxval))
             # print(pseudo_label_query.shape)
             # print(pseudo_label_randaug.shape)
             # print(pseudo_maxval.shape)
@@ -216,19 +222,25 @@ class ContrastiveModel(nn.Module):
 
             randaug = torch.index_select(randaug, index=mask_indexes2, dim=0)
             with torch.no_grad():
-                threshold = 0.9
+                # threshold = 0.5
                 pseudo_label_randaug = torch.index_select(pseudo_label_randaug, index=mask_indexes2, dim=0).long().detach()
-                pseudo_maxval = torch.index_select(pseudo_maxval, index=mask_indexes2, dim=0).long().detach()
-                mask = pseudo_maxval.ge(threshold).squeeze().float()
+                pseudo_maxval = torch.index_select(pseudo_maxval, index=mask_indexes2, dim=0).float().detach()
+                
+                # import numpy as np
+                # np.save('/content/drive/MyDrive/UCS_local/our_18_randaug/maxval.npy', pseudo_maxval.cpu().numpy())
+
+                # mask = pseudo_maxval.ge(threshold).squeeze().float()
+
+
             randaug /= 0.1
 
         self._dequeue_and_enqueue(prototypes_obj) 
 
-        
+
         logits /= self.T
         
         if classifier:
-            return logits, sal_q, cluster, pseudo_label_query, randaug, pseudo_label_randaug, mask, sal_loss
+            return logits, sal_q, cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
         else:
             return logits, sal_q, sal_loss
 
