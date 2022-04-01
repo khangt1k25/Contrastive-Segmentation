@@ -10,10 +10,10 @@ num_workers: 2
 train_batch_size: 32
 
 # Model
-backbone: resnet50
+backbone: resnet18
 backbone_kwargs:
    dilated: True
-   pretraining: imagenet_moco 
+   pretraining: imagenet_classification
    moco_state_dict: /content/drive/MyDrive/UCS_local/moco_v2_800ep_pretrain.pth.tar
 model_kwargs:
    ndim: 32
@@ -44,9 +44,9 @@ moco_kwargs:
 seed: 2022
 kmeans:
    n_iter: 20
-   n_init: 64
-   n_update: 2
-   K_train: 20
+   n_init: 32
+   n_update: 1
+   K_train: 100
    K_test: 20
    reducer: 0
    cluster_epochs: 1

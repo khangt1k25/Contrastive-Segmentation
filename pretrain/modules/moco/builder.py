@@ -172,13 +172,13 @@ class ContrastiveModel(nn.Module):
            
             pseudo_maxval = torch.softmax(pseudo_label/0.1, dim=1) # B x C x H x W
 
-                
+
             pseudo_label = pseudo_label.topk(1, dim=1)[1].squeeze().long()
             
             pseudo_maxval = pseudo_maxval.topk(1, dim=1)[1].squeeze().detach()         
-            threshold = 0.5
+            threshold = 0.9
             pseudo_maxval = (pseudo_maxval > threshold).float()
-
+            
             
 
             pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
