@@ -56,11 +56,3 @@ class BalancedCrossEntropyLoss(Module):
 
         return final_loss
 
-
-class Regression_loss(Module):
-    def __init__(self):
-        super(Regression_loss, self).__init__()
-    def forward(self, output, labels):
-        # x = F.normalize(output, dim=1)
-        # y = F.normalize(labels, dim=1)
-        return (2 - 2 * (output * labels).sum(dim=-1)).mean()
