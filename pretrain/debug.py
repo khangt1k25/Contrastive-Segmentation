@@ -4,14 +4,16 @@ from utils.common_config import get_train_dataset
 import numpy as np
 from matplotlib import pyplot as plt
 from data.dataloaders.dataset import DatasetKeyQuery, DatasetKeyQueryRandAug
-# p['train_db_kwargs']['saliency']
+import torchvision.transforms.functional as TF
+import torch 
+
 p = {'train_db_name': 'VOCSegmentation', 'overfit': False , 'train_db_kwargs': {'saliency': 'unsupervised_model'}}
 base_dataset = get_train_dataset(p, transform=None)
 
 
 dataset = DatasetKeyQueryRandAug(
                                 base_dataset, res=224, 
-                                inv_list=['brightness', 'contrast', 'saturation', 'hue' 'blur'],
+                                inv_list=['brightness', 'contrast', 'saturation', 'hue' 'gray'],
                                 eqv_list=['h_flip', 'v_flip'])
 
 import random
@@ -31,6 +33,16 @@ sal_query = sample['query']['sal']
 sal_key = sample['key']['sal']
 sal_randaug = sample['randaug']['sal']
 
+
+
+axes[0].imshow(key.astype(np.uint8))
+axes[1].imshow(query.astype(np.uint8))
+axes[2].imshow(randaug.astype(np.uint8))
+axes[3].imshow(sal_key)
+axes[4].imshow(sal_query)
+axes[5].imshow(sal_randaug)
+plt.show()
+
 # print(np.unique(sal_randaug))
 # print(np.unique(sal_query))
 # print(np.unique(sal_query))
@@ -38,8 +50,7 @@ sal_randaug = sample['randaug']['sal']
 # ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
 # ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
-import torchvision.transforms.functional as TF
-import torch 
+
 
 
 
@@ -51,13 +62,13 @@ import torch
 # print(torch.unique(sal_key))
 # print(torch.unique(sal_randaug))
 
-ok  = torch.randn(size=(10, 32, 224, 224))
-index = torch.randint(0, 20, size=(10, ))
-# print(index)
+# ok  = torch.randn(size=(10, 32, 224, 224))
+# index = torch.randint(0, 20, size=(10, ))
+# # print(index)
 
-after = dataset.apply_randaug(index, deepcopy(ok), is_feat=2).squeeze()
+# after = dataset.apply_randaug(index, deepcopy(ok), is_feat=2).squeeze()
 
-print(ok-after)
+# print(ok-after)
 # print(after.shape)
 
 # print(sal_randaug.shape)
@@ -68,15 +79,7 @@ print(ok-after)
 # TF.to_pil_image(ok2).show()
 # TF.to_pil_image(randaug.astype(np.uint8)).show()
 # TF.to_pil_image(255*(sample['randaug']['image']* torch.tensor([0.229,0.224,0.225]))+torch.tensor([0.485,0.456,0.406])).show()
-# axes[0].imshow(key.astype(np.uint8))
-# # axes[1].imshow(query.astype(np.uint8))
-# axes[2].imshow(ok2.astype(np.uint8))
 
-# axes[2].imshow(randaug.astype(np.uint8))
-# # axes[3].imshow(sal_key)
-# # axes[4].imshow(sal_query)
-# # axes[5].imshow(sal_randaug)
-# plt.show()
 
 # for i, sample in enumerate(dataset):
 #     fig, axes = plt.subplots(4)

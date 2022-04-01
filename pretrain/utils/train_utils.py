@@ -287,7 +287,7 @@ def train_mc(p, train_loader, model, optimizer, epoch):
                         [losses, contrastive_losses, saliency_losses, top1contrast],
                         prefix="Epoch: [{}]".format(epoch))
     
-
+    
     if p['freeze_layers']:
         model = freeze_layers(model)
     
