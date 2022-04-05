@@ -346,13 +346,12 @@ class RandAugment(object):
         for k, i in enumerate(index):
             m = self.m[i]
             x = feat[k].unsqueeze(0)
-            # print(x.shape)
+        
 
             for iop, (op, minval, maxval, geo, signed) in enumerate(self.augment_list):
                 
                 if not geo:
-                    continue
-                
+                    continue    
                 p_seed = self.rand_ops[i][iop]
                 if p_seed >= 0.5:
                     val = (float(m)/ self.magnitude) * float(maxval - minval) + minval 
@@ -363,6 +362,6 @@ class RandAugment(object):
             feat_t.append(x)
         feat_t = torch.stack(feat_t)
         return feat_t
-
+        
 
         

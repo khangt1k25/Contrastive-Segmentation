@@ -226,7 +226,14 @@ def train(p, train_loader, model, optimizer, epoch):
         
         
         if classifier:
-            cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            focal = False
+            if focal:
+                from modules.losses import FocalLoss
+                fl = FocalLoss(gamma=3, reduction='mean')
+                cluster_loss = fl(cluster_logits, cluster_labels, reduction='mean')
+            else:
+                cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            
             cluster_losses.update(cluster_loss.item())
             
 
