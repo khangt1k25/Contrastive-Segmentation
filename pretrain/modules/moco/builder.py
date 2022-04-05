@@ -130,7 +130,6 @@ class ContrastiveModel(nn.Module):
 
         if classifier:
             cluster = classifier(q)  # cosine
-            # cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             
@@ -138,41 +137,39 @@ class ContrastiveModel(nn.Module):
             randaug, _ = self.model_q(im_randaug)
             randaug = nn.functional.normalize(randaug, dim=1)
             randaug = classifier(randaug) #consine
-            # randaug = compute_negative_euclidean(randaug, centroids, classifier) #negative euclidean
             randaug = randaug.permute((0, 2, 3, 1)) # BxCxHxW
             randaug = torch.reshape(randaug, [-1, randaug.shape[-1]]) # BHW x C
 
 
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
-
-
-        with torch.no_grad():
-            offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
-            sal_q = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
-            sal_q = sal_q.view(-1)
-            mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
-            sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
         
-        with torch.no_grad():
-            offset2 = torch.arange(0, 2 * batch_size, 2).to(sal_randaug.device)
-            sal_randaug = (sal_randaug + torch.reshape(offset2, [-1, 1, 1]))*sal_randaug # all bg's to 0
-            sal_randaug = sal_randaug.view(-1)
-            mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
 
-        
-       
 
         with torch.no_grad():
             self._momentum_update_key_encoder()  # update the key encoder
-            k, _ = self.model_k(im_k)  # keys: N x C x H x W
-            k = nn.functional.normalize(k, dim=1)
+            k, _ = self.model_k(im_k)  # keys: B x C x H x W
+            k = nn.functional.normalize(k, dim=1) #  B x C x H x W
+
+            kernel = 3
+            padding = (kernel-1)/2
+            num_neigbor = F.avg_pool2d(sal_q, kernel_size=kernel, stride=1, padding=padding) # BxHxW
+            feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W
+            feat_neigbor = feat_neigbor * sal_q # BxCxHxW
+            feat_neigbor = F.avg_pool2d(feat_neigbor, kernel_size=kernel, stride=1, padding=padding, divisor_override=1) # sum_pooling: BxdimxHxW
+            feat_neigbor = feat_neigbor * num_neigbor # BxCxHxW
+            feat_neigbor = feat_neigbor.permute((0, 2, 3, 1))          # B x H x W x dim 
+            feat_neigbor = torch.reshape(feat_neigbor, [-1, self.dim]) # BHW x dim
+            
+
+
+
 
             pseudo_label = classifier(k) # B x C x H x W
            
             pseudo_maxval = torch.softmax(pseudo_label/0.1, dim=1) # B x C x H x W
             
-            
+
             pseudo_label = pseudo_label.topk(1, dim=1)[1].squeeze().long()
             
             pseudo_maxval = pseudo_maxval.topk(1, dim=1)[0].squeeze().detach()         
@@ -187,6 +184,7 @@ class ContrastiveModel(nn.Module):
             
             pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval, is_feat=1).flatten()# BHW
 
+
             
             k = k.reshape(batch_size, self.dim, -1) # B x dim x H.W
             sal_k = sal_k.reshape(batch_size, -1, 1).type(q.dtype)
@@ -194,18 +192,39 @@ class ContrastiveModel(nn.Module):
             prototypes_obj = torch.bmm(k, sal_k).squeeze() # B x dim
             prototypes_obj = nn.functional.normalize(prototypes_obj, dim=1) 
         
-        negatives = self.obj_queue.clone().detach()         # dim x K
+        with torch.no_grad():
+            offset = torch.arange(0, 2 * batch_size, 2).to(sal_q.device)
+            sal_q = (sal_q + torch.reshape(offset, [-1, 1, 1]))*sal_q # all bg's to 0
+            sal_q = sal_q.view(-1)
+            mask_indexes = torch.nonzero((sal_q)).view(-1).squeeze()
+            sal_q = torch.index_select(sal_q, index=mask_indexes, dim=0) // 2
+        
+        with torch.no_grad():
+            offset2 = torch.arange(0, 2 * batch_size, 2).to(sal_randaug.device)
+            sal_randaug = (sal_randaug + torch.reshape(offset2, [-1, 1, 1]))*sal_randaug # all bg's to 0
+            sal_randaug = sal_randaug.view(-1)
+            mask_indexes2 = torch.nonzero((sal_randaug)).view(-1).squeeze()
 
+        negatives = self.obj_queue.clone().detach()         # dim x K
         # compute pixel-level loss
         q = q.permute((0, 2, 3, 1))          # B x H x W x dim 
         q = torch.reshape(q, [-1, self.dim]) # BHW x dim
         q = torch.index_select(q, index=mask_indexes, dim=0)  # pixels x dim
         
-        l_batch = torch.matmul(q, prototypes_obj.t()) # pixels x B
-        l_bank = torch.matmul(q, negatives) # pixels x K
-        logits = torch.cat([l_batch, l_bank], dim=1) # pixels x (B+K)
-
+        with torch.no_grad():
+            feat_neigbor = torch.index_select(feat_neigbor, index=mask_indexes, dim=0) # pixels x dim
         
+
+        pos = torch.einsum('ij,ij->j', q, feat_neigbor.t()) # pixels x dim
+
+        l_batch = torch.matmul(q, prototypes_obj.t())   # shape: pixels x proto
+        pixels, proto = l_batch.shape[0], l_batch.shape[1]
+        mask = torch.ones_like(l_batch).scatter_(1, sal_q.unsqueeze(1), 0.)
+        l_batch = l_batch[mask.bool()].view(pixels, proto-1) #pixels x (proto -1)
+
+        l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
+        logits = torch.cat([pos ,l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
+
 
          # compute cluster loss : Not use bg
         if classifier:
@@ -229,7 +248,7 @@ class ContrastiveModel(nn.Module):
         logits /= self.T
         
         if classifier:
-            return logits, sal_q, cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
+            return logits, torch.zeros(size=(pixels)).to(sal_q.device), cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
         else:
             return logits, sal_q, sal_loss
 

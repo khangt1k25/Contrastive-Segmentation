@@ -146,6 +146,6 @@ def main_worker(gpu, args):
                     'epoch': epoch + 1}, 
                     p['checkpoint'])
 
-
+            
 if __name__ == "__main__":
     main()
