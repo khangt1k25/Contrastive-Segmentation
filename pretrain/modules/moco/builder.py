@@ -154,8 +154,7 @@ class ContrastiveModel(nn.Module):
             kernel = 3
             padding = int((kernel-1)//2)
             num_neigbor = F.avg_pool2d(sal_q.float(), kernel_size=kernel, stride=1, padding=padding) # BxHxW
-            feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W
-            
+            feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W   
             feat_neigbor = feat_neigbor * sal_q # BxCxHxW
             feat_neigbor = F.avg_pool2d(feat_neigbor, kernel_size=kernel, stride=1, padding=padding, divisor_override=1) # sum_pooling: BxdimxHxW
             feat_neigbor = feat_neigbor * num_neigbor # BxCxHxW
@@ -163,16 +162,13 @@ class ContrastiveModel(nn.Module):
             feat_neigbor = torch.reshape(feat_neigbor, [-1, self.dim]) # BHW x dim
             
 
+            
 
 
 
-            pseudo_label = classifier(k) # B x C x H x W
-           
+            pseudo_label = classifier(k) # B x C x H x W        
             pseudo_maxval = torch.softmax(pseudo_label/0.1, dim=1) # B x C x H x W
-            
-
             pseudo_label = pseudo_label.topk(1, dim=1)[1].squeeze().long()
-            
             pseudo_maxval = pseudo_maxval.topk(1, dim=1)[0].squeeze().detach()         
             threshold = 0.9
             pseudo_maxval = (pseudo_maxval > threshold).float()
@@ -180,9 +176,7 @@ class ContrastiveModel(nn.Module):
             
 
             pseudo_label_query = loader.dataset.apply_eqv(deepcopy(index), deepcopy(pseudo_label)).flatten()  # BHW
-
             pseudo_label_randaug = loader.dataset.apply_randaug(deepcopy(index), deepcopy(pseudo_label), is_feat=1).flatten() # BHW
-            
             pseudo_maxval = loader.dataset.apply_randaug(deepcopy(index), pseudo_maxval, is_feat=1).flatten()# BHW
 
 
@@ -245,7 +239,7 @@ class ContrastiveModel(nn.Module):
             randaug /= 0.1
 
         self._dequeue_and_enqueue(prototypes_obj) 
-
+        
 
         logits /= self.T
         
