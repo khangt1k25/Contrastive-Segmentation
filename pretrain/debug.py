@@ -7,6 +7,8 @@ from data.dataloaders.dataset import DatasetKeyQuery, DatasetKeyQueryRandAug
 import torchvision.transforms.functional as TF
 import torch 
 
+
+
 p = {'train_db_name': 'VOCSegmentation', 'overfit': False , 'train_db_kwargs': {'saliency': 'unsupervised_model'}}
 base_dataset = get_train_dataset(p, transform=None)
 
@@ -33,22 +35,22 @@ sal_query = sample['query']['sal']
 sal_key = sample['key']['sal']
 sal_randaug = sample['randaug']['sal']
 
+ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
+ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
 
 axes[0].imshow(key.astype(np.uint8))
 axes[1].imshow(query.astype(np.uint8))
-axes[2].imshow(randaug.astype(np.uint8))
-axes[3].imshow(sal_key)
-axes[4].imshow(sal_query)
-axes[5].imshow(sal_randaug)
+axes[2].imshow(ok1.astype(np.uint8))
+# axes[3].imshow(sal_key)
+# axes[4].imshow(sal_query)
+# axes[5].imshow(sal_randaug)
 plt.show()
 
 # print(np.unique(sal_randaug))
 # print(np.unique(sal_query))
 # print(np.unique(sal_query))
 
-# ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
-# ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
 
 
 

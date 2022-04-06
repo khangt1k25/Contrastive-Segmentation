@@ -152,9 +152,10 @@ class ContrastiveModel(nn.Module):
             k = nn.functional.normalize(k, dim=1) #  B x C x H x W
 
             kernel = 3
-            padding = (kernel-1)/2
-            num_neigbor = F.avg_pool2d(sal_q, kernel_size=kernel, stride=1, padding=padding) # BxHxW
+            padding = int((kernel-1)//2)
+            num_neigbor = F.avg_pool2d(sal_q.float(), kernel_size=kernel, stride=1, padding=padding) # BxHxW
             feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W
+            
             feat_neigbor = feat_neigbor * sal_q # BxCxHxW
             feat_neigbor = F.avg_pool2d(feat_neigbor, kernel_size=kernel, stride=1, padding=padding, divisor_override=1) # sum_pooling: BxdimxHxW
             feat_neigbor = feat_neigbor * num_neigbor # BxCxHxW
@@ -215,18 +216,19 @@ class ContrastiveModel(nn.Module):
             feat_neigbor = torch.index_select(feat_neigbor, index=mask_indexes, dim=0) # pixels x dim
         
 
-        pos = torch.einsum('ij,ij->j', q, feat_neigbor.t()) # pixels x dim
+       
 
+    
+        pos = (q * feat_neigbor).sum(1).view(-1, 1)
         l_batch = torch.matmul(q, prototypes_obj.t())   # shape: pixels x proto
         pixels, proto = l_batch.shape[0], l_batch.shape[1]
-        mask = torch.ones_like(l_batch).scatter_(1, sal_q.unsqueeze(1), 0.)
-        l_batch = l_batch[mask.bool()].view(pixels, proto-1) #pixels x (proto -1)
-
+        mask_batch = torch.ones_like(l_batch).scatter_(1, sal_q.unsqueeze(1), 0.)
+        l_batch = l_batch[mask_batch.bool()].view(pixels, proto-1) #pixels x (proto -1)
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([pos ,l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
 
 
-         # compute cluster loss : Not use bg
+        # compute cluster loss : Not use bg
         if classifier:
             cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
             with torch.no_grad():
@@ -248,7 +250,7 @@ class ContrastiveModel(nn.Module):
         logits /= self.T
         
         if classifier:
-            return logits, torch.zeros(size=(pixels)).to(sal_q.device), cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
+            return logits, torch.zeros(size=(pixels, )).long().to(sal_q.device), cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
         else:
             return logits, sal_q, sal_loss
 
