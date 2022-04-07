@@ -206,7 +206,6 @@ def train(p, train_loader, model, optimizer, epoch):
         if classifier:
             im_randaug = batch['randaug']['image'].cuda(p['gpu'], non_blocking=True)
             sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
-            # index = batch['index'].cuda(p['gpu'], non_blocking=True)
             index = batch['index']
             
             logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
@@ -216,14 +215,15 @@ def train(p, train_loader, model, optimizer, epoch):
 
 
         #Use E-Net weighting for calculating the pixel-wise loss.
-        uniq, freq = torch.unique(labels, return_counts=True)
-        p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
-        p_class_non_zero_classes = freq.float() / labels.numel()
-        p_class[uniq] = p_class_non_zero_classes
-        w_class = 1 / torch.log(1.02 + p_class)
-        contrastive_loss = cross_entropy(logits, labels, weight=w_class,
-                                            reduction='mean')
+        # uniq, freq = torch.unique(labels, return_counts=True)
+        # p_class = torch.zeros(logits.shape[1], dtype=torch.float32).cuda(p['gpu'], non_blocking=True)
+        # p_class_non_zero_classes = freq.float() / labels.numel()
+        # p_class[uniq] = p_class_non_zero_classes
+        # w_class = 1 / torch.log(1.02 + p_class)
+        # contrastive_loss = cross_entropy(logits, labels, weight=w_class,
+        #                                     reduction='mean')
         
+        contrastive_loss = cross_entropy(logits, labels, reduction='mean')
         
         if classifier:
             focal = False
@@ -245,13 +245,10 @@ def train(p, train_loader, model, optimizer, epoch):
             randaug_loss = (F.cross_entropy(randaug_logits, randaug_labels, reduction='none') * mask ).mean()
             randaug_losses.update(randaug_loss.item())
 
-            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + 0.05 * randaug_loss
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + randaug_loss
             
             certain = mask.sum()/mask.shape[0]
             certain_rate.update(certain.item())
-
-
-
 
         else:
             loss = contrastive_loss + saliency_loss

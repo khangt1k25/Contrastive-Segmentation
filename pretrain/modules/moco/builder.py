@@ -163,7 +163,7 @@ class ContrastiveModel(nn.Module):
             feat_neigbor = nn.functional.normalize(feat_neigbor, dim=1)
 
         
-
+            
 
 
             pseudo_label = classifier(k) # B x C x H x W        
@@ -221,7 +221,7 @@ class ContrastiveModel(nn.Module):
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([pos, l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
         
-
+        
         # compute cluster loss : Not use bg
         if classifier:
             cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
