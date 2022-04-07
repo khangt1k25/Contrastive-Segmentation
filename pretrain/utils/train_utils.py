@@ -166,12 +166,13 @@ def train(p, train_loader, model, optimizer, epoch):
     cluster_losses = AverageMeter('Cluster', ':.4e')
     randaug_losses = AverageMeter('Randaug', ':.4e')
     kmeans_losses = AverageMeter('Kmeans', ':.4e')
+    superpixel_losses = AverageMeter('Superpixel', ':.4e')
     top1contrast = AverageMeter('Acc1@contrastive', ':6.2f')
     top1cluster = AverageMeter('Acc1@cluster', ':6.2f')
     certain_rate = AverageMeter('Certain',':.4e')
 
     progress = ProgressMeter(len(train_loader), 
-                        [losses, contrastive_losses, cluster_losses, randaug_losses, certain_rate, kmeans_losses, saliency_losses, top1contrast, top1cluster],
+                        [losses, contrastive_losses, superpixel_losses, cluster_losses, randaug_losses, certain_rate, kmeans_losses, saliency_losses, top1contrast, top1cluster],
                         prefix="Epoch: [{}]".format(epoch))
     
 
@@ -208,7 +209,7 @@ def train(p, train_loader, model, optimizer, epoch):
             sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
             index = batch['index']
             
-            logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
+            logits, labels, obj_logits, obj_labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
         
         else:
             logits, labels, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k)
@@ -224,7 +225,8 @@ def train(p, train_loader, model, optimizer, epoch):
         #                                     reduction='mean')
         
         contrastive_loss = cross_entropy(logits, labels, reduction='mean')
-        
+        supepixel_loss = cross_entropy(obj_logits, obj_labels, reduction='mean')
+
         if classifier:
             focal = False
             if focal:
@@ -245,16 +247,17 @@ def train(p, train_loader, model, optimizer, epoch):
             randaug_loss = (F.cross_entropy(randaug_logits, randaug_labels, reduction='none') * mask ).mean()
             randaug_losses.update(randaug_loss.item())
 
-            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + randaug_loss
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + randaug_loss + supepixel_loss
             
             certain = mask.sum()/mask.shape[0]
             certain_rate.update(certain.item())
 
         else:
-            loss = contrastive_loss + saliency_loss
+            loss = contrastive_loss + saliency_loss + supepixel_loss
 
         contrastive_losses.update(contrastive_loss.item())
         saliency_losses.update(saliency_loss.item())
+        superpixel_losses.update(supepixel_loss.item())
         losses.update(loss.item())
         acc1, _ = accuracy(logits, labels, topk=(1, 5))
         top1contrast.update(acc1[0], im_q.size(0))
@@ -279,6 +282,7 @@ def train(p, train_loader, model, optimizer, epoch):
     writer.add_scalar('kmeans loss', kmeans_losses.avg, epoch)
     writer.add_scalar('randaug loss', randaug_losses.avg, epoch)
     writer.add_scalar('certain rate', certain_rate.avg, epoch)
+    writer.add_scalar('superpixel loss', superpixel_losses.avg, epoch)
     writer.close()      
 
 

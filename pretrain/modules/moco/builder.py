@@ -127,6 +127,14 @@ class ContrastiveModel(nn.Module):
 
         q, q_bg = self.model_q(im_q)         # queries: B x dim x H x W
         q = nn.functional.normalize(q, dim=1)
+        
+        q_reshape = q.reshape(batch_size, self.dim, -1) # B x dim x H.W
+        sal_q_flat = sal_q.reshape(batch_size, -1, 1).type(q.dtype)
+        
+
+        q_obj_mean = torch.bmm(q_reshape, sal_q_flat).squeeze() # B x dim
+        q_obj_mean = nn.functional.normalize(q_obj_mean, dim=1) # B x dim
+
 
         if classifier:
             cluster = classifier(q)  # cosine
@@ -139,7 +147,7 @@ class ContrastiveModel(nn.Module):
             randaug = classifier(randaug) #consine
             randaug = randaug.permute((0, 2, 3, 1)) # BxCxHxW
             randaug = torch.reshape(randaug, [-1, randaug.shape[-1]]) # BHW x C
-
+        
 
         # compute saliency loss
         sal_loss = self.bce(q_bg, sal_q)
@@ -151,7 +159,7 @@ class ContrastiveModel(nn.Module):
             k, _ = self.model_k(im_k)  # keys: B x C x H x W
             k = nn.functional.normalize(k, dim=1) #  B x C x H x W
 
-            kernel = 3
+            kernel = 7
             padding = int((kernel-1)//2)
             num_neigbor = F.avg_pool2d(sal_q.float(), kernel_size=kernel, stride=1, padding=padding) # BxHxW
             feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W   
@@ -210,8 +218,6 @@ class ContrastiveModel(nn.Module):
             feat_neigbor = torch.index_select(feat_neigbor, index=mask_indexes, dim=0) # pixels x dim
         
 
-       
-
     
         pos = (q * feat_neigbor).sum(1).view(-1, 1)
         l_batch = torch.matmul(q, prototypes_obj.t())   # shape: pixels x proto
@@ -221,7 +227,16 @@ class ContrastiveModel(nn.Module):
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([pos, l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
         
-        
+
+        # compute superpixel loss
+        l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
+        l_negative = torch.matmul(q_obj_mean, negatives)
+        obj_logits = torch.cat([l_positive, l_negative], dim=1)
+        obj_labels = torch.arange(obj_logits.shape[0]).to(q.device)
+
+
+
+
         # compute cluster loss : Not use bg
         if classifier:
             cluster = torch.index_select(cluster, index=mask_indexes, dim=0) # pixels x C
@@ -242,11 +257,14 @@ class ContrastiveModel(nn.Module):
         
 
         logits /= self.T
-        
+        obj_logits /= self.T
+
+
+
         if classifier:
-            return logits, torch.zeros(size=(pixels, )).long().to(sal_q.device), cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
+            return logits, torch.zeros(size=(pixels, )).long().to(sal_q.device), obj_logits, obj_labels ,cluster, pseudo_label_query, randaug, pseudo_label_randaug, pseudo_maxval, sal_loss
         else:
             return logits, sal_q, sal_loss
 
         
-
+    
