@@ -160,9 +160,9 @@ class ContrastiveModel(nn.Module):
             feat_neigbor = feat_neigbor * num_neigbor # BxCxHxW
             feat_neigbor = feat_neigbor.permute((0, 2, 3, 1))          # B x H x W x dim 
             feat_neigbor = torch.reshape(feat_neigbor, [-1, self.dim]) # BHW x dim
-            
+            feat_neigbor = nn.functional.normalize(feat_neigbor, dim=1)
 
-            
+        
 
 
 
@@ -219,8 +219,8 @@ class ContrastiveModel(nn.Module):
         mask_batch = torch.ones_like(l_batch).scatter_(1, sal_q.unsqueeze(1), 0.)
         l_batch = l_batch[mask_batch.bool()].view(pixels, proto-1) #pixels x (proto -1)
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
-        logits = torch.cat([pos ,l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
-
+        logits = torch.cat([pos, l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
+        
 
         # compute cluster loss : Not use bg
         if classifier:
