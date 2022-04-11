@@ -119,7 +119,7 @@ class ContrastiveModel(nn.Module):
 
         return logits, sal_q, sal_loss
 
-    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, centroids=None, im_randaug=None, sal_randaug=None, loader=None, index=None):
+    def forward(self, im_q, sal_q, im_k, sal_k, classifier=None, im_randaug=None, sal_randaug=None, loader=None, index=None):
             
         batch_size, dim, H, W = im_q.shape
         
@@ -130,7 +130,6 @@ class ContrastiveModel(nn.Module):
 
         if classifier:
             cluster = classifier(q)  # cosine
-            # cluster = compute_negative_euclidean(q, centroids, classifier) #negative euclidean
             cluster = cluster.permute((0, 2, 3, 1))
             cluster = torch.reshape(cluster, [-1, cluster.shape[-1]]) # BHW x C
             
@@ -138,7 +137,6 @@ class ContrastiveModel(nn.Module):
             randaug, _ = self.model_q(im_randaug)
             randaug = nn.functional.normalize(randaug, dim=1)
             randaug = classifier(randaug) #consine
-            # randaug = compute_negative_euclidean(randaug, centroids, classifier) #negative euclidean
             randaug = randaug.permute((0, 2, 3, 1)) # BxCxHxW
             randaug = torch.reshape(randaug, [-1, randaug.shape[-1]]) # BHW x C
 
@@ -234,4 +232,4 @@ class ContrastiveModel(nn.Module):
             return logits, sal_q, sal_loss
 
         
-
+        

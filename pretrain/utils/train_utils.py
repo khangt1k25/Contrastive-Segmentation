@@ -114,49 +114,6 @@ def run_mini_batch_kmeans(p, dataloader, model, split='train', seed=2022):
 
 
 
-def compute_labels(p, logger, dataloader, model, centroids, device):
-    """
-    Label for Query view using Key view: Eqv
-    The distance is efficiently computed by setting centroids as convolution layer. 
-    """
-    K = centroids.size(0) + 1
-
-    # Define metric function with conv layer. 
-    metric_function = get_metric_as_conv(centroids)
-    metric_function = metric_function.to(device)
-    counts = torch.zeros(K, requires_grad=False).cpu()
-    model.eval()
-    with torch.no_grad():
-        for i_batch, batch in enumerate(dataloader):
-            img_q = batch['query']['image'].cuda(p['gpu'], non_blocking=True)
-            # sal_q = batch['query']['sal'].cuda(p['gpu'], non_blocking=True)
-            indice = batch['query']['meta']['name']
-
-            
-            q, _ = model.model_k(img_q) # Bx dim x H x W
-            q = nn.functional.normalize(q, dim=1)
-
-            if i_batch == 0:
-                print('Centroid size      : {}'.format(list(centroids.shape)))
-                print('Batch input size   : {}'.format(list(img_q.shape)))
-                print('Batch feature size : {}\n'.format(list(q.shape)))
-
-            # Compute distance and assign label. 
-            scores  = compute_negative_euclidean(q, centroids, metric_function) #BxCxHxW: all bg 're 0 
-            
-
-            # Save labels and count. 
-            for idx, idx_img in enumerate(indice):
-                counts += postprocess_label(p, K, idx, idx_img, scores, view='query')
-            
-            if (i_batch % 200) == 0:
-                print('[Assigning labels] {} / {}'.format(i_batch, len(dataloader)))
-    
-    weight = counts / counts.sum()
-     
-    return weight
-
-
 
 
 def train(p, train_loader, model, optimizer, epoch):
@@ -190,8 +147,7 @@ def train(p, train_loader, model, optimizer, epoch):
     else:
         classifier = None
 
-    # weight = compute_labels(p, train_loader, model, centroids) 
-    
+
     model.train()
     for i, batch in enumerate(train_loader):
         # Forward pass
@@ -206,7 +162,6 @@ def train(p, train_loader, model, optimizer, epoch):
         if classifier:
             im_randaug = batch['randaug']['image'].cuda(p['gpu'], non_blocking=True)
             sal_randaug = batch['randaug']['sal'].cuda(p['gpu'], non_blocking=True)
-            # index = batch['index'].cuda(p['gpu'], non_blocking=True)
             index = batch['index']
             
             logits, labels, cluster_logits, cluster_labels, randaug_logits, randaug_labels, mask, saliency_loss = model(im_q=im_q, sal_q=sal_q, im_k=im_k, sal_k=sal_k, classifier=classifier, im_randaug=im_randaug, sal_randaug=sal_randaug, loader=train_loader, index=index)
@@ -226,13 +181,13 @@ def train(p, train_loader, model, optimizer, epoch):
         
         
         if classifier:
-            focal = False
-            if focal:
-                from modules.losses import FocalLoss
-                fl = FocalLoss(gamma=3, reduction='mean')
-                cluster_loss = fl(cluster_logits, cluster_labels, reduction='mean')
-            else:
-                cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            # focal = False
+            # if focal:
+            #     from modules.losses import FocalLoss
+            #     fl = FocalLoss(gamma=3, reduction='mean')
+            #     cluster_loss = fl(cluster_logits, cluster_labels, reduction='mean')
+            # else:
+            cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
             
             cluster_losses.update(cluster_loss.item())
             
@@ -245,12 +200,12 @@ def train(p, train_loader, model, optimizer, epoch):
             randaug_loss = (F.cross_entropy(randaug_logits, randaug_labels, reduction='none') * mask ).mean()
             randaug_losses.update(randaug_loss.item())
 
-            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + 0.05 * randaug_loss
-            
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + p['loss_coeff']['randaug'] * randaug_loss
+
             certain = mask.sum()/mask.shape[0]
             certain_rate.update(certain.item())
 
-
+            
 
 
         else:

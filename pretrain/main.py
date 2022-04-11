@@ -103,7 +103,7 @@ def main_worker(gpu, args):
     # train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), train_transform, randaug_transform,
     #                             downsample_sal=not p['model_kwargs']['upsample'])
     train_dataset = DatasetKeyQueryRandAug(get_train_dataset(p, transform = None), res=224, inv_list=['brightness', 'contrast', 'saturation', 'hue' 'gray'],
-                                            eqv_list=['h_flip'])
+                                            eqv_list=['h_flip', 'v_flip'])
     #                             downsample_sal=not p['model_kwargs']['upsample'])
 
     train_dataloader = torch.utils.data.DataLoader(train_dataset, batch_size=p['train_batch_size'], shuffle=False,

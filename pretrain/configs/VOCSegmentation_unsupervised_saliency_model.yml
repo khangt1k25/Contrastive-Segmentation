@@ -54,3 +54,5 @@ kmeans:
 ## Loss
 loss_coeff:
    cluster: 0.1
+   randaug: 0.05
+
