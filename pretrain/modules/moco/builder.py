@@ -159,18 +159,16 @@ class ContrastiveModel(nn.Module):
             k, _ = self.model_k(im_k)  # keys: B x C x H x W
             k = nn.functional.normalize(k, dim=1) #  B x C x H x W
 
-            kernel = 7
+            kernel = 11
             padding = int((kernel-1)//2)
-            num_neigbor = F.avg_pool2d(sal_q.float(), kernel_size=kernel, stride=1, padding=padding) # BxHxW
             feat_neigbor = loader.dataset.apply_eqv(deepcopy(index), deepcopy(k)) # B x C x Hx W   
             feat_neigbor = feat_neigbor * sal_q # BxCxHxW
             feat_neigbor = F.avg_pool2d(feat_neigbor, kernel_size=kernel, stride=1, padding=padding, divisor_override=1) # sum_pooling: BxdimxHxW
-            feat_neigbor = feat_neigbor * num_neigbor # BxCxHxW
             feat_neigbor = feat_neigbor.permute((0, 2, 3, 1))          # B x H x W x dim 
             feat_neigbor = torch.reshape(feat_neigbor, [-1, self.dim]) # BHW x dim
             feat_neigbor = nn.functional.normalize(feat_neigbor, dim=1)
 
-        
+
             
 
 
@@ -227,7 +225,7 @@ class ContrastiveModel(nn.Module):
         l_mem = torch.matmul(q, negatives)          # shape: pixels x negatives (Memory bank)
         logits = torch.cat([pos, l_batch, l_mem], dim=1) # pixels x (1+ proto-1 + negatives)
         
-
+        
         # compute superpixel loss
         l_positive = torch.matmul(q_obj_mean, prototypes_obj.t())
         l_negative = torch.matmul(q_obj_mean, negatives)

@@ -191,7 +191,6 @@ def train(p, train_loader, model, optimizer, epoch):
     else:
         classifier = None
 
-    # weight = compute_labels(p, train_loader, model, centroids) 
     
     model.train()
     for i, batch in enumerate(train_loader):
@@ -226,15 +225,15 @@ def train(p, train_loader, model, optimizer, epoch):
         
         contrastive_loss = cross_entropy(logits, labels, reduction='mean')
         supepixel_loss = cross_entropy(obj_logits, obj_labels, reduction='mean')
-
+        
         if classifier:
-            focal = False
-            if focal:
-                from modules.losses import FocalLoss
-                fl = FocalLoss(gamma=3, reduction='mean')
-                cluster_loss = fl(cluster_logits, cluster_labels, reduction='mean')
-            else:
-                cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
+            # focal = False
+            # if focal:
+            #     from modules.losses import FocalLoss
+            #     fl = FocalLoss(gamma=3, reduction='mean')
+            #     cluster_loss = fl(cluster_logits, cluster_labels, reduction='mean')
+            # else:
+            cluster_loss = cross_entropy(cluster_logits, cluster_labels, reduction='mean')
             
             cluster_losses.update(cluster_loss.item())
             
@@ -247,7 +246,7 @@ def train(p, train_loader, model, optimizer, epoch):
             randaug_loss = (F.cross_entropy(randaug_logits, randaug_labels, reduction='none') * mask ).mean()
             randaug_losses.update(randaug_loss.item())
 
-            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + randaug_loss + supepixel_loss
+            loss = contrastive_loss + saliency_loss + p['loss_coeff']['cluster'] * cluster_loss + p['loss_coeff']['randaug']*randaug_loss + supepixel_loss
             
             certain = mask.sum()/mask.shape[0]
             certain_rate.update(certain.item())
