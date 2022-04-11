@@ -8,44 +8,55 @@ import torchvision.transforms.functional as TF
 import torch 
 
 
+l_batch = torch.randn(size=(4, 5))
+print(l_batch)
+sal_q = torch.tensor([0, 1, 2, 3])
 
-p = {'train_db_name': 'VOCSegmentation', 'overfit': False , 'train_db_kwargs': {'saliency': 'unsupervised_model'}}
-base_dataset = get_train_dataset(p, transform=None)
-
-
-dataset = DatasetKeyQueryRandAug(
-                                base_dataset, res=224, 
-                                inv_list=['brightness', 'contrast', 'saturation', 'hue' 'gray'],
-                                eqv_list=['h_flip', 'v_flip'])
-
-import random
-i = random.randint(0, 100)
-sample = dataset[i]
-fig, axes = plt.subplots(6)
-key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
-key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
-
-query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
-query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
-
-randaug = np.transpose(sample['randaug']['image'].numpy(), (1,2,0))
-randaug = 255*(randaug * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
-
-sal_query = sample['query']['sal']
-sal_key = sample['key']['sal']
-sal_randaug = sample['randaug']['sal']
-
-ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
-ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+pixels, proto = l_batch.shape[0], l_batch.shape[1]
+mask_batch = torch.ones_like(l_batch).scatter_(1, sal_q.unsqueeze(1), 0.)
+l_batch = l_batch[mask_batch.bool()].view(pixels, proto-1) #pixels x (proto -1)
 
 
-axes[0].imshow(key.astype(np.uint8))
-axes[1].imshow(query.astype(np.uint8))
-axes[2].imshow(ok1.astype(np.uint8))
-# axes[3].imshow(sal_key)
-# axes[4].imshow(sal_query)
-# axes[5].imshow(sal_randaug)
-plt.show()
+print(l_batch)
+
+
+# p = {'train_db_name': 'VOCSegmentation', 'overfit': False , 'train_db_kwargs': {'saliency': 'unsupervised_model'}}
+# base_dataset = get_train_dataset(p, transform=None)
+
+
+# dataset = DatasetKeyQueryRandAug(
+#                                 base_dataset, res=224, 
+#                                 inv_list=['brightness', 'contrast', 'saturation', 'hue' 'gray'],
+#                                 eqv_list=['h_flip', 'v_flip'])
+
+# import random
+# i = random.randint(0, 100)
+# sample = dataset[i]
+# fig, axes = plt.subplots(6)
+# key = np.transpose(sample['key']['image'].numpy(), (1,2,0))
+# key = 255*(key * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
+# query = np.transpose(sample['query']['image'].numpy(), (1,2,0))
+# query = 255*(query * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
+# randaug = np.transpose(sample['randaug']['image'].numpy(), (1,2,0))
+# randaug = 255*(randaug * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
+# sal_query = sample['query']['sal']
+# sal_key = sample['key']['sal']
+# sal_randaug = sample['randaug']['sal']
+
+# ok1 = np.transpose(dataset.apply_eqv(i, sample['key']['image']).numpy(), (1, 2, 0))
+# ok1 = 255*(ok1 * np.array([0.229,0.224,0.225]) + np.array([0.485,0.456,0.406]))
+
+
+# axes[0].imshow(key.astype(np.uint8))
+# axes[1].imshow(query.astype(np.uint8))
+# axes[2].imshow(ok1.astype(np.uint8))
+# # axes[3].imshow(sal_key)
+# # axes[4].imshow(sal_query)
+# # axes[5].imshow(sal_randaug)
+# plt.show()
 
 # print(np.unique(sal_randaug))
 # print(np.unique(sal_query))

@@ -238,7 +238,7 @@ def train(p, train_loader, model, optimizer, epoch):
             
             cluster_losses.update(cluster_loss.item())
             
-
+            
 
             bcc1, _ = accuracy(cluster_logits, cluster_labels, topk=(1, 5))
             top1cluster.update(bcc1[0], im_q.size(0))
